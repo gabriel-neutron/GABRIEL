@@ -31,7 +31,6 @@ const READ_ONLY_HANDLERS = {
   handleUpdateEntity: (_entityId: string, _patch: Partial<MapEntity>) => {},
   handleDeleteGeometry: (_geometryId: string) => {},
   handleSelectOsmObject: (_type: "node" | "way" | "relation", _id: number, _f?: GeoJSON.Feature & { id?: string }) => {},
-  handleCloseDetail: () => {},
   onNewProject: () => {},
   onOpenProject: (_file: File) => {},
   onSaveProject: () => {},
@@ -49,7 +48,7 @@ export function ViewPage({ onEditMode, onOpenAbout }: ViewPageProps): React.Reac
   const [loadError, setLoadError] = useState<string | null>(null)
 
   useEffect(function loadDemoProject() {
-    fetch("/demo.gpkg")
+    fetch("/project.gpkg")
       .then((res) => {
         if (!res.ok) throw new Error("Failed to load demo project")
         return res.arrayBuffer()
@@ -65,7 +64,7 @@ export function ViewPage({ onEditMode, onOpenAbout }: ViewPageProps): React.Reac
       })
       .catch((e) => {
         setLoadError(e instanceof Error ? e.message : "Failed to load demo")
-        console.error("ViewPage load demo.gpkg failed", e)
+        console.error("ViewPage load project.gpkg failed", e)
       })
   }, [])
 
@@ -98,6 +97,11 @@ export function ViewPage({ onEditMode, onOpenAbout }: ViewPageProps): React.Reac
 
   function setLayerExpanded(id: string, expanded: boolean): void {
     setLayers((prev) => prev.map((l) => (l.id === id ? { ...l, expanded } : l)))
+  }
+
+  function handleCloseDetail(): void {
+    setSelectedEntityId(null)
+    setSelectedOsmObject(null)
   }
 
   if (loadError !== null) {
@@ -138,7 +142,7 @@ export function ViewPage({ onEditMode, onOpenAbout }: ViewPageProps): React.Reac
       handleUpdateEntity={READ_ONLY_HANDLERS.handleUpdateEntity}
       handleDeleteGeometry={READ_ONLY_HANDLERS.handleDeleteGeometry}
       handleSelectOsmObject={READ_ONLY_HANDLERS.handleSelectOsmObject}
-      handleCloseDetail={READ_ONLY_HANDLERS.handleCloseDetail}
+      handleCloseDetail={handleCloseDetail}
       busy={false}
       error={null}
       onNewProject={READ_ONLY_HANDLERS.onNewProject}

@@ -36,7 +36,3 @@ Output in `dist/`. Serve with any static host.
 - `src/services/` — geopackage, symbol, overpass, nominatim, projectStorage.
 - `src/types/` — domain and symbol types (including echelon options).
 - `src/lib/` — `cn()` and tooling; `src/utils/` — pure helpers (e.g. geometry).
-
-## License
-
-See repository.

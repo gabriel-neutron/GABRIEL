@@ -52,3 +52,8 @@ body {
 .react-flow__node.tree-symbol-node.selected {
   box-shadow: 0 0 0 2px var(--ring);
 }
+
+.react-flow__node.tree-symbol-node .react-flow__handle {
+  opacity: 0;
+  pointer-events: none;
+}

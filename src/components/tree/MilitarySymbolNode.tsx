@@ -1,4 +1,4 @@
-import type { NodeProps } from "reactflow"
+import { Handle, type NodeProps, Position } from "reactflow"
 import { getSymbolForUnit, mapEntityToSymbolInput, renderSymbol } from "@/services/symbol.service"
 import type { MapEntity } from "@/types/domain.types"
 
@@ -17,10 +17,13 @@ export function MilitarySymbolNode({ data }: NodeProps<MilitarySymbolNodeData>) 
 
   return (
     <div
-      className="flex shrink-0 items-center justify-center [&_svg]:block [&_svg]:h-full [&_svg]:w-full"
+      className="relative flex shrink-0 items-center justify-center [&_svg]:block [&_svg]:h-full [&_svg]:w-full"
       style={{ width, height }}
-      dangerouslySetInnerHTML={{ __html: svg }}
       title={data.label}
-    />
+    >
+      <Handle type="target" position={Position.Left} isConnectable={false} />
+      <div dangerouslySetInnerHTML={{ __html: svg }} />
+      <Handle type="source" position={Position.Right} isConnectable={false} />
+    </div>
   )
 }

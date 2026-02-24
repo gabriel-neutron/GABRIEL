@@ -119,28 +119,6 @@
   filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%);
 }
 
-/* React Flow dark theme (v11 has no colorMode prop; style via CSS) */
-.dark .react-flow__edge-path,
-.dark .react-flow__connection-path {
-  stroke: #94a3b8;
-}
-.dark .react-flow__edge.selected .react-flow__edge-path,
-.dark .react-flow__edge:focus .react-flow__edge-path,
-.dark .react-flow__edge:focus-visible .react-flow__edge-path {
-  stroke: #cbd5e1;
-}
-.dark .react-flow__edge-textbg {
-  fill: var(--card);
-}
-.dark .react-flow__controls button {
-  background-color: var(--card);
-  color: var(--card-foreground);
-  border-color: var(--border);
-}
-.dark .react-flow__controls button:hover {
-  background-color: var(--muted);
-}
-
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);

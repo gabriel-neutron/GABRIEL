@@ -1,9 +1,11 @@
 import { useCallback, useMemo } from "react"
-import ReactFlow, { Background, type Edge, type Node } from "reactflow"
+import ReactFlow, { Background, type Edge, type Node, Position } from "reactflow"
 import type { MapEntity } from "@/types/domain.types"
 import { MilitarySymbolNode } from "./MilitarySymbolNode"
 
 const nodeTypes = { militarySymbol: MilitarySymbolNode }
+const X_SPACING_PER_LEVEL = 320
+const Y_SPACING = 100
 
 type Props = {
   entities: MapEntity[]
@@ -17,29 +19,28 @@ export function TreeView({ entities, selectedEntityId, onSelectEntity }: Props) 
     const edgeList: Edge[] = []
     let y = 0
 
-    // Build nodes and edges from parent relationships
-    function buildTree(entityId: string | null, depth: number) {
-      const children = entities.filter((e) => e.parentId === entityId)
+    function buildTree(parentId: string | null, depth: number) {
+      const children = entities.filter((e) => e.parentId === parentId)
       for (const entity of children) {
-        const nodeId = entity.id
+        const nodeId = String(entity.id)
         if (!nodeMap.has(nodeId)) {
           nodeMap.set(nodeId, {
             id: nodeId,
             type: "militarySymbol",
-            position: { x: depth * 200, y: y * 100 },
+            position: { x: depth * X_SPACING_PER_LEVEL, y: y * Y_SPACING },
             data: { label: entity.name, entity },
+            sourcePosition: Position.Right,
+            targetPosition: Position.Left,
           })
           y++
         }
-
-        if (entity.parentId) {
+        if (entity.parentId != null) {
           edgeList.push({
             id: `e-${entity.parentId}-${nodeId}`,
-            source: entity.parentId,
+            source: String(entity.parentId),
             target: nodeId,
           })
         }
-
         buildTree(nodeId, depth + 1)
       }
     }
@@ -73,6 +74,7 @@ export function TreeView({ entities, selectedEntityId, onSelectEntity }: Props) 
         nodes={nodesWithSelection}
         edges={edges}
         nodeTypes={nodeTypes}
+        defaultEdgeOptions={{ type: "smoothstep" }}
         onNodeClick={handleNodeClick}
         onPaneClick={handlePaneClick}
         fitView
