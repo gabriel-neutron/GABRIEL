@@ -22,9 +22,9 @@ const ABOUT_FR = {
 }
 
 const SOCIAL_LINKS = [
-  { label: "Instagram", url: "https://instagram.com", key: "instagram" },
-  { label: "YouTube", url: "https://youtube.com", key: "youtube" },
-  { label: "TikTok", url: "https://tiktok.com", key: "tiktok" },
+  { label: "Instagram", url: "https://www.instagram.com/gabriel__0x0/", key: "instagram" },
+  { label: "YouTube", url: "https://www.youtube.com/@Gabriel__0x0", key: "youtube" },
+  { label: "TikTok", url: "https://www.tiktok.com/@gabriel__0x0", key: "tiktok" },
 ] as const
 
 type Props = {

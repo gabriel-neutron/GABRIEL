@@ -2,6 +2,7 @@ import { createRoot } from "react-dom/client"
 import { useEffect, useRef } from "react"
 import L from "leaflet"
 import { useMap } from "react-leaflet"
+import { Button } from "@/components/ui/button"
 
 type MapTool = "pan" | "point" | "line" | "polygon"
 
@@ -9,6 +10,13 @@ type Props = {
   mapTool: MapTool
   onMapToolChange: (tool: MapTool) => void
 }
+
+const TOOLS: { tool: MapTool; label: string; title: string }[] = [
+  { tool: "pan",     label: "Pan",     title: "Pan tool"    },
+  { tool: "point",   label: "Point",   title: "Draw point"  },
+  { tool: "line",    label: "Line",    title: "Draw line"   },
+  { tool: "polygon", label: "Polygon", title: "Draw polygon"},
+]
 
 export function MapToolSelector({ mapTool, onMapToolChange }: Props) {
   const map = useMap()
@@ -37,64 +45,26 @@ export function MapToolSelector({ mapTool, onMapToolChange }: Props) {
       rootRef.current = null
       controlRef.current = null
       if (ctrl) map.removeControl(ctrl)
-      // Defer unmount to avoid "synchronously unmount a root while React was already rendering"
       if (root) queueMicrotask(() => root.unmount())
     }
   }, [map])
 
   useEffect(() => {
     if (!rootRef.current) return
-
     rootRef.current.render(
-      <div className="flex flex-col gap-1 p-1 bg-white rounded shadow-lg border border-border">
-        <button
-          type="button"
-          className={`px-3 py-2 text-sm font-medium rounded transition-colors ${
-            mapTool === "pan"
-              ? "bg-primary text-primary-foreground"
-              : "bg-background hover:bg-muted"
-          }`}
-          onClick={() => onMapToolChange("pan")}
-          title="Pan tool"
-        >
-          Pan
-        </button>
-        <button
-          type="button"
-          className={`px-3 py-2 text-sm font-medium rounded transition-colors ${
-            mapTool === "point"
-              ? "bg-primary text-primary-foreground"
-              : "bg-background hover:bg-muted"
-          }`}
-          onClick={() => onMapToolChange("point")}
-          title="Draw point"
-        >
-          Point
-        </button>
-        <button
-          type="button"
-          className={`px-3 py-2 text-sm font-medium rounded transition-colors ${
-            mapTool === "line"
-              ? "bg-primary text-primary-foreground"
-              : "bg-background hover:bg-muted"
-          }`}
-          onClick={() => onMapToolChange("line")}
-          title="Draw line"
-        >
-          Line
-        </button>
-        <button
-          type="button"
-          className={`px-3 py-2 text-sm font-medium rounded transition-colors ${
-            mapTool === "polygon"
-              ? "bg-primary text-primary-foreground"
-              : "bg-background hover:bg-muted"
-          }`}
-          onClick={() => onMapToolChange("polygon")}
-          title="Draw polygon"
-        >
-          Polygon
-        </button>
+      <div className="flex flex-col gap-1 rounded border bg-background p-1 shadow-lg">
+        {TOOLS.map(({ tool, label, title }) => (
+          <Button
+            key={tool}
+            type="button"
+            size="sm"
+            variant={mapTool === tool ? "default" : "ghost"}
+            title={title}
+            onClick={() => onMapToolChange(tool)}
+          >
+            {label}
+          </Button>
+        ))}
       </div>,
     )
   }, [mapTool, onMapToolChange])

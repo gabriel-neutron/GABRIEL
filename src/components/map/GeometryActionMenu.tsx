@@ -1,5 +1,6 @@
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
 import {
   Select,
   SelectContent,
@@ -26,22 +27,21 @@ export function GeometryActionMenu({
 
   function handleLinkChange(value: string) {
     setLinkTarget(value)
-    if (value && value !== "__none__") {
-      onLinkToExisting(value)
-    }
+    if (value !== "__none__") onLinkToExisting(value)
   }
 
   return (
-    <div className="absolute left-1/2 top-4 z-[1000] w-80 -translate-x-1/2 rounded-lg border bg-background p-4 shadow-lg">
-      <div className="mb-3 text-sm font-medium">Geometry created</div>
-      <div className="flex flex-col gap-3">
-        <Button size="sm" onClick={onCreateNew}>
-          Create new entity
-        </Button>
-        <div className="space-y-1.5">
-          <span className="text-xs text-muted-foreground">Link to existing</span>
+    <div className="absolute left-1/2 z-[1000] w-80 -translate-x-1/2 rounded-lg border bg-background p-4 shadow-lg">
+      <FieldGroup>
+        <Field>
+          <Button size="sm" className="w-full" onClick={onCreateNew}>
+            Create new entity
+          </Button>
+        </Field>
+        <Field>
+          <FieldLabel>Link to existing</FieldLabel>
           <Select value={linkTarget} onValueChange={handleLinkChange}>
-            <SelectTrigger className="w-full">
+            <SelectTrigger>
               <SelectValue placeholder="Choose entity…" />
             </SelectTrigger>
             <SelectContent>
@@ -53,11 +53,13 @@ export function GeometryActionMenu({
               ))}
             </SelectContent>
           </Select>
-        </div>
-        <Button size="sm" variant="ghost" onClick={onCancel}>
-          Cancel
-        </Button>
-      </div>
+        </Field>
+        <Field>
+          <Button size="sm" variant="ghost"onClick={onCancel}>
+            Cancel
+          </Button>
+        </Field>
+      </FieldGroup>
     </div>
   )
 }

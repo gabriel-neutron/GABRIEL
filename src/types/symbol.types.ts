@@ -28,6 +28,25 @@ export const ECHELON_OPTIONS = [
 /** Echelon / size level for amplifier (SIDC positions 9-10). */
 export type SymbolEchelon = (typeof ECHELON_OPTIONS)[number]["value"]
 
+/** Standard identity / affiliation (frame shape and color). For Select UIs. */
+export const AFFILIATION_OPTIONS: { value: SymbolAffiliation; label: string }[] = [
+  { value: "Assumed Friend", label: "Assumed Friend" },
+  { value: "Friend", label: "Friend" },
+  { value: "Hostile", label: "Hostile" },
+  { value: "Neutral", label: "Neutral" },
+  { value: "Suspect", label: "Suspect" },
+  { value: "Unknown", label: "Unknown" },
+]
+
+/** Battle dimension (symbol set selection). For Select UIs. */
+export const DOMAIN_OPTIONS: { value: SymbolDomain; label: string }[] = [
+  { value: "Air", label: "Air" },
+  { value: "Ground", label: "Ground" },
+  { value: "Sea", label: "Sea" },
+  { value: "Space", label: "Space" },
+  { value: "Subsurface", label: "Subsurface" },
+]
+
 /** Semantic unit type used by the app (maps to entity/type/subtype in symbol.service). */
 export type UnitType =
   | "infantry"

@@ -75,11 +75,12 @@ type OverpassElement = {
 
 const OVERPASS_QUERY_TIMEOUT = 25
 
-async function runOverpassBody(body: string): Promise<OverpassResponse> {
+async function runOverpassBody(body: string, signal?: AbortSignal): Promise<OverpassResponse> {
   const response = await fetch(OVERPASS_ENDPOINT, {
     method: "POST",
     body: body.trim(),
     headers: { "Content-Type": "text/plain; charset=utf-8" },
+    signal,
   })
   const text = await response.text()
   if (!response.ok) {
@@ -126,9 +127,10 @@ function parseElements(data: OverpassResponse): OsmElementCandidate[] {
 export async function findOsmElementsAtPoint(
   lat: number,
   lng: number,
-  options?: { radiusMeters?: number },
+  options?: { radiusMeters?: number; signal?: AbortSignal },
 ): Promise<OsmElementCandidate[]> {
   const radius = options?.radiusMeters ?? 100
+  const signal = options?.signal
   const latStr = String(Number(lat))
   const lngStr = String(Number(lng))
   const results: OsmElementCandidate[] = []
@@ -148,7 +150,7 @@ is_in(${latStr},${lngStr})->.a;
 ( way(pivot.a); rel(pivot.a); );
 out ids tags;`
   try {
-    const data = await runOverpassBody(intersectionQuery)
+    const data = await runOverpassBody(intersectionQuery, signal)
     checkOverpassResponse(data)
     add(parseElements(data))
   } catch (err) {
@@ -163,7 +165,7 @@ out ids tags;`
   const nearbyQuery = `[out:json][timeout:${OVERPASS_QUERY_TIMEOUT}];
 ( node(around:${radius},${latStr},${lngStr}); way(around:${radius},${latStr},${lngStr}); rel(around:${radius},${latStr},${lngStr}); );
 out ids tags;`
-  const nearbyData = await runOverpassBody(nearbyQuery)
+  const nearbyData = await runOverpassBody(nearbyQuery, signal)
   checkOverpassResponse(nearbyData)
   add(parseElements(nearbyData))
 
@@ -189,12 +191,13 @@ export type OsmObjectDetails = {
 export async function fetchOsmObjectDetails(
   type: "node" | "way" | "relation",
   id: number,
+  options?: { signal?: AbortSignal },
 ): Promise<OsmObjectDetails> {
   const query = `[out:json][timeout:${OVERPASS_QUERY_TIMEOUT}];
 ${type}(${id});
 out meta;`
 
-  const data = await runOverpassBody(query)
+  const data = await runOverpassBody(query, options?.signal)
   checkOverpassResponse(data)
 
   const elements = (data.elements ?? []) as Array<{

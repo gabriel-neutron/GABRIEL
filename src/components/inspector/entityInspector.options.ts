@@ -1,5 +1,3 @@
-import { ECHELON_OPTIONS, type SymbolAffiliation, type SymbolDomain } from "@/types/symbol.types"
-
 export type UnitTypeOption = { value: string; label: string }
 
 /** Grouped unit types for Select (MIL-STD-2525 Land Unit symbol set 10). Values match symbol.service UNIT_TYPE_TO_FUNCTION_ID. */
@@ -96,27 +94,5 @@ export const UNIT_TYPE_OPTIONS_GROUPED: { label: string; options: UnitTypeOption
   },
 ]
 
-/** Flat list of all unit type options (e.g. for lookups). */
+/** Flat list of all unit type options (for lookups / validation). */
 export const UNIT_TYPE_OPTIONS: UnitTypeOption[] = UNIT_TYPE_OPTIONS_GROUPED.flatMap((g) => g.options)
-
-/** Echelon options (re-exported for inspector UI). */
-export { ECHELON_OPTIONS }
-
-/** Standard identity / affiliation (frame shape and color). */
-export const AFFILIATION_OPTIONS: { value: SymbolAffiliation; label: string }[] = [
-  { value: "Assumed Friend", label: "Assumed Friend" },
-  { value: "Friend", label: "Friend" },
-  { value: "Hostile", label: "Hostile" },
-  { value: "Neutral", label: "Neutral" },
-  { value: "Suspect", label: "Suspect" },
-  { value: "Unknown", label: "Unknown" },
-]
-
-/** Battle dimension (symbol set selection). */
-export const DOMAIN_OPTIONS: { value: SymbolDomain; label: string }[] = [
-  { value: "Air", label: "Air" },
-  { value: "Ground", label: "Ground" },
-  { value: "Sea", label: "Sea" },
-  { value: "Space", label: "Space" },
-  { value: "Subsurface", label: "Subsurface" },
-]

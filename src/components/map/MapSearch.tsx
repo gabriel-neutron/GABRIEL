@@ -49,8 +49,7 @@ export function MapSearch() {
         const one = await lookupOsmId(osmParsed.type, osmParsed.id)
         setResults(one ? [one] : [])
       } else {
-        const list = await searchPlace(trimmed, 8)
-        setResults(list)
+        setResults(await searchPlace(trimmed, 8))
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Search failed")
@@ -74,25 +73,23 @@ export function MapSearch() {
   return (
     <div
       ref={wrapperRef}
-      className="absolute top-2 right-2 z-[1000] w-80 max-w-[calc(100%-1rem)]"
+      className="absolute right-2 top-2 z-[1000] w-80 max-w-[calc(100%-1rem)]"
       onClick={(e) => e.stopPropagation()}
     >
-      <div className="flex gap-1 rounded-md border border-border bg-background shadow-md">
-        <div className="relative flex-1">
-          <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            type="text"
-            placeholder="Place, city or OSM ID (e.g. way 123)"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-            className="pl-8"
-          />
-        </div>
+      <div className="flex gap-1">
+        <Input
+          type="text"
+          placeholder="Place, city or OSM ID (e.g. way 123)"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+          className="flex-1"
+        />
         <Button
           type="button"
           variant="secondary"
           size="icon"
+          className="shadow-xs border"
           onClick={handleSearch}
           disabled={loading}
           title="Search"
@@ -100,43 +97,33 @@ export function MapSearch() {
           <Search className="h-4 w-4" />
         </Button>
       </div>
+
       {open && (
-        <div
-          className={cn(
-            "mt-1 max-h-64 overflow-auto rounded-md border border-border bg-background shadow-lg",
-            "empty:hidden"
-          )}
-        >
+        <div className={cn("mt-1 max-h-64 overflow-auto rounded-md border bg-background", "empty:hidden")}>
           {loading && (
-            <div className="px-3 py-4 text-center text-sm text-muted-foreground">
-              Searching…
-            </div>
+            <p className="px-3 py-4 text-center text-sm text-muted-foreground">Searching…</p>
           )}
           {error && (
-            <div className="px-3 py-2 text-sm text-destructive">{error}</div>
+            <p className="px-3 py-2 text-sm text-destructive">{error}</p>
           )}
           {!loading && !error && results.length === 0 && query.trim() && (
-            <div className="px-3 py-4 text-center text-sm text-muted-foreground">
-              No results
-            </div>
+            <p className="px-3 py-4 text-center text-sm text-muted-foreground">No results</p>
           )}
-          {!loading &&
-            results.length > 0 &&
-            results.map((r, i) => (
-              <button
-                key={`${r.osm_type ?? ""}-${r.osm_id ?? i}-${r.lat}-${r.lon}`}
-                type="button"
-                className="w-full px-3 py-2 text-left text-sm hover:bg-muted focus:bg-muted focus:outline-none"
-                onClick={() => handleSelect(r)}
-              >
-                <span className="line-clamp-2">{r.display_name}</span>
-                {(r.type ?? r.class) && (
-                  <span className="mt-0.5 block text-xs text-muted-foreground">
-                    {[r.type, r.class].filter(Boolean).join(" · ")}
-                  </span>
-                )}
-              </button>
-            ))}
+          {!loading && results.map((r, i) => (
+            <button
+              key={`${r.osm_type ?? ""}-${r.osm_id ?? i}-${r.lat}-${r.lon}`}
+              type="button"
+              className="w-full px-3 py-2 text-left text-sm hover:bg-accent focus:bg-accent focus:outline-none"
+              onClick={() => handleSelect(r)}
+            >
+              <span className="line-clamp-2">{r.display_name}</span>
+              {(r.type ?? r.class) && (
+                <span className="mt-0.5 block text-xs text-muted-foreground">
+                  {[r.type, r.class].filter(Boolean).join(" · ")}
+                </span>
+              )}
+            </button>
+          ))}
         </div>
       )}
     </div>
