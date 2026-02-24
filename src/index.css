@@ -108,6 +108,39 @@
   --shadow-2xl: 4px 4px 0px 0px hsl(0 0% 0% / 2.50);
 }
 
+/* Leaflet dark theme: invert tiles and controls when app is in dark mode */
+.dark .leaflet-container {
+  background: #000;
+}
+.dark .leaflet-layer,
+.dark .leaflet-control-zoom-in,
+.dark .leaflet-control-zoom-out,
+.dark .leaflet-control-attribution {
+  filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%);
+}
+
+/* React Flow dark theme (v11 has no colorMode prop; style via CSS) */
+.dark .react-flow__edge-path,
+.dark .react-flow__connection-path {
+  stroke: #94a3b8;
+}
+.dark .react-flow__edge.selected .react-flow__edge-path,
+.dark .react-flow__edge:focus .react-flow__edge-path,
+.dark .react-flow__edge:focus-visible .react-flow__edge-path {
+  stroke: #cbd5e1;
+}
+.dark .react-flow__edge-textbg {
+  fill: var(--card);
+}
+.dark .react-flow__controls button {
+  background-color: var(--card);
+  color: var(--card-foreground);
+  border-color: var(--border);
+}
+.dark .react-flow__controls button:hover {
+  background-color: var(--muted);
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -159,61 +192,4 @@
   --shadow-lg: var(--shadow-lg);
   --shadow-xl: var(--shadow-xl);
   --shadow-2xl: var(--shadow-2xl);
-}
-
-html,
-body,
-#root {
-  height: 100%;
-}
-
-body {
-  margin: 0;
-  background: var(--background);
-  color: var(--foreground);
-}
-
-.unit-symbol-icon {
-  background: transparent;
-  border: none;
-}
-
-.map-entity-marker span {
-  display: block;
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  background: oklch(0.4 0.2 250);
-  border: 2px solid white;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
-}
-
-.nato-symbol-marker {
-  background: none;
-  border: none;
-}
-
-.nato-symbol-marker .nato-symbol-wrap svg {
-  display: block;
-  width: 100%;
-  height: 100%;
-}
-
-/* White outline on symbol text for contrast on any map background */
-.nato-symbol-marker .nato-symbol-wrap svg text {
-  font-weight: bold;
-  paint-order: stroke;
-  stroke: white;
-  stroke-width: 6px;
-  stroke-linejoin: round;
-}
-
-/* Hierarchy tree: symbol-only nodes, no card (read-only, no handles) */
-.react-flow__node.tree-symbol-node {
-  background: none;
-  border: none;
-  padding: 0;
-}
-.react-flow__node.tree-symbol-node.selected {
-  box-shadow: 0 0 0 2px var(--ring);
 }

@@ -56,7 +56,11 @@ export function ViewPage({ onEditMode, onOpenAbout }: ViewPageProps): React.Reac
       })
       .then((buffer) => loadGeoPackage(buffer))
       .then((result) => {
-        applyGeoPackageResult(result, setLayers, setEntities, setDrawnGeometries, setSelectedEntityId)
+        const next = applyGeoPackageResult(result, null)
+        setLayers(next.layers)
+        setEntities(next.entities)
+        setDrawnGeometries(next.drawnGeometries)
+        setSelectedEntityId(next.selectedEntityId)
         setLoadError(null)
       })
       .catch((e) => {

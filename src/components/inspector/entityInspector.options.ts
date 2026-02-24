@@ -1,4 +1,4 @@
-import type { SymbolAffiliation, SymbolDomain, SymbolEchelon } from "@/types/symbol.types"
+import { ECHELON_OPTIONS, type SymbolAffiliation, type SymbolDomain } from "@/types/symbol.types"
 
 export type UnitTypeOption = { value: string; label: string }
 
@@ -99,23 +99,8 @@ export const UNIT_TYPE_OPTIONS_GROUPED: { label: string; options: UnitTypeOption
 /** Flat list of all unit type options (e.g. for lookups). */
 export const UNIT_TYPE_OPTIONS: UnitTypeOption[] = UNIT_TYPE_OPTIONS_GROUPED.flatMap((g) => g.options)
 
-/** Echelon / size (amplifier positions 9–10). */
-export const ECHELON_OPTIONS: { value: SymbolEchelon; label: string }[] = [
-  { value: "Army", label: "Army" },
-  { value: "Army Group/front", label: "Army Group/front" },
-  { value: "Battalion/squadron", label: "Battalion/squadron" },
-  { value: "Brigade", label: "Brigade" },
-  { value: "Command", label: "Command" },
-  { value: "Company/battery/troop", label: "Company/battery/troop" },
-  { value: "Corps/MEF", label: "Corps/MEF" },
-  { value: "Division", label: "Division" },
-  { value: "Platoon/detachment", label: "Platoon/detachment" },
-  { value: "Region/Theater", label: "Region/Theater" },
-  { value: "Regiment/group", label: "Regiment/group" },
-  { value: "Section", label: "Section" },
-  { value: "Squad", label: "Squad" },
-  { value: "Team/Crew", label: "Team/Crew" },
-]
+/** Echelon options (re-exported for inspector UI). */
+export { ECHELON_OPTIONS }
 
 /** Standard identity / affiliation (frame shape and color). */
 export const AFFILIATION_OPTIONS: { value: SymbolAffiliation; label: string }[] = [

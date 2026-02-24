@@ -4,6 +4,7 @@
  */
 
 import ms from "milsymbol"
+import type { MapEntity } from "@/types/domain.types"
 import type { SymbolAffiliation, SymbolDomain, SymbolEchelon, SymbolServiceInput, SymbolServiceOutput } from "@/types/symbol.types"
 
 const SIDC_LENGTH = 20
@@ -158,6 +159,24 @@ function buildDerivedSidc(
     mod1 +
     mod2
   )
+}
+
+/**
+ * Maps a MapEntity to SymbolServiceInput (unit uses parent_id for DB compatibility).
+ */
+export function mapEntityToSymbolInput(entity: MapEntity): SymbolServiceInput {
+  return {
+    unit: {
+      id: entity.id,
+      name: entity.name,
+      type: entity.type ?? "unknown",
+      parent_id: entity.parentId,
+      nato_symbol_code: entity.natoSymbolCode ?? undefined,
+    },
+    affiliation: entity.affiliation ?? DEFAULT_AFFILIATION,
+    echelon: entity.echelon as SymbolEchelon | undefined,
+    domain: (entity.domain as SymbolDomain) ?? DEFAULT_DOMAIN,
+  }
 }
 
 /**

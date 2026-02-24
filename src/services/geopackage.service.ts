@@ -12,7 +12,7 @@ import {
   GeoPackageDataType,
   setSqljsWasmLocateFile,
 } from "@ngageoint/geopackage"
-import { ECHELON_OPTIONS } from "@/components/inspector/entityInspector.options"
+import { ECHELON_OPTIONS } from "@/types/symbol.types"
 import type { Layer, MapEntity, DrawnGeometry } from "@/types/domain.types"
 
 // Configure WASM location - use CDN (acceptable per user preference)
@@ -52,10 +52,8 @@ export interface GpkgEntity {
   notes?: string | null
 }
 
-export type GpkgGeometry =
-  | { id: string; layerId: string; entityId: string | null; type: "point"; lat: number; lng: number }
-  | { id: string; layerId: string; entityId: string | null; type: "line"; positions: [number, number][] }
-  | { id: string; layerId: string; entityId: string | null; type: "polygon"; rings: [number, number][][] }
+/** Same shape as DrawnGeometry; alias for GeoPackage read/write. */
+export type GpkgGeometry = DrawnGeometry
 
 export interface GeoPackageLoadResult {
   layers: GpkgLayer[]
@@ -456,14 +454,18 @@ export function getDefaultEchelonLayers(): Layer[] {
   }))
 }
 
-/** Apply load result to React state setters. Shared by view and edit modes. */
+export interface ApplyGeoPackageResultState {
+  layers: Layer[]
+  entities: MapEntity[]
+  drawnGeometries: DrawnGeometry[]
+  selectedEntityId: string | null
+}
+
+/** Pure: compute state from load result. Preserves current selection if still in loaded entities. */
 export function applyGeoPackageResult(
   result: GeoPackageLoadResult,
-  setLayers: (v: Layer[] | ((prev: Layer[]) => Layer[])) => void,
-  setEntities: (v: MapEntity[] | ((prev: MapEntity[]) => MapEntity[])) => void,
-  setDrawnGeometries: (v: DrawnGeometry[] | ((prev: DrawnGeometry[]) => DrawnGeometry[])) => void,
-  setSelectedEntityId: (v: string | null | ((prev: string | null) => string | null)) => void,
-): void {
+  currentSelectedEntityId: string | null,
+): ApplyGeoPackageResultState {
   const loaded = result.layers
   const echelonById = new Map(loaded.filter((l) => l.kind === "echelon").map((l) => [l.id, l]))
   const echelonLayers: Layer[] = getDefaultEchelonLayers().map((d) => {
@@ -484,10 +486,14 @@ export function applyGeoPackageResult(
       osmData: l.osmData,
       sourceQuery: l.sourceQuery,
     }))
-  setLayers([...echelonLayers, ...customLayers, ...osmLayers])
-  setEntities(result.entities as MapEntity[])
-  setDrawnGeometries(result.geometries as DrawnGeometry[])
-  setSelectedEntityId((prev) =>
-    prev && result.entities.some((e) => e.id === prev) ? prev : null,
-  )
+  const selectedEntityId =
+    currentSelectedEntityId != null && result.entities.some((e) => e.id === currentSelectedEntityId)
+      ? currentSelectedEntityId
+      : null
+  return {
+    layers: [...echelonLayers, ...customLayers, ...osmLayers],
+    entities: result.entities as MapEntity[],
+    drawnGeometries: result.geometries as DrawnGeometry[],
+    selectedEntityId,
+  }
 }

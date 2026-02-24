@@ -7,6 +7,7 @@ import { ShowNetworksToggle } from "@/components/shared/ShowNetworksToggle"
 import { TreeView } from "@/components/tree/TreeView"
 import { OsmQueryMenu } from "@/components/shared/OsmQueryMenu"
 import { BaseMapSwitcher, type BaseMapId } from "@/components/shared/BaseMapSwitcher"
+import { ModeToggle } from "@/components/shared/ModeToggle"
 import type { Layer, MapEntity, DrawnGeometry } from "@/types/domain.types"
 
 type SelectedOsmObject = {
@@ -154,6 +155,7 @@ export function MainLayout({
           <ShowNetworksToggle checked={showNetworks} onCheckedChange={setShowNetworks} />
           <BaseMapSwitcher value={baseMap} onValueChange={setBaseMap} />
           {!readOnly && <OsmQueryMenu layers={layers} onAddLayer={addLayer} />}
+          <ModeToggle />
         </>
       }
       selectedEntityId={selectedEntityId}

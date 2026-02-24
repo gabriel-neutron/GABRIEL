@@ -50,13 +50,11 @@ export function EditPage({ onViewMode, onOpenAbout }: EditPageProps): React.Reac
       if (!stored) return
       loadGeoPackage(stored.buffer)
         .then((result) => {
-          applyGeoPackageResult(
-            result,
-            setLayers,
-            setEntities,
-            setDrawnGeometries,
-            setSelectedEntityId,
-          )
+          const next = applyGeoPackageResult(result, null)
+          setLayers(next.layers)
+          setEntities(next.entities)
+          setDrawnGeometries(next.drawnGeometries)
+          setSelectedEntityId(next.selectedEntityId)
           setRestoredFromSession(true)
         })
         .catch(() => {})
@@ -254,7 +252,11 @@ export function EditPage({ onViewMode, onOpenAbout }: EditPageProps): React.Reac
     try {
       const buffer = await file.arrayBuffer()
       const result = await loadGeoPackage(buffer)
-      applyGeoPackageResult(result, setLayers, setEntities, setDrawnGeometries, setSelectedEntityId)
+      const next = applyGeoPackageResult(result, null)
+      setLayers(next.layers)
+      setEntities(next.entities)
+      setDrawnGeometries(next.drawnGeometries)
+      setSelectedEntityId(next.selectedEntityId)
       await saveProject(buffer, { fileName: file.name })
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load GeoPackage")

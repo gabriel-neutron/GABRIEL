@@ -65,13 +65,15 @@ export function AppShell({
       <div className="flex h-full min-w-0 flex-col">
         <header className="border-b border-border">
           <div className="flex h-14 items-center justify-between gap-4 px-5">
-
-            <Tabs value={activeView} onValueChange={(v) => setActiveView(v as typeof activeView)}>
+            <div className="flex items-center gap-3">
+              <img src="/favicon.svg" alt="Gabriel" className="h-8 w-8 shrink-0" aria-hidden />
+              <Tabs value={activeView} onValueChange={(v) => setActiveView(v as typeof activeView)}>
               <TabsList>
                 <TabsTrigger value="map">Map</TabsTrigger>
                 <TabsTrigger value="tree">Hierarchy</TabsTrigger>
               </TabsList>
-            </Tabs>
+              </Tabs>
+            </div>
 
             <div className="flex items-center gap-2">
               {headerSlot}

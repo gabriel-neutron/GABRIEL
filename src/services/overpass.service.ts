@@ -46,30 +46,8 @@ export async function executeOverpassQuery(
   bbox: { south: number; west: number; north: number; east: number } | null,
 ): Promise<OverpassResult> {
   const fullQuery = buildQuery(query, bbox)
-  const response = await fetch(OVERPASS_ENDPOINT, {
-    method: "POST",
-    body: fullQuery,
-    headers: { "Content-Type": "text/plain" },
-  })
-
-  if (!response.ok) {
-    const text = await response.text()
-    throw new Error(`Overpass API error (${response.status}): ${text.slice(0, 200)}`)
-  }
-
-  let data: OverpassResponse
-  try {
-    data = (await response.json()) as OverpassResponse
-  } catch {
-    throw new Error("Invalid JSON response from Overpass API")
-  }
-
-  if (data.error) {
-    throw new Error(`Overpass error: ${data.error}`)
-  }
-  if (data.remark && /error|timeout|rate/i.test(data.remark)) {
-    throw new Error(`Overpass: ${data.remark}`)
-  }
+  const data = await runOverpassBody(fullQuery)
+  checkOverpassResponse(data)
 
   const elements = data.elements ?? []
   if (elements.length === 0) {
@@ -88,9 +66,6 @@ export type OsmElementCandidate = {
   id: number
   tags: Record<string, string>
 }
-
-/** Relation candidate for linking (backward compatibility). */
-export type RelationAtPoint = OsmElementCandidate & { type: "relation" }
 
 type OverpassElement = {
   type: "node" | "way" | "relation"
@@ -114,6 +89,13 @@ async function runOverpassBody(body: string): Promise<OverpassResponse> {
     return JSON.parse(text) as OverpassResponse
   } catch {
     throw new Error("Invalid JSON response from Overpass API")
+  }
+}
+
+function checkOverpassResponse(data: OverpassResponse): void {
+  if (data.error) throw new Error(`Overpass error: ${data.error}`)
+  if (data.remark && /error|timeout|rate/i.test(data.remark)) {
+    throw new Error(`Overpass: ${data.remark}`)
   }
 }
 
@@ -167,8 +149,7 @@ is_in(${latStr},${lngStr})->.a;
 out ids tags;`
   try {
     const data = await runOverpassBody(intersectionQuery)
-    if (data.error) throw new Error(data.error)
-    if (data.remark && /error|timeout|rate/i.test(data.remark)) throw new Error(data.remark)
+    checkOverpassResponse(data)
     add(parseElements(data))
   } catch (err) {
     if (err instanceof Error && err.message.includes("400")) {
@@ -183,27 +164,10 @@ out ids tags;`
 ( node(around:${radius},${latStr},${lngStr}); way(around:${radius},${latStr},${lngStr}); rel(around:${radius},${latStr},${lngStr}); );
 out ids tags;`
   const nearbyData = await runOverpassBody(nearbyQuery)
-  if (nearbyData.error) throw new Error(nearbyData.error)
-  if (nearbyData.remark && /error|timeout|rate/i.test(nearbyData.remark)) {
-    throw new Error(nearbyData.remark)
-  }
+  checkOverpassResponse(nearbyData)
   add(parseElements(nearbyData))
 
   return results
-}
-
-/**
- * Find OSM relations at the point. Wrapper around findOsmElementsAtPoint (relations only).
- */
-export async function findRelationsAtPoint(
-  lat: number,
-  lng: number,
-  _options?: { tagFilters?: Record<string, string> },
-): Promise<RelationAtPoint[]> {
-  const all = await findOsmElementsAtPoint(lat, lng, { radiusMeters: 100 })
-  return all
-    .filter((el): el is RelationAtPoint => el.type === "relation")
-    .map((el) => ({ ...el, type: "relation" as const }))
 }
 
 const EMPTY_FC: FeatureCollection = { type: "FeatureCollection", features: [] }
@@ -231,10 +195,7 @@ ${type}(${id});
 out meta;`
 
   const data = await runOverpassBody(query)
-  if (data.error) throw new Error(data.error)
-  if (data.remark && /error|timeout|rate/i.test(data.remark)) {
-    throw new Error(`Overpass: ${data.remark}`)
-  }
+  checkOverpassResponse(data)
 
   const elements = (data.elements ?? []) as Array<{
     type: "node" | "way" | "relation"
@@ -275,30 +236,8 @@ export async function fetchRelationGeometry(relationId: number): Promise<Feature
 rel(${relationId});
 out geom;`
 
-  const response = await fetch(OVERPASS_ENDPOINT, {
-    method: "POST",
-    body: query,
-    headers: { "Content-Type": "text/plain" },
-  })
-
-  if (!response.ok) {
-    const text = await response.text()
-    throw new Error(`Overpass API error (${response.status}): ${text.slice(0, 200)}`)
-  }
-
-  let data: OverpassResponse
-  try {
-    data = (await response.json()) as OverpassResponse
-  } catch {
-    throw new Error("Invalid JSON response from Overpass API")
-  }
-
-  if (data.error) {
-    throw new Error(`Overpass error: ${data.error}`)
-  }
-  if (data.remark && /error|timeout|rate/i.test(data.remark)) {
-    throw new Error(`Overpass: ${data.remark}`)
-  }
+  const data = await runOverpassBody(query)
+  checkOverpassResponse(data)
 
   const elements = data.elements ?? []
   if (elements.length === 0) {

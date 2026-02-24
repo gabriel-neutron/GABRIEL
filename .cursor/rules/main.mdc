@@ -29,19 +29,20 @@ You are an expert Frontend GIS Engineer for this project.
 
   * `src/components/` – Feature-based UI components
     * `map/` – Leaflet map, layers, drawing tools
-    * `units/` – Unit CRUD UI
+    * `inspector/` – Entity and OSM object inspection
     * `tree/` – Read-only hierarchy view (React Flow)
     * `shared/` – Reusable components across features
     * `ui/` – shadcn components (NEVER modify directly)
-  * `src/hooks/` – Shared hooks only (state orchestration, map sync)
   * `src/services/`
     * `geopackage.service.ts` – All GeoPackage read/write logic
-    * `unit.service.ts` – Pure military domain logic
     * `symbol.service.ts` – MIL-STD-2525 symbol generation
-    * `osm.service.ts` – OSM layer + linking logic
-  * `src/types/` – All domain and GeoPackage types
-  * `src/utils/` – Pure utility helpers
-  * `src/store/` – Centralized state (Zustand)
+    * `overpass.service.ts` – Overpass API, OSM elements at point, relation geometry
+    * `nominatim.service.ts` – Place search and OSM ID lookup
+    * `projectStorage.service.ts` – IndexedDB project persist/load
+  * `src/types/` – Domain and symbol types (`domain.types`, `symbol.types`); echelon options in `symbol.types`
+  * `src/lib/` – App/tooling helpers (e.g. `lib/utils.ts` for `cn()` class-name merge; shadcn convention)
+  * `src/utils/` – Pure domain or shared helpers (e.g. geometry), no UI/tooling
+  * `src/store/` – Centralized state (Zustand), when used
 
 ---
 
@@ -118,8 +119,7 @@ Follow these rules for all code you write:
 
 ### Military Domain Rules
 
-* A Unit:
-  * Has `id`, `name`, `type`, `parent_id`, `nato_symbol_code`
+* A Unit (entity): `id`, `name`, `layerId`, `parentId`, `type`, `natoSymbolCode`, `echelon`, `affiliation`, `domain`, `osmRelationId`, `militaryUnitId`, `notes`
 * A Unit may link to multiple geometries.
 * A geometry belongs to at most one unit.
 * Hierarchy tree is strictly read-only.

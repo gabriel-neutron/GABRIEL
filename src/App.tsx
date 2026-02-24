@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react"
-import { ViewPage, EditPage } from "@/pages"
+import { ViewPage } from "@/pages/ViewPage"
+import { EditPage } from "@/pages/EditPage"
 import { AboutDialog } from "@/components/shared/AboutDialog"
 
 const ABOUT_SEEN_KEY = "aboutSeen"

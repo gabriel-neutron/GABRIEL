@@ -1,8 +1,7 @@
 import { useMemo } from "react"
 import L from "leaflet"
 import { Marker, Popup } from "react-leaflet"
-import { getSymbolForUnit, renderSymbol } from "@/services/symbol.service"
-import type { SymbolDomain, SymbolEchelon } from "@/types/symbol.types"
+import { getSymbolForUnit, mapEntityToSymbolInput, renderSymbol } from "@/services/symbol.service"
 import type { DrawnGeometry, MapEntity } from "@/types/domain.types"
 import { getEntityDisplayPosition } from "@/utils/geometry"
 
@@ -11,21 +10,6 @@ type Props = {
   drawnGeometries: DrawnGeometry[]
   visibleLayerIds: Set<string>
   onSelectEntity: (id: string | null) => void
-}
-
-function entityToSymbolInput(entity: MapEntity): Parameters<typeof getSymbolForUnit>[0] {
-  return {
-    unit: {
-      id: entity.id,
-      name: entity.name,
-      type: entity.type ?? "unknown",
-      parent_id: entity.parentId,
-      nato_symbol_code: entity.natoSymbolCode ?? undefined,
-    },
-    affiliation: entity.affiliation ?? "Friend",
-    echelon: (entity.echelon as SymbolEchelon) ?? undefined,
-    domain: (entity.domain as SymbolDomain) ?? "Ground",
-  }
 }
 
 function makeSymbolIcon(svg: string, anchor: { x: number; y: number }, width: number, height: number): L.DivIcon {
@@ -49,7 +33,7 @@ export function SymbolsLayer({ entities, drawnGeometries, visibleLayerIds, onSel
         const position = getEntityDisplayPosition(entity.id, drawnGeometries)
         if (!position) return null
 
-        const input = entityToSymbolInput(entity)
+        const input = mapEntityToSymbolInput(entity)
         const { sidc, options } = getSymbolForUnit(input)
         const { svg, anchor, width, height } = renderSymbol(sidc, options)
         const icon = makeSymbolIcon(svg, anchor, width, height)

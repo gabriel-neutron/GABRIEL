@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="500" height="500" viewBox="0 0 500 500" role="img" aria-label="Minimal Gabriel wings and sword icon">
+  <g fill="none" stroke="currentColor" stroke-width="30" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="250" cy="70" r="40" />
+    <path d="M250 150 L40 40 L110 300 L250 360" />
+    <path d="M250 150 L460 40 L390 300 L250 360" />
+    <path d="M250 180 L250 320" />
+    <path d="M215 220 L285 220" />
+  </g>
+</svg>

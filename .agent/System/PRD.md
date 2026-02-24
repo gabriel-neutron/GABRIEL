@@ -209,38 +209,46 @@ GeoPackage contains:
 
 ### Table: `units`
 
-| Field            | Type            |
-| ---------------- | --------------- |
-| id               | TEXT (UUID)     |
-| name             | TEXT            |
-| type             | TEXT            |
-| parent_id        | TEXT (nullable) |
-| nato_symbol_code | TEXT            |
-| created_at       | DATETIME        |
+| Field              | Type            |
+| ------------------ | --------------- |
+| id                 | TEXT (UUID)     |
+| name               | TEXT            |
+| layer_id           | TEXT            |
+| parent_id          | TEXT (nullable) |
+| type               | TEXT            |
+| nato_symbol_code   | TEXT            |
+| echelon            | TEXT            |
+| affiliation        | TEXT            |
+| domain             | TEXT            |
+| osm_relation_id    | INTEGER (nullable) |
+| military_unit_id   | TEXT (nullable) |
+| notes              | TEXT (nullable) |
 
 ---
 
 ### Table: `geometries`
 
-| Field        | Type            |
-| ------------ | --------------- |
-| id           | TEXT            |
-| unit_id      | TEXT            |
-| osm_id       | TEXT (nullable) |
-| source_layer | TEXT            |
-| geometry     | GEOMETRY        |
-| created_at   | DATETIME        |
+| Field      | Type     |
+| ---------- | -------- |
+| id         | TEXT     |
+| layer_id   | TEXT     |
+| entity_id  | TEXT (nullable) |
+| type       | TEXT (point/line/polygon) |
+| geometry   | GEOMETRY |
 
 ---
 
 ### Table: `layers`
 
-| Field   | Type    |
-| ------- | ------- |
-| id      | TEXT    |
-| name    | TEXT    |
-| visible | BOOLEAN |
-| type    | TEXT    |
+| Field         | Type    |
+| ------------- | ------- |
+| id            | TEXT    |
+| name          | TEXT    |
+| visible       | INTEGER (0/1) |
+| expanded      | INTEGER (0/1) |
+| kind          | TEXT (echelon/custom/osm) |
+| source_query  | TEXT (nullable) |
+| geojson       | TEXT (nullable) |
 
 ---
 
