@@ -30,6 +30,10 @@ function geometryLabel(g: DrawnGeometry): string {
   return "Geometry"
 }
 
+function isUrl(value: string): boolean {
+  return /^https?:\/\//i.test(value.trim())
+}
+
 function ReadOnlyField({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
@@ -84,6 +88,11 @@ export function EntityInspector({
     setFindDialogOpen,
     handleEchelonChange,
     handleSelectOsmRelation,
+    sources,
+    newSource,
+    setNewSource,
+    handleAddSource,
+    handleRemoveSource,
   } = state
 
   if (!entity) {
@@ -92,7 +101,7 @@ export function EntityInspector({
 
   if (readOnly) {
     return (
-      <div className="space-y-3 overflow-auto p-4">
+      <div className="space-y-3 p-4">
         <ReadOnlyField label="Name">
           <span className="truncate">{entity.name}</span>
         </ReadOnlyField>
@@ -104,6 +113,28 @@ export function EntityInspector({
         {entity.notes != null && entity.notes !== "" && (
           <ReadOnlyField label="Notes">
             <span className="whitespace-pre-wrap">{entity.notes}</span>
+          </ReadOnlyField>
+        )}
+        {sources.length > 0 && (
+          <ReadOnlyField label="Sources">
+            <ul className="mt-1 space-y-1 text-xs">
+              {sources.map((src, index) => (
+                <li key={index} className="truncate">
+                  {isUrl(src) ? (
+                    <a
+                      href={src}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-blue-600 hover:underline"
+                    >
+                      {src}
+                    </a>
+                  ) : (
+                    <span className="whitespace-pre-wrap">{src}</span>
+                  )}
+                </li>
+              ))}
+            </ul>
           </ReadOnlyField>
         )}
         <div className="grid grid-cols-2 gap-2">
@@ -142,7 +173,7 @@ export function EntityInspector({
   }
 
   return (
-    <div className="overflow-auto p-4">
+    <div className="p-4">
       <FieldGroup className="gap-4 [&_[data-slot=field]]:gap-1">
         <Field>
           <FieldLabel>Name</FieldLabel>
@@ -173,6 +204,59 @@ export function EntityInspector({
               })
             }
           />
+        </Field>
+        <Field>
+          <FieldLabel>Sources</FieldLabel>
+          {sources.length > 0 && (
+            <ul className="mb-2 space-y-1 text-xs">
+              {sources.map((src, index) => (
+                <li key={index} className="flex items-center gap-2">
+                  {isUrl(src) ? (
+                    <a
+                      href={src}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-blue-600 hover:underline"
+                    >
+                      {src}
+                    </a>
+                  ) : (
+                    <span>{src}</span>
+                  )}
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleRemoveSource(index)}
+                  >
+                    Remove
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          )}
+          <div className="flex gap-2">
+            <Input
+              placeholder="Add source URL or note"
+              value={newSource}
+              onChange={(e) => setNewSource(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault()
+                  handleAddSource()
+                }
+              }}
+            />
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={handleAddSource}
+              disabled={newSource.trim() === ""}
+            >
+              Add
+            </Button>
+          </div>
         </Field>
         <div className="grid grid-cols-2 gap-2">
           <Field>

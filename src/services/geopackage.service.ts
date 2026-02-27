@@ -50,6 +50,7 @@ export interface GpkgEntity {
   osmRelationId?: number | null
   militaryUnitId?: string | null
   notes?: string | null
+  sources?: string | null
 }
 
 /** Same shape as DrawnGeometry; alias for GeoPackage read/write. */
@@ -184,12 +185,14 @@ function readEntities(geoPackage: GeoPackage): GpkgEntity[] {
   const hasOsmRelationId = hasColumn(geoPackage, UNITS_TABLE, "osm_relation_id")
   const hasMilitaryUnitId = hasColumn(geoPackage, UNITS_TABLE, "military_unit_id")
   const hasNotes = hasColumn(geoPackage, UNITS_TABLE, "notes")
+  const hasSources = hasColumn(geoPackage, UNITS_TABLE, "sources")
   const columns = [
     "id", "name", "layer_id", "parent_id", "type", "nato_symbol_code",
     "echelon", "affiliation", "domain",
     ...(hasOsmRelationId ? ["osm_relation_id"] : []),
     ...(hasMilitaryUnitId ? ["military_unit_id"] : []),
     ...(hasNotes ? ["notes"] : []),
+    ...(hasSources ? ["sources"] : []),
   ].join(", ")
   const result = geoPackage.connection.all(
     `SELECT ${columns} FROM ${UNITS_TABLE}`,
@@ -206,6 +209,7 @@ function readEntities(geoPackage: GeoPackage): GpkgEntity[] {
     osm_relation_id?: number | null
     military_unit_id?: string | null
     notes?: string | null
+    sources?: string | null
   }>
 
   return result.map((row) => ({
@@ -221,6 +225,7 @@ function readEntities(geoPackage: GeoPackage): GpkgEntity[] {
     osmRelationId: hasOsmRelationId && row.osm_relation_id != null ? Number(row.osm_relation_id) : undefined,
     militaryUnitId: hasMilitaryUnitId && row.military_unit_id != null ? String(row.military_unit_id) : undefined,
     notes: hasNotes && row.notes != null ? String(row.notes) : undefined,
+    sources: hasSources && row.sources != null ? String(row.sources) : undefined,
   }))
 }
 
@@ -318,7 +323,8 @@ export async function saveGeoPackage(
   domain TEXT,
   osm_relation_id INTEGER,
   military_unit_id TEXT,
-  notes TEXT
+  notes TEXT,
+  sources TEXT
 )`)
 
     // Create feature table with geometry column.
@@ -372,7 +378,7 @@ export async function saveGeoPackage(
     // Insert units
     for (const e of entities) {
       geoPackage.connection.run(
-        `INSERT INTO ${UNITS_TABLE} (id, name, layer_id, parent_id, type, nato_symbol_code, echelon, affiliation, domain, osm_relation_id, military_unit_id, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO ${UNITS_TABLE} (id, name, layer_id, parent_id, type, nato_symbol_code, echelon, affiliation, domain, osm_relation_id, military_unit_id, notes, sources) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           String(e.id ?? ""),
           String(e.name ?? ""),
@@ -386,6 +392,7 @@ export async function saveGeoPackage(
           e.osmRelationId != null ? e.osmRelationId : null,
           e.militaryUnitId != null ? String(e.militaryUnitId) : null,
           e.notes != null ? String(e.notes) : null,
+          e.sources != null ? String(e.sources) : null,
         ],
       )
     }

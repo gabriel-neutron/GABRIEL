@@ -18,6 +18,13 @@ type Props = {
   onMoveLayer: (layerId: string, direction: "up" | "down") => void
 }
 
+function getLayerTitle(isOsmLayer: boolean, expanded: boolean, readOnly: boolean): string | undefined {
+  if (isOsmLayer) return undefined
+  if (expanded) return "Collapse"
+  if (readOnly) return "Expand"
+  return "Expand. Right-click to rename or delete."
+}
+
 export function LayersPanel({
   readOnly = false,
   layers,
@@ -56,9 +63,15 @@ export function LayersPanel({
   const isEchelonLayer = contextLayer?.kind === "echelon"
   const canRename = contextLayer?.kind === "custom"
   const canRemove = contextLayer && (contextLayer.kind === "custom" || isOsmContext)
+  const visibleLayers = layers.filter(
+    (layer) =>
+      layer.osmData != null ||
+      layer.kind === "custom" ||
+      entities.some((e) => e.layerId === layer.id),
+  )
 
   return (
-    <div className="flex h-full min-w-0 flex-col">
+    <div className="flex min-w-0 flex-col">
       <div className="flex shrink-0 items-center justify-between gap-2 border-b border-border px-4 py-3">
         <h2 className="text-sm font-semibold">Layers</h2>
         {!readOnly && (
@@ -67,15 +80,8 @@ export function LayersPanel({
           </Button>
         )}
       </div>
-      <div className="min-h-0 flex-1 space-y-1 overflow-y-auto p-4">
-        {(() => {
-          const visibleLayers = layers.filter(
-            (layer) =>
-              layer.osmData != null ||
-              layer.kind === "custom" ||
-              entities.some((e) => e.layerId === layer.id),
-          )
-          return visibleLayers.map((layer, index) => {
+      <div className="min-h-0 flex-1 space-y-1 p-4">
+        {visibleLayers.map((layer, index) => {
           const isOsmLayer = layer.osmData != null
           const isCustomLayer = layer.kind === "custom"
           const layerEntities = entities.filter((e) => e.layerId === layer.id)
@@ -83,20 +89,25 @@ export function LayersPanel({
           const nextLayer = visibleLayers[index + 1]
           const canMoveUp = isCustomLayer && prevLayer?.kind === "custom"
           const canMoveDown = isCustomLayer && nextLayer?.kind === "custom"
+
           return (
             <div key={layer.id} className="rounded-md border">
               <div
                 className="flex items-center justify-between gap-2 px-3 py-2"
-                onContextMenu={readOnly ? undefined : (e) => {
-                  e.preventDefault()
-                  setContextMenu({ layerId: layer.id, x: e.clientX, y: e.clientY })
-                }}
+                onContextMenu={
+                  readOnly
+                    ? undefined
+                    : (e) => {
+                        e.preventDefault()
+                        setContextMenu({ layerId: layer.id, x: e.clientX, y: e.clientY })
+                      }
+                }
               >
                 <button
                   type="button"
                   className="flex min-w-0 flex-1 items-center gap-2 text-left"
                   onClick={() => !isOsmLayer && onToggleExpanded(layer.id, !layer.expanded)}
-                  title={isOsmLayer ? undefined : layer.expanded ? "Collapse" : readOnly ? "Expand" : "Expand. Right-click to rename or delete."}
+                  title={getLayerTitle(isOsmLayer, layer.expanded, readOnly)}
                 >
                   {!isOsmLayer && (
                     <span className="text-muted-foreground">
@@ -108,7 +119,9 @@ export function LayersPanel({
                     <div className="truncate text-xs text-muted-foreground">
                       {isOsmLayer
                         ? "OSM layer"
-                        : `${layerEntities.length} ${layerEntities.length === 1 ? "entity" : "entities"}`}
+                        : `${layerEntities.length} ${
+                            layerEntities.length === 1 ? "entity" : "entities"
+                          }`}
                     </div>
                   </div>
                 </button>
@@ -149,10 +162,7 @@ export function LayersPanel({
                 <div className="border-t bg-muted/30 px-3 py-2">
                   <div className="flex flex-col gap-1">
                     {layerEntities.map((entity) => (
-                      <div
-                        key={entity.id}
-                        className="flex items-center gap-1"
-                      >
+                      <div key={entity.id} className="flex items-center gap-1">
                         <button
                           type="button"
                           onClick={() => onSelectEntity(entity.id)}
@@ -184,8 +194,7 @@ export function LayersPanel({
               )}
             </div>
           )
-          })
-        })()}
+        })}
       </div>
 
       {!readOnly && contextMenu && (

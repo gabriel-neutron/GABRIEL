@@ -44,6 +44,8 @@ export type MapEntity = {
   militaryUnitId?: string | null
   /** Free-form notes. */
   notes?: string | null
+  /** Sources for this entity as a newline-delimited list of URLs/citations. */
+  sources?: string | null
 }
 
 export type DrawnGeometry =

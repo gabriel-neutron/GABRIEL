@@ -98,6 +98,11 @@ export function MainLayout({
   const defaultLayerId = layers.filter((l) => l.osmData == null)[0]?.id ?? ""
   const assignableLayers = layers.filter((l) => l.osmData == null)
 
+  const handleSelectEntity = (id: string | null): void => {
+    setSelectedEntityId(id)
+    setSelectedOsmObject(null)
+  }
+
   return (
     <AppShell
       readOnly={readOnly}
@@ -115,10 +120,7 @@ export function MainLayout({
           onLinkGeometryToEntity={handleLinkGeometryToEntity}
           defaultLayerId={defaultLayerId}
           selectedEntityId={selectedEntityId}
-          onSelectEntity={(id) => {
-            setSelectedEntityId(id)
-            setSelectedOsmObject(null)
-          }}
+          onSelectEntity={handleSelectEntity}
           onSelectOsmObject={handleSelectOsmObject}
           showNetworks={showNetworks}
           baseMap={baseMap}
@@ -128,7 +130,7 @@ export function MainLayout({
         <TreeView
           entities={entities}
           selectedEntityId={selectedEntityId}
-          onSelectEntity={setSelectedEntityId}
+          onSelectEntity={handleSelectEntity}
         />
       }
       leftSlot={
@@ -137,7 +139,7 @@ export function MainLayout({
           layers={layers}
           entities={entities}
           selectedEntityId={selectedEntityId}
-          onSelectEntity={setSelectedEntityId}
+          onSelectEntity={handleSelectEntity}
           onToggleVisible={setLayerVisible}
           onToggleExpanded={setLayerExpanded}
           onRemoveLayer={removeLayer}

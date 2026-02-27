@@ -152,11 +152,13 @@ export function EditPage({ onViewMode, onOpenAbout }: EditPageProps): React.Reac
     const entity = entityFromGeometry(geom, defaultLayerId)
     setEntities((prev) => [...prev, entity])
     setDrawnGeometries((prev) => [...prev, { ...geom, entityId: entity.id }])
+    setSelectedOsmObject(null)
     setSelectedEntityId(entity.id)
   }
 
   function handleLinkGeometryToEntity(geom: DrawnGeometry, entityId: string): void {
     setDrawnGeometries((prev) => [...prev, { ...geom, entityId }])
+    setSelectedOsmObject(null)
     setSelectedEntityId(entityId)
   }
 

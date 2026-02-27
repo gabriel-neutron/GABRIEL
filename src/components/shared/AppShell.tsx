@@ -174,15 +174,15 @@ export function AppShell({
         </header>
 
         <div
-          className="grid min-w-0 flex-1"
+          className="grid min-h-0 min-w-0 flex-1"
           style={{
-            gridTemplateColumns: `320px 1fr ${
-              rightPanelOpen ? "360px" : "0px"
-            }`,
+            gridTemplateColumns: `320px 1fr ${rightPanelOpen ? "360px" : "0px"}`,
           }}
         >
-          <aside className="flex min-h-0 min-w-0 flex-col overflow-hidden border-r border-border">
-            <div className="min-h-0 flex-1 overflow-auto">{leftSlot}</div>
+          <aside className="flex min-h-0 min-w-0 flex-col border-r border-border overflow-hidden">
+            <div className="min-h-0 w-full flex-1 overflow-y-auto overflow-x-hidden">
+              {leftSlot}
+            </div>
           </aside>
 
           <main className="min-w-0">
@@ -191,7 +191,9 @@ export function AppShell({
 
           <aside
             className={
-              rightPanelOpen ? "flex min-h-0 min-w-0 flex-col overflow-hidden border-l border-border bg-sidebar text-sidebar-foreground" : "hidden"
+              rightPanelOpen
+                ? "flex min-h-0 min-w-0 flex-col border-l border-border bg-sidebar text-sidebar-foreground overflow-hidden"
+                : "hidden"
             }
           >
             <div className="flex shrink-0 items-center justify-end border-b border-border px-2 py-1">
@@ -199,7 +201,9 @@ export function AppShell({
                 Close
               </Button>
             </div>
-            <div className="min-h-0 flex-1 overflow-auto">{rightSlot}</div>
+            <div className="min-h-0 w-full flex-1 overflow-y-auto overflow-x-hidden">
+              {rightSlot}
+            </div>
           </aside>
         </div>
       </div>

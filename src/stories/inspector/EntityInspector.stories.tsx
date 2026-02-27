@@ -34,6 +34,7 @@ const defaultEntities: MapEntity[] = [
     domain: "Ground",
     militaryUnitId: "MU-001",
     notes: "Deployed in sector Alpha.",
+    sources: "https://example.com/unit-briefing\nField report #23-7",
     osmRelationId: null,
   },
 ]
