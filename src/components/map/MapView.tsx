@@ -80,6 +80,7 @@ type Props = {
     id: number,
     cachedFeature?: GeoJSON.Feature & { id?: string }
   ) => void
+  hiddenEntityIds?: Set<string>
 }
 
 export function MapView({
@@ -97,6 +98,7 @@ export function MapView({
   showNetworks = false,
   baseMap = "osm",
   onSelectOsmObject,
+  hiddenEntityIds,
 }: Props) {
   const tileConfig = BASE_MAP_TILE_CONFIG[baseMap]
 
@@ -192,6 +194,7 @@ export function MapView({
           entities={entities}
           drawnGeometries={drawnGeometries}
           visibleLayerIds={visibleLayerIds}
+          hiddenEntityIds={hiddenEntityIds}
           onSelectEntity={onSelectEntity}
         />
         <NetworkLinksLayer

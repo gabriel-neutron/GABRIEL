@@ -9,6 +9,7 @@ type Props = {
   entities: MapEntity[]
   drawnGeometries: DrawnGeometry[]
   visibleLayerIds: Set<string>
+  hiddenEntityIds?: Set<string>
   onSelectEntity: (id: string | null) => void
 }
 
@@ -21,10 +22,10 @@ function makeSymbolIcon(svg: string, anchor: { x: number; y: number }, width: nu
   })
 }
 
-export function SymbolsLayer({ entities, drawnGeometries, visibleLayerIds, onSelectEntity }: Props) {
+export function SymbolsLayer({ entities, drawnGeometries, visibleLayerIds, hiddenEntityIds, onSelectEntity }: Props) {
   const entitiesOnVisibleLayers = useMemo(
-    () => entities.filter((e) => visibleLayerIds.has(e.layerId)),
-    [entities, visibleLayerIds],
+    () => entities.filter((e) => visibleLayerIds.has(e.layerId) && !hiddenEntityIds?.has(e.id)),
+    [entities, visibleLayerIds, hiddenEntityIds],
   )
 
   return (

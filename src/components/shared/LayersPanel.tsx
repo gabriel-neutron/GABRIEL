@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react"
+import { Eye, EyeOff } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Switch } from "@/components/ui/switch"
 import type { Layer, MapEntity } from "@/types/domain.types"
 
 type Props = {
@@ -152,10 +152,20 @@ export function LayersPanel({
                       </Button>
                     </>
                   )}
-                  <Switch
-                    checked={layer.visible}
-                    onCheckedChange={(checked) => onToggleVisible(layer.id, checked)}
-                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-xs"
+                    className="h-5 w-5 shrink-0 text-muted-foreground"
+                    onClick={() => onToggleVisible(layer.id, !layer.visible)}
+                    title={layer.visible ? "Hide" : "Show"}
+                  >
+                    {layer.visible ? (
+                      <Eye className="h-3 w-3" />
+                    ) : (
+                      <EyeOff className="h-3 w-3" />
+                    )}
+                  </Button>
                 </div>
               </div>
               {!isOsmLayer && layer.expanded && layerEntities.length > 0 && (

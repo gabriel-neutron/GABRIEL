@@ -1,14 +1,32 @@
+import { useState } from "react"
 import { MapView } from "@/components/map/MapView"
 import { EntityInspector } from "@/components/inspector/EntityInspector"
 import { OsmObjectInspector } from "@/components/inspector/OsmObjectInspector"
 import { AppShell } from "@/components/shared/AppShell"
 import { LayersPanel } from "@/components/shared/LayersPanel"
+import { HierarchyPanel } from "@/components/shared/HierarchyPanel"
 import { ShowNetworksToggle } from "@/components/shared/ShowNetworksToggle"
 import { TreeView } from "@/components/tree/TreeView"
 import { OsmQueryMenu } from "@/components/shared/OsmQueryMenu"
 import { BaseMapSwitcher, type BaseMapId } from "@/components/shared/BaseMapSwitcher"
 import { ModeToggle } from "@/components/shared/ModeToggle"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import type { Layer, MapEntity, DrawnGeometry } from "@/types/domain.types"
+
+function collectDescendants(entities: MapEntity[], rootId: string): string[] {
+  const result: string[] = [rootId]
+  const queue = [rootId]
+  while (queue.length > 0) {
+    const current = queue.shift()!
+    for (const e of entities) {
+      if (e.parentId === current) {
+        result.push(e.id)
+        queue.push(e.id)
+      }
+    }
+  }
+  return result
+}
 
 type SelectedOsmObject = {
   type: "node" | "way" | "relation"
@@ -95,6 +113,18 @@ export function MainLayout({
   onOpenProject,
   onSaveProject,
 }: MainLayoutProps) {
+  const [leftMode, setLeftMode] = useState<"layers" | "hierarchy">("layers")
+  const [hiddenEntityIds, setHiddenEntityIds] = useState<Set<string>>(new Set())
+
+  function handleToggleEntityVisible(entityId: string, visible: boolean) {
+    const affected = collectDescendants(entities, entityId)
+    setHiddenEntityIds((prev) => {
+      const next = new Set(prev)
+      affected.forEach((id) => (visible ? next.delete(id) : next.add(id)))
+      return next
+    })
+  }
+
   const defaultLayerId = layers.filter((l) => l.osmData == null)[0]?.id ?? ""
   const assignableLayers = layers.filter((l) => l.osmData == null)
 
@@ -124,6 +154,7 @@ export function MainLayout({
           onSelectOsmObject={handleSelectOsmObject}
           showNetworks={showNetworks}
           baseMap={baseMap}
+          hiddenEntityIds={hiddenEntityIds}
         />
       }
       treeSlot={
@@ -134,20 +165,42 @@ export function MainLayout({
         />
       }
       leftSlot={
-        <LayersPanel
-          readOnly={readOnly}
-          layers={layers}
-          entities={entities}
-          selectedEntityId={selectedEntityId}
-          onSelectEntity={handleSelectEntity}
-          onToggleVisible={setLayerVisible}
-          onToggleExpanded={setLayerExpanded}
-          onRemoveLayer={removeLayer}
-          onRenameLayer={renameLayer}
-          onAddLayer={addNewLayer}
-          onRemoveEntity={handleDeleteEntity}
-          onMoveLayer={moveLayer}
-        />
+        <div className="flex h-full flex-col">
+          <div className="shrink-0 border-b border-border px-3 py-2">
+            <Tabs value={leftMode} onValueChange={(v) => setLeftMode(v as typeof leftMode)}>
+              <TabsList className="w-full">
+                <TabsTrigger value="layers" className="flex-1 text-xs">Layers</TabsTrigger>
+                <TabsTrigger value="hierarchy" className="flex-1 text-xs">Army</TabsTrigger>
+              </TabsList>
+            </Tabs>
+          </div>
+          <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
+            {leftMode === "layers" ? (
+              <LayersPanel
+                readOnly={readOnly}
+                layers={layers}
+                entities={entities}
+                selectedEntityId={selectedEntityId}
+                onSelectEntity={handleSelectEntity}
+                onToggleVisible={setLayerVisible}
+                onToggleExpanded={setLayerExpanded}
+                onRemoveLayer={removeLayer}
+                onRenameLayer={renameLayer}
+                onAddLayer={addNewLayer}
+                onRemoveEntity={handleDeleteEntity}
+                onMoveLayer={moveLayer}
+              />
+            ) : (
+              <HierarchyPanel
+                entities={entities}
+                selectedEntityId={selectedEntityId}
+                hiddenEntityIds={hiddenEntityIds}
+                onSelectEntity={(id) => handleSelectEntity(id)}
+                onToggleEntityVisible={handleToggleEntityVisible}
+              />
+            )}
+          </div>
+        </div>
       }
       headerSlot={
         <>

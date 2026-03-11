@@ -76,7 +76,7 @@ export function MapSearch() {
       className="absolute right-2 top-2 z-[1000] w-80 max-w-[calc(100%-1rem)]"
       onClick={(e) => e.stopPropagation()}
     >
-      <div className="flex gap-1">
+      <div className="flex gap-1 rounded-md border bg-background/95 p-1 shadow-md backdrop-blur-sm">
         <Input
           type="text"
           placeholder="Place, city or OSM ID (e.g. way 123)"

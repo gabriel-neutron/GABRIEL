@@ -188,6 +188,14 @@ export function isValidSidc(sidc: string): boolean {
 }
 
 /**
+ * Extracts the first whitespace-separated token from a unit name and uppercases it.
+ * E.g. "37th Infantry Division" → "37TH". Returns "" if name is empty.
+ */
+function extractShortLabel(name: string): string {
+  return /^(\S+)/.exec(name)?.[1]?.toUpperCase() ?? ""
+}
+
+/**
  * Returns SIDC and options for a unit. Prefers stored nato_symbol_code when valid;
  * otherwise derives from type, echelon, domain (Land only for now).
  */
@@ -215,7 +223,7 @@ export function getSymbolForUnit(input: SymbolServiceInput): SymbolServiceOutput
   return {
     sidc,
     options: {
-      uniqueDesignation: unit.name,
+      uniqueDesignation: extractShortLabel(unit.name),
       size: 40,
     },
   }

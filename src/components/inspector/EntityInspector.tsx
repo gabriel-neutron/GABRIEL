@@ -11,6 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { FilterableSelect } from "@/components/tree/FilterableSelect"
 import type { DrawnGeometry, Layer, MapEntity } from "@/types/domain.types"
 import {
   AFFILIATION_OPTIONS,
@@ -363,24 +364,14 @@ export function EntityInspector({
           )}
           <Field className={isEchelonLayerSelected ? "col-span-2" : undefined}>
             <FieldLabel>Parent (optional)</FieldLabel>
-            <Select
+            <FilterableSelect
+              options={parentOptions.map((p) => ({ id: p.id, name: p.name, echelon: p.echelon }))}
               value={entity.parentId ?? "__none__"}
               onValueChange={(v) =>
                 onUpdateEntity(entity.id, { parentId: v === "__none__" ? null : v })
               }
-            >
-              <SelectTrigger className="h-8 text-xs">
-                <SelectValue placeholder="No parent" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__none__">No parent</SelectItem>
-                {parentOptions.map((parent) => (
-                  <SelectItem key={parent.id} value={parent.id}>
-                    {parent.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              className="w-full"
+            />
           </Field>
         </div>
         <Field>
