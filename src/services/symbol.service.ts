@@ -5,7 +5,13 @@
 
 import ms from "milsymbol"
 import type { MapEntity } from "@/types/domain.types"
-import type { SymbolAffiliation, SymbolDomain, SymbolEchelon, SymbolServiceInput, SymbolServiceOutput } from "@/types/symbol.types"
+import type {
+  SymbolAffiliation,
+  SymbolDomain,
+  SymbolEchelon,
+  SymbolServiceInput,
+  SymbolServiceOutput,
+} from "@/types/symbol.types"
 
 const SIDC_LENGTH = 20
 const VERSION_2525D = "10"
@@ -195,6 +201,16 @@ function extractShortLabel(name: string): string {
   return /^(\S+)/.exec(name)?.[1]?.toUpperCase() ?? ""
 }
 
+function extractInitials(name: string, maxLetters = 3): string {
+  const words = name
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+  if (words.length === 0) return ""
+  const initials = words.map((w) => w[0]?.toUpperCase() ?? "").join("")
+  return initials.slice(0, maxLetters)
+}
+
 /**
  * Returns SIDC and options for a unit. Prefers stored nato_symbol_code when valid;
  * otherwise derives from type, echelon, domain (Land only for now).
@@ -273,4 +289,35 @@ export function renderSymbol(sidc: string, options: SymbolServiceOutput["options
   }
   renderCache.set(key, result)
   return result
+}
+
+function buildDistrictSymbol(entity: MapEntity, size: number): RenderedSymbol {
+  const label = extractInitials(entity.name, 3) || extractShortLabel(entity.name) || "MD"
+  const width = size
+  const height = size
+  const half = size / 2
+  const svg = [
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">`,
+    `<rect x="1" y="1" width="${width - 2}" height="${height - 2}" fill="white" stroke="black" stroke-width="2" rx="4" ry="4" />`,
+    `<text x="${half}" y="${half}" text-anchor="middle" dominant-baseline="central" font-size="${size * 0.35}" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif">`,
+    label,
+    "</text>",
+    "</svg>",
+  ].join("")
+
+  return {
+    svg,
+    anchor: { x: half, y: half },
+    width,
+    height,
+  }
+}
+
+export function getRenderedSymbolForEntity(entity: MapEntity, size = 40): RenderedSymbol {
+  if (entity.echelon === "Region/Theater") {
+    return buildDistrictSymbol(entity, size)
+  }
+  const input = mapEntityToSymbolInput(entity)
+  const { sidc, options } = getSymbolForUnit(input)
+  return renderSymbol(sidc, { ...options, size })
 }

@@ -3,6 +3,8 @@ import { useState, useRef, type ReactNode } from "react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { cn } from "@/lib/utils"
+import { useTheme } from "@/provider/theme-provider"
 
 type Props = {
   mapSlot: ReactNode
@@ -18,12 +20,6 @@ type Props = {
   onNewProject: () => void
   onOpenProject: (file: File) => void
   onSaveProject: () => void
-  canUndo: boolean
-  canRedo: boolean
-  onUndo: () => void
-  onRedo: () => void
-  historyBusy: boolean
-  historyError: string | null
   readOnly?: boolean
   onOpenAbout?: () => void
   onSwitchToEdit?: () => void
@@ -44,12 +40,6 @@ export function AppShell({
   onNewProject,
   onOpenProject,
   onSaveProject,
-  canUndo,
-  canRedo,
-  onUndo,
-  onRedo,
-  historyBusy,
-  historyError,
   readOnly = false,
   onOpenAbout,
   onSwitchToEdit,
@@ -57,6 +47,8 @@ export function AppShell({
 }: Props) {
   const [activeView, setActiveView] = useState<"map" | "tree">("map")
   const fileInputRef = useRef<HTMLInputElement | null>(null)
+  const { theme } = useTheme()
+  const isDark = theme === "dark"
 
   const rightPanelOpen = selectedEntityId !== null || selectedOsmObject !== null
 
@@ -66,7 +58,12 @@ export function AppShell({
         <header className="border-b border-border">
           <div className="flex h-14 items-center justify-between gap-4 px-5">
             <div className="flex items-center gap-3">
-              <img src="/favicon.svg" alt="Gabriel" className="h-8 w-8 shrink-0" aria-hidden />
+              <img
+                src="/favicon.svg"
+                alt="Gabriel"
+                className={cn("h-8 w-8 shrink-0", isDark ? "invert" : "")}
+                aria-hidden
+              />
               <Tabs value={activeView} onValueChange={(v) => setActiveView(v as typeof activeView)}>
               <TabsList>
                 <TabsTrigger value="map">Map</TabsTrigger>
@@ -125,25 +122,6 @@ export function AppShell({
                     title="Save project"
                   >
                     Save
-                  </Button>
-                  <div className="mx-1 h-6 w-px bg-border" />
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={onUndo}
-                    disabled={!canUndo || historyBusy}
-                    title={historyError ?? "Undo"}
-                  >
-                    Undo
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={onRedo}
-                    disabled={!canRedo || historyBusy}
-                    title={historyError ?? "Redo"}
-                  >
-                    Redo
                   </Button>
                 </>
               )}

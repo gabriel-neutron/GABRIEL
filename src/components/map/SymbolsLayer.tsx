@@ -1,7 +1,7 @@
 import { useMemo } from "react"
 import L from "leaflet"
 import { Marker, Popup } from "react-leaflet"
-import { getSymbolForUnit, mapEntityToSymbolInput, renderSymbol } from "@/services/symbol.service"
+import { getRenderedSymbolForEntity } from "@/services/symbol.service"
 import type { DrawnGeometry, MapEntity } from "@/types/domain.types"
 import { getEntityDisplayPosition } from "@/utils/geometry"
 
@@ -34,9 +34,7 @@ export function SymbolsLayer({ entities, drawnGeometries, visibleLayerIds, hidde
         const position = getEntityDisplayPosition(entity.id, drawnGeometries)
         if (!position) return null
 
-        const input = mapEntityToSymbolInput(entity)
-        const { sidc, options } = getSymbolForUnit(input)
-        const { svg, anchor, width, height } = renderSymbol(sidc, options)
+        const { svg, anchor, width, height } = getRenderedSymbolForEntity(entity)
         const icon = makeSymbolIcon(svg, anchor, width, height)
 
         return (

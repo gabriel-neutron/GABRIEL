@@ -148,7 +148,7 @@ export function HierarchyPanel({
   return (
     <div className="flex min-w-0 flex-col">
       <div className="shrink-0 border-b border-border px-4 py-3">
-        <h2 className="text-sm font-semibold">Army</h2>
+        <h2 className="text-sm font-semibold">Hierarchy</h2>
       </div>
       <div className="min-h-0 flex-1 space-y-px overflow-y-auto p-2">
         {roots.length === 0 ? (

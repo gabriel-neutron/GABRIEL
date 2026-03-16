@@ -87,6 +87,7 @@ export function EntityInspector({
     isEchelonLayerSelected,
     findDialogOpen,
     setFindDialogOpen,
+    handleNameChange,
     handleEchelonChange,
     handleSelectOsmRelation,
     sources,
@@ -180,7 +181,7 @@ export function EntityInspector({
           <FieldLabel>Name</FieldLabel>
           <Input
             value={entity.name}
-            onChange={(e) => onUpdateEntity(entity.id, { name: e.target.value })}
+            onChange={(e) => handleNameChange(e.target.value)}
           />
         </Field>
         <Field>

@@ -26,10 +26,16 @@ export type EditPageProps = {
 const EMPTY_ENTITIES: MapEntity[] = []
 const EMPTY_GEOMETRIES: DrawnGeometry[] = []
 
-function entityFromGeometry(geom: DrawnGeometry, defaultLayerId: string): MapEntity {
+function entityFromGeometry(geom: DrawnGeometry, defaultLayerId: string, parentId: string | null): MapEntity {
   const id = crypto.randomUUID()
   const layerId = geom.layerId ?? defaultLayerId
-  return { id, name: "New entity", layerId, parentId: null }
+  return {
+    id,
+    name: "New entity",
+    layerId,
+    parentId,
+    affiliation: "Hostile",
+  }
 }
 
 export function EditPage({ onViewMode, onOpenAbout }: EditPageProps): React.ReactElement {
@@ -38,7 +44,7 @@ export function EditPage({ onViewMode, onOpenAbout }: EditPageProps): React.Reac
   const [drawnGeometries, setDrawnGeometries] = useState<DrawnGeometry[]>(EMPTY_GEOMETRIES)
   const [selectedEntityId, setSelectedEntityId] = useState<string | null>(null)
   const [selectedOsmObject, setSelectedOsmObject] = useState<SelectedOsmObject>(null)
-  const [showNetworks, setShowNetworks] = useState(false)
+  const [showNetworks, setShowNetworks] = useState(true)
   const [baseMap, setBaseMap] = useState<BaseMapId>("osm")
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -149,7 +155,7 @@ export function EditPage({ onViewMode, onOpenAbout }: EditPageProps): React.Reac
   const defaultLayerId = layers.filter((l) => l.osmData == null)[0]?.id ?? ""
 
   function handleCreateNewEntity(geom: DrawnGeometry): void {
-    const entity = entityFromGeometry(geom, defaultLayerId)
+    const entity = entityFromGeometry(geom, defaultLayerId, selectedEntityId)
     setEntities((prev) => [...prev, entity])
     setDrawnGeometries((prev) => [...prev, { ...geom, entityId: entity.id }])
     setSelectedOsmObject(null)

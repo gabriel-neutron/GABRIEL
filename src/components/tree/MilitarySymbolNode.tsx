@@ -1,5 +1,5 @@
 import { Handle, type NodeProps, Position } from "reactflow"
-import { getSymbolForUnit, mapEntityToSymbolInput, renderSymbol } from "@/services/symbol.service"
+import { getRenderedSymbolForEntity } from "@/services/symbol.service"
 import type { MapEntity } from "@/types/domain.types"
 
 const TREE_SYMBOL_SIZE = 28
@@ -11,9 +11,7 @@ export type MilitarySymbolNodeData = {
 
 export function MilitarySymbolNode({ data }: NodeProps<MilitarySymbolNodeData>) {
   const entity = data.entity
-  const input = mapEntityToSymbolInput(entity)
-  const { sidc, options } = getSymbolForUnit(input)
-  const { svg, width, height } = renderSymbol(sidc, { ...options, size: TREE_SYMBOL_SIZE })
+  const { svg, width, height } = getRenderedSymbolForEntity(entity, TREE_SYMBOL_SIZE)
 
   return (
     <div

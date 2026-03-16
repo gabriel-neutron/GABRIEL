@@ -12,6 +12,17 @@ function parseSources(raw?: string | null): string[] {
     .filter((s) => s.length > 0)
 }
 
+function detectEchelonFromName(name: string): SymbolEchelon | null {
+  const n = name.toLowerCase()
+  if (n.includes("division")) return "Division"
+  if (n.includes("brigade")) return "Brigade"
+  if (n.includes("regiment") || n.includes("régiment")) return "Regiment/group"
+  if (n.includes("battalion") || n.includes("bataillon")) return "Battalion/squadron"
+  if (n.includes("company") || n.includes("compagnie")) return "Company/battery/troop"
+  if (n.includes("platoon") || n.includes("section")) return "Platoon/detachment"
+  return null
+}
+
 export type UseEntityInspectorArgs = {
   selectedEntityId: string | null
   entities: MapEntity[]
@@ -26,7 +37,7 @@ export type EntityInspectorState = {
   layerName: string
   parentName: string | null
   typeValue: string
-  echelonValue: SymbolEchelon
+  echelonValue: SymbolEchelon | ""
   affiliationValue: SymbolAffiliation
   domainValue: SymbolDomain
   parentOptions: MapEntity[]
@@ -36,6 +47,7 @@ export type EntityInspectorState = {
   newSource: string
   findDialogOpen: boolean
   setFindDialogOpen: (open: boolean) => void
+  handleNameChange: (name: string) => void
   handleEchelonChange: (v: string) => void
   handleSelectOsmRelation: (relationId: number) => void
   setNewSource: (value: string) => void
@@ -69,8 +81,8 @@ export function useEntityInspector({
       : null
 
   const typeValue = entity?.type ?? "unknown"
-  const echelonValue = (entity?.echelon as SymbolEchelon) ?? "Division"
-  const affiliationValue = (entity?.affiliation as SymbolAffiliation) ?? "Friend"
+  const echelonValue = (entity?.echelon as SymbolEchelon | undefined) ?? ""
+  const affiliationValue = (entity?.affiliation as SymbolAffiliation) ?? "Hostile"
   const domainValue = (entity?.domain as SymbolDomain) ?? "Ground"
   const parentOptions = entity ? entities.filter((e) => e.id !== entity.id) : []
   const firstPoint = linkedGeometries.find((g) => g.type === "point")
@@ -78,6 +90,21 @@ export function useEntityInspector({
     entity != null &&
     layers.some((l) => l.kind === "echelon" && l.id === entity.layerId)
   const sources = entity ? parseSources(entity.sources) : []
+
+  const handleNameChange = useCallback(
+    (name: string) => {
+      if (!entity) return
+      const patch: Partial<MapEntity> = { name }
+      if (!entity.echelon || entity.echelon === "") {
+        const detected = detectEchelonFromName(name)
+        if (detected) {
+          patch.echelon = detected
+        }
+      }
+      onUpdateEntity(entity.id, patch)
+    },
+    [entity, onUpdateEntity],
+  )
 
   const handleEchelonChange = useCallback(
     (v: string) => {
@@ -133,6 +160,7 @@ export function useEntityInspector({
     newSource,
     findDialogOpen,
     setFindDialogOpen,
+    handleNameChange,
     handleEchelonChange,
     handleSelectOsmRelation,
     setNewSource,

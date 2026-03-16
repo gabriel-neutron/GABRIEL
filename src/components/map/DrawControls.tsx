@@ -66,7 +66,12 @@ export function DrawControls({
 
     let handler: L.Draw.Marker | L.Draw.Polyline | L.Draw.Polygon
     if (geometryType === "point") {
-      handler = new L.Draw.Marker(drawMap, { icon: new L.Icon.Default() })
+      const invisibleIcon = L.divIcon({
+        className: "",
+        html: "",
+        iconSize: [0, 0],
+      })
+      handler = new L.Draw.Marker(drawMap, { icon: invisibleIcon })
     } else if (geometryType === "line") {
       handler = new L.Draw.Polyline(drawMap, {
         allowIntersection: false,

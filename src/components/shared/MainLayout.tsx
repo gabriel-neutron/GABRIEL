@@ -73,8 +73,6 @@ export type MainLayoutProps = {
   onSaveProject: () => void
 }
 
-const noop = () => {}
-
 export function MainLayout({
   readOnly,
   onOpenAbout,
@@ -241,12 +239,6 @@ export function MainLayout({
       onNewProject={onNewProject}
       onOpenProject={onOpenProject}
       onSaveProject={onSaveProject}
-      canUndo={false}
-      canRedo={false}
-      onUndo={noop}
-      onRedo={noop}
-      historyBusy={false}
-      historyError={null}
     />
   )
 }
