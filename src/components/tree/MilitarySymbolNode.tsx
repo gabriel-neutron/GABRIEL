@@ -19,9 +19,9 @@ export function MilitarySymbolNode({ data }: NodeProps<MilitarySymbolNodeData>) 
       style={{ width, height }}
       title={data.label}
     >
-      <Handle type="target" position={Position.Left} isConnectable={false} />
+      <Handle type="target" position={Position.Top} isConnectable={false} />
       <div dangerouslySetInnerHTML={{ __html: svg }} />
-      <Handle type="source" position={Position.Right} isConnectable={false} />
+      <Handle type="source" position={Position.Bottom} isConnectable={false} />
     </div>
   )
 }

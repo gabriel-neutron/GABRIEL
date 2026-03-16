@@ -4,8 +4,11 @@ import type { MapEntity } from "@/types/domain.types"
 import { MilitarySymbolNode } from "./MilitarySymbolNode"
 
 const nodeTypes = { militarySymbol: MilitarySymbolNode }
-const X_SPACING_PER_LEVEL = 320
-const Y_SPACING = 100
+
+// Horizontal spacing between sibling units (same level)
+const H_SPACING = 110
+// Vertical spacing between hierarchical levels
+const V_SPACING = 130
 
 type Props = {
   entities: MapEntity[]
@@ -17,35 +20,86 @@ export function TreeView({ entities, selectedEntityId, onSelectEntity }: Props) 
   const { nodes, edges } = useMemo(() => {
     const nodeMap = new Map<string, Node>()
     const edgeList: Edge[] = []
-    let y = 0
 
-    function buildTree(parentId: string | null, depth: number) {
-      const children = entities.filter((e) => e.parentId === parentId)
-      for (const entity of children) {
-        const nodeId = String(entity.id)
-        if (!nodeMap.has(nodeId)) {
-          nodeMap.set(nodeId, {
-            id: nodeId,
-            type: "militarySymbol",
-            position: { x: depth * X_SPACING_PER_LEVEL, y: y * Y_SPACING },
-            data: { label: entity.name, entity },
-            sourcePosition: Position.Right,
-            targetPosition: Position.Left,
-          })
-          y++
-        }
-        if (entity.parentId != null) {
-          edgeList.push({
-            id: `e-${entity.parentId}-${nodeId}`,
-            source: String(entity.parentId),
-            target: nodeId,
-          })
-        }
-        buildTree(nodeId, depth + 1)
+    const childrenByParent = new Map<string | null, MapEntity[]>()
+    for (const entity of entities) {
+      const parentKey = (entity.parentId ?? null) as string | null
+      if (!childrenByParent.has(parentKey)) {
+        childrenByParent.set(parentKey, [])
       }
+      childrenByParent.get(parentKey)!.push(entity)
     }
 
-    buildTree(null, 0)
+    const roots = childrenByParent.get(null) ?? []
+
+    const xIndexById = new Map<string, number>()
+    let currentXIndex = 0
+
+    function layoutEntity(entity: MapEntity): number {
+      const children = childrenByParent.get(entity.id) ?? []
+      const childXIndexes: number[] = []
+
+      for (const child of children) {
+        const childIndex = layoutEntity(child)
+        childXIndexes.push(childIndex)
+      }
+
+      let xIndex: number
+
+      if (childXIndexes.length === 0) {
+        xIndex = currentXIndex
+        currentXIndex += 1
+      } else {
+        const first = childXIndexes[0]
+        const last = childXIndexes[childXIndexes.length - 1]
+        xIndex = (first + last) / 2
+      }
+
+      xIndexById.set(entity.id, xIndex)
+      return xIndex
+    }
+
+    for (const root of roots) {
+      layoutEntity(root)
+    }
+
+    for (const entity of entities) {
+      const nodeId = String(entity.id)
+      const xIndex = xIndexById.get(entity.id)
+
+      if (xIndex == null) continue
+
+      let depth = 0
+      let currentParentId = entity.parentId
+      while (currentParentId != null) {
+        const parent = entities.find((e) => e.id === currentParentId)
+        if (!parent) break
+        depth += 1
+        currentParentId = parent.parentId
+      }
+
+      const position = {
+        x: xIndex * H_SPACING,
+        y: depth * V_SPACING,
+      }
+
+      nodeMap.set(nodeId, {
+        id: nodeId,
+        type: "militarySymbol",
+        position,
+        data: { label: entity.name, entity },
+        sourcePosition: Position.Bottom,
+        targetPosition: Position.Top,
+      })
+
+      if (entity.parentId != null) {
+        edgeList.push({
+          id: `e-${entity.parentId}-${nodeId}`,
+          source: String(entity.parentId),
+          target: nodeId,
+        })
+      }
+    }
 
     return { nodes: Array.from(nodeMap.values()), edges: edgeList }
   }, [entities])
