@@ -20,6 +20,7 @@ import {
   type SymbolAffiliation,
   type SymbolDomain,
 } from "@/types/symbol.types"
+import { Trash2 } from "lucide-react"
 import { UNIT_TYPE_OPTIONS_GROUPED } from "./entityInspector.options"
 import { FindOsmAtPointDialog } from "./FindOsmAtPointDialog"
 import { useEntityInspector } from "./useEntityInspector"
@@ -42,6 +43,12 @@ function ReadOnlyField({ label, children }: { label: string; children: React.Rea
       <div>{children}</div>
     </div>
   )
+}
+
+function capitalizeFirst(value: string): string {
+  const trimmed = value.trim()
+  if (trimmed === "") return ""
+  return trimmed.charAt(0).toUpperCase() + trimmed.slice(1)
 }
 
 type Props = {
@@ -121,18 +128,19 @@ export function EntityInspector({
           <ReadOnlyField label="Sources">
             <ul className="mt-1 space-y-1 text-xs">
               {sources.map((src, index) => (
-                <li key={index} className="truncate">
+                <li key={index} className="flex items-start gap-2">
                   {isUrl(src) ? (
                     <a
                       href={src}
                       target="_blank"
                       rel="noreferrer"
-                      className="text-blue-600 hover:underline"
+                      title={src}
+                      className="min-w-0 flex-1 truncate text-blue-600 hover:underline"
                     >
                       {src}
                     </a>
                   ) : (
-                    <span className="whitespace-pre-wrap">{src}</span>
+                    <span className="min-w-0 flex-1 whitespace-pre-wrap break-words">{src}</span>
                   )}
                 </li>
               ))}
@@ -141,7 +149,9 @@ export function EntityInspector({
         )}
         <div className="grid grid-cols-2 gap-2">
           <ReadOnlyField label="Echelon">{entity.echelon ?? "—"}</ReadOnlyField>
-          <ReadOnlyField label="Type">{entity.type ?? "—"}</ReadOnlyField>
+          <ReadOnlyField label="Type">
+            {entity.type ? capitalizeFirst(entity.type) : "—"}
+          </ReadOnlyField>
         </div>
         <div className="grid grid-cols-2 gap-2">
           <ReadOnlyField label="Affiliation">{entity.affiliation ?? "—"}</ReadOnlyField>
@@ -212,26 +222,31 @@ export function EntityInspector({
           {sources.length > 0 && (
             <ul className="mb-2 space-y-1 text-xs">
               {sources.map((src, index) => (
-                <li key={index} className="flex items-center gap-2">
-                  {isUrl(src) ? (
-                    <a
-                      href={src}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-blue-600 hover:underline"
-                    >
-                      {src}
-                    </a>
-                  ) : (
-                    <span>{src}</span>
-                  )}
+                <li key={index} className="flex items-start gap-2">
+                  <div className="min-w-0 flex-1">
+                    {isUrl(src) ? (
+                      <a
+                        href={src}
+                        target="_blank"
+                        rel="noreferrer"
+                        title={src}
+                        className="block truncate text-blue-600 hover:underline"
+                      >
+                        {src}
+                      </a>
+                    ) : (
+                      <span className="block whitespace-pre-wrap break-words">{src}</span>
+                    )}
+                  </div>
                   <Button
                     type="button"
                     variant="ghost"
                     size="sm"
+                    className="h-7 w-7 shrink-0 p-0"
                     onClick={() => handleRemoveSource(index)}
+                    aria-label="Remove source"
                   >
-                    Remove
+                    <Trash2 className="h-4 w-4" />
                   </Button>
                 </li>
               ))}

@@ -70,6 +70,15 @@ export function LayersPanel({
       entities.some((e) => e.layerId === layer.id),
   )
 
+  const entityHasChildren = useRef<Map<string, boolean>>(new Map())
+  useEffect(() => {
+    const hasChildren = new Map<string, boolean>()
+    for (const e of entities) {
+      if (e.parentId) hasChildren.set(e.parentId, true)
+    }
+    entityHasChildren.current = hasChildren
+  }, [entities])
+
   return (
     <div className="flex min-w-0 flex-col">
       <div className="flex shrink-0 items-center justify-between gap-2 border-b border-border px-4 py-3">
@@ -84,7 +93,15 @@ export function LayersPanel({
         {visibleLayers.map((layer, index) => {
           const isOsmLayer = layer.osmData != null
           const isCustomLayer = layer.kind === "custom"
-          const layerEntities = entities.filter((e) => e.layerId === layer.id)
+          const layerEntities = entities
+            .filter((e) => e.layerId === layer.id)
+            .sort((a, b) => {
+              // “Group” entities first (those with children), then single units; then alphabetically.
+              const aGroup = entityHasChildren.current.get(a.id) === true
+              const bGroup = entityHasChildren.current.get(b.id) === true
+              if (aGroup !== bGroup) return aGroup ? -1 : 1
+              return a.name.localeCompare(b.name, undefined, { sensitivity: "base" })
+            })
           const prevLayer = visibleLayers[index - 1]
           const nextLayer = visibleLayers[index + 1]
           const canMoveUp = isCustomLayer && prevLayer?.kind === "custom"

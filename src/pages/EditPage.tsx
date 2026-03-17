@@ -276,7 +276,12 @@ export function EditPage({ onViewMode, onOpenAbout }: EditPageProps): React.Reac
 
   const handleSaveProject = useCallback(async (): Promise<void> => {
     const nonOsmLayerIds = new Set(layers.filter((l) => l.osmData == null).map((l) => l.id))
-    const persistedEntities = entities.filter((e) => nonOsmLayerIds.has(e.layerId))
+    const persistedEntities = entities
+      .filter((e) => nonOsmLayerIds.has(e.layerId))
+      .map((e) => {
+        const trimmedName = e.name.trim()
+        return { ...e, name: trimmedName === "" ? "Untitled" : trimmedName }
+      })
     const persistedGeometries = drawnGeometries.filter((g) => nonOsmLayerIds.has(g.layerId))
     const gpkgLayers: GpkgLayer[] = layers.map((l) => ({
       id: l.id,

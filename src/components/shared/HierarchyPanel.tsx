@@ -143,7 +143,12 @@ export function HierarchyPanel({
     })
   }
 
-  const roots = entities.filter((e) => e.parentId == null)
+  const roots = entities
+    .filter((e) => e.parentId == null)
+    .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }))
+
+  const collapsibleRoots = roots.filter((r) => hasChildren(r.id, entities))
+  const leafRoots = roots.filter((r) => !hasChildren(r.id, entities))
 
   return (
     <div className="flex min-w-0 flex-col">
@@ -156,20 +161,36 @@ export function HierarchyPanel({
             No units without a parent
           </div>
         ) : (
-          roots.map((root) => (
-            <EntityNode
-              key={root.id}
-              entity={root}
-              depth={0}
-              entities={entities}
-              selectedEntityId={selectedEntityId}
-              hiddenEntityIds={hiddenEntityIds}
-              expandedIds={expandedIds}
-              onSelectEntity={onSelectEntity}
-              onToggleEntityVisible={onToggleEntityVisible}
-              onToggleExpanded={handleToggleExpanded}
-            />
-          ))
+          <>
+            {collapsibleRoots.map((root) => (
+              <EntityNode
+                key={root.id}
+                entity={root}
+                depth={0}
+                entities={entities}
+                selectedEntityId={selectedEntityId}
+                hiddenEntityIds={hiddenEntityIds}
+                expandedIds={expandedIds}
+                onSelectEntity={onSelectEntity}
+                onToggleEntityVisible={onToggleEntityVisible}
+                onToggleExpanded={handleToggleExpanded}
+              />
+            ))}
+            {leafRoots.map((root) => (
+              <EntityNode
+                key={root.id}
+                entity={root}
+                depth={0}
+                entities={entities}
+                selectedEntityId={selectedEntityId}
+                hiddenEntityIds={hiddenEntityIds}
+                expandedIds={expandedIds}
+                onSelectEntity={onSelectEntity}
+                onToggleEntityVisible={onToggleEntityVisible}
+                onToggleExpanded={handleToggleExpanded}
+              />
+            ))}
+          </>
         )}
       </div>
     </div>
