@@ -194,11 +194,16 @@ export function isValidSidc(sidc: string): boolean {
 }
 
 /**
- * Extracts the first whitespace-separated token from a unit name and uppercases it.
- * E.g. "37th Infantry Division" → "37TH". Returns "" if name is empty.
+ * Extracts a leading designation token in the form:
+ * - 1 to 4 digits
+ * - followed by 1 to 2 letters
+ * Examples: "1st", "2nd", "12A", "333rd".
+ * Returns "" when no matching leading token exists.
  */
-function extractShortLabel(name: string): string {
-  return /^(\S+)/.exec(name)?.[1]?.toUpperCase() ?? ""
+function extractNumericDesignation(name: string): string {
+  const firstToken = name.trim().split(/\s+/)[0] ?? ""
+  const cleanedToken = firstToken.replace(/^[^0-9A-Za-z]+|[^0-9A-Za-z]+$/g, "")
+  return /^(\d{1,4}[A-Za-z]{1,2})$/.exec(cleanedToken)?.[1] ?? ""
 }
 
 function extractInitials(name: string, maxLetters = 3): string {
@@ -239,7 +244,7 @@ export function getSymbolForUnit(input: SymbolServiceInput): SymbolServiceOutput
   return {
     sidc,
     options: {
-      uniqueDesignation: extractInitials(unit.name, 3) || extractShortLabel(unit.name),
+      uniqueDesignation: extractNumericDesignation(unit.name) || extractInitials(unit.name, 3),
       size: 40,
     },
   }
