@@ -1,13 +1,7 @@
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
+import { FilterableSelect } from "@/components/tree/FilterableSelect"
 import type { MapEntity } from "@/types/domain.types"
 
 type Props = {
@@ -40,19 +34,12 @@ export function GeometryActionMenu({
         </Field>
         <Field>
           <FieldLabel>Link to existing</FieldLabel>
-          <Select value={linkTarget} onValueChange={handleLinkChange}>
-            <SelectTrigger>
-              <SelectValue placeholder="Choose entity…" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="__none__">Choose entity…</SelectItem>
-              {entities.map((e) => (
-                <SelectItem key={e.id} value={e.id}>
-                  {e.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <FilterableSelect
+            options={entities}
+            value={linkTarget}
+            onValueChange={handleLinkChange}
+            placeholder="Choose entity..."
+          />
         </Field>
         <Field>
           <Button size="sm" variant="ghost"onClick={onCancel}>

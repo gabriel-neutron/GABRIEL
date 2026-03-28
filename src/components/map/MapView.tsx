@@ -12,6 +12,7 @@ import { MapBoundsReporter, type MapBounds } from "./MapBoundsReporter"
 import { useMapDrawing } from "./useMapDrawing"
 import { BASE_MAP_TILE_CONFIG } from "./mapTileConfig"
 import type { Layer, MapEntity, DrawnGeometry } from "@/types/domain.types"
+import { getEffectiveEntityLayerId } from "@/utils/entityLayer"
 import { getEntityDisplayPosition } from "@/utils/geometry"
 import type { BaseMapId } from "@/components/shared/BaseMapSwitcher"
 
@@ -122,13 +123,16 @@ export function MapView({
 
   const drawnByLayerId = useMemo(() => {
     const m = new Map<string, DrawnGeometry[]>()
+    const entityById = new Map(entities.map((e) => [e.id, e]))
     for (const g of drawnGeometries) {
-      const list = m.get(g.layerId) ?? []
+      const linked = g.entityId != null ? entityById.get(g.entityId) : undefined
+      const layerKey = linked != null ? getEffectiveEntityLayerId(linked, layers) : g.layerId
+      const list = m.get(layerKey) ?? []
       list.push(g)
-      m.set(g.layerId, list)
+      m.set(layerKey, list)
     }
     return m
-  }, [drawnGeometries])
+  }, [drawnGeometries, entities, layers])
 
   const visibleLayerIds = useMemo(
     () => new Set(visibleLayersInOrder.map((l) => l.id)),
@@ -191,6 +195,7 @@ export function MapView({
         )}
 
         <SymbolsLayer
+          layers={layers}
           entities={entities}
           drawnGeometries={drawnGeometries}
           visibleLayerIds={visibleLayerIds}

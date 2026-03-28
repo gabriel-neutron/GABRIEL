@@ -10,6 +10,7 @@ import {
 import { loadProject, saveProject, clearProject } from "@/services/projectStorage.service"
 import { fetchRelationGeometry } from "@/services/overpass.service"
 import type { Layer, MapEntity, DrawnGeometry } from "@/types/domain.types"
+import { getDefaultEntityLayerId } from "@/utils/entityLayer"
 import type { BaseMapId } from "@/components/shared/BaseMapSwitcher"
 
 type SelectedOsmObject = {
@@ -152,7 +153,7 @@ export function EditPage({ onViewMode, onOpenAbout }: EditPageProps): React.Reac
     })
   }
 
-  const defaultLayerId = layers.filter((l) => l.osmData == null)[0]?.id ?? ""
+  const defaultLayerId = getDefaultEntityLayerId(layers)
 
   function handleCreateNewEntity(geom: DrawnGeometry): void {
     const entity = entityFromGeometry(geom, defaultLayerId, selectedEntityId)

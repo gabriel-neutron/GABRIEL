@@ -12,6 +12,7 @@ import { BaseMapSwitcher, type BaseMapId } from "@/components/shared/BaseMapSwit
 import { ModeToggle } from "@/components/shared/ModeToggle"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import type { Layer, MapEntity, DrawnGeometry } from "@/types/domain.types"
+import { getDefaultEntityLayerId } from "@/utils/entityLayer"
 
 function collectDescendants(entities: MapEntity[], rootId: string): string[] {
   const result: string[] = [rootId]
@@ -123,7 +124,7 @@ export function MainLayout({
     })
   }
 
-  const defaultLayerId = layers.filter((l) => l.osmData == null)[0]?.id ?? ""
+  const defaultLayerId = getDefaultEntityLayerId(layers)
   const assignableLayers = layers.filter((l) => l.osmData == null)
 
   const handleSelectEntity = (id: string | null): void => {

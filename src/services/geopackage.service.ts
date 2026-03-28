@@ -14,6 +14,7 @@ import {
 } from "@ngageoint/geopackage"
 import { ECHELON_OPTIONS } from "@/types/symbol.types"
 import type { Layer, MapEntity, DrawnGeometry } from "@/types/domain.types"
+import { reconcileEntitiesAndGeometriesWithEchelon } from "@/utils/entityLayer"
 
 // Configure WASM location - use CDN (acceptable per user preference)
 setSqljsWasmLocateFile(
@@ -497,10 +498,16 @@ export function applyGeoPackageResult(
     currentSelectedEntityId != null && result.entities.some((e) => e.id === currentSelectedEntityId)
       ? currentSelectedEntityId
       : null
+  const layers: Layer[] = [...echelonLayers, ...customLayers, ...osmLayers]
+  const { entities, drawnGeometries } = reconcileEntitiesAndGeometriesWithEchelon(
+    result.entities as MapEntity[],
+    result.geometries as DrawnGeometry[],
+    layers,
+  )
   return {
-    layers: [...echelonLayers, ...customLayers, ...osmLayers],
-    entities: result.entities as MapEntity[],
-    drawnGeometries: result.geometries as DrawnGeometry[],
+    layers,
+    entities,
+    drawnGeometries,
     selectedEntityId,
   }
 }

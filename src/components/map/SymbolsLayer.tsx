@@ -2,10 +2,12 @@ import { useMemo } from "react"
 import L from "leaflet"
 import { Marker, Popup } from "react-leaflet"
 import { getRenderedSymbolForEntity } from "@/services/symbol.service"
-import type { DrawnGeometry, MapEntity } from "@/types/domain.types"
+import type { DrawnGeometry, Layer, MapEntity } from "@/types/domain.types"
+import { getEffectiveEntityLayerId } from "@/utils/entityLayer"
 import { getEntityDisplayPosition } from "@/utils/geometry"
 
 type Props = {
+  layers: Layer[]
   entities: MapEntity[]
   drawnGeometries: DrawnGeometry[]
   visibleLayerIds: Set<string>
@@ -22,10 +24,21 @@ function makeSymbolIcon(svg: string, anchor: { x: number; y: number }, width: nu
   })
 }
 
-export function SymbolsLayer({ entities, drawnGeometries, visibleLayerIds, hiddenEntityIds, onSelectEntity }: Props) {
+export function SymbolsLayer({
+  layers,
+  entities,
+  drawnGeometries,
+  visibleLayerIds,
+  hiddenEntityIds,
+  onSelectEntity,
+}: Props) {
   const entitiesOnVisibleLayers = useMemo(
-    () => entities.filter((e) => visibleLayerIds.has(e.layerId) && !hiddenEntityIds?.has(e.id)),
-    [entities, visibleLayerIds, hiddenEntityIds],
+    () =>
+      entities.filter(
+        (e) =>
+          visibleLayerIds.has(getEffectiveEntityLayerId(e, layers)) && !hiddenEntityIds?.has(e.id),
+      ),
+    [entities, layers, visibleLayerIds, hiddenEntityIds],
   )
 
   return (
