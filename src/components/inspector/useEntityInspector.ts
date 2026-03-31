@@ -42,6 +42,7 @@ export type EntityInspectorState = {
   affiliationValue: SymbolAffiliation
   domainValue: SymbolDomain
   positionModeValue: PositionMode
+  isExactPositionValue: boolean
   parentOptions: MapEntity[]
   firstPoint: DrawnGeometry | undefined
   isEchelonLayerSelected: boolean
@@ -52,6 +53,7 @@ export type EntityInspectorState = {
   handleNameChange: (name: string) => void
   handleEchelonChange: (v: string) => void
   handlePositionModeChange: (mode: PositionMode) => void
+  handleIsExactPositionChange: (value: boolean) => void
   handleParentChange: (parentId: string | null) => void
   handleSelectOsmRelation: (relationId: number) => void
   setNewSource: (value: string) => void
@@ -90,6 +92,7 @@ export function useEntityInspector({
   const affiliationValue = (entity?.affiliation as SymbolAffiliation) ?? "Hostile"
   const domainValue = (entity?.domain as SymbolDomain) ?? "Ground"
   const positionModeValue: PositionMode = entity?.positionMode ?? "own"
+  const isExactPositionValue = entity?.isExactPosition ?? false
   const parentOptions = entity ? entities.filter((e) => e.id !== entity.id) : []
   const firstPoint = linkedGeometries.find((g) => g.type === "point")
   const isEchelonLayerSelected =
@@ -147,6 +150,14 @@ export function useEntityInspector({
     [entity, onUpdateEntity],
   )
 
+  const handleIsExactPositionChange = useCallback(
+    (value: boolean) => {
+      if (!entity) return
+      onUpdateEntity(entity.id, { isExactPosition: value })
+    },
+    [entity, onUpdateEntity],
+  )
+
   const handleSelectOsmRelation = useCallback(
     (relationId: number) => {
       if (!entity) return
@@ -185,6 +196,7 @@ export function useEntityInspector({
     affiliationValue,
     domainValue,
     positionModeValue,
+    isExactPositionValue,
     parentOptions,
     firstPoint,
     isEchelonLayerSelected,
@@ -195,6 +207,7 @@ export function useEntityInspector({
     handleNameChange,
     handleEchelonChange,
     handlePositionModeChange,
+    handleIsExactPositionChange,
     handleParentChange,
     handleSelectOsmRelation,
     setNewSource,

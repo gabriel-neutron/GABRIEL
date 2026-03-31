@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button"
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
+import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
 import {
   Select,
@@ -101,6 +102,7 @@ export function EntityInspector({
     affiliationValue,
     domainValue,
     positionModeValue,
+    isExactPositionValue,
     parentOptions,
     firstPoint,
     isEchelonLayerSelected,
@@ -109,6 +111,7 @@ export function EntityInspector({
     handleNameChange,
     handleEchelonChange,
     handlePositionModeChange,
+    handleIsExactPositionChange,
     handleParentChange,
     handleSelectOsmRelation,
     sources,
@@ -175,6 +178,11 @@ export function EntityInspector({
           <ReadOnlyField label="Position">
             <span>{positionModeLabel(entity.positionMode)}</span>
           </ReadOnlyField>
+          <ReadOnlyField label="Exact position">
+            <span>{entity.isExactPosition ? "Yes" : "No"}</span>
+          </ReadOnlyField>
+        </div>
+        <div className="grid grid-cols-2 gap-2">
           <ReadOnlyField label="OSM relation">
             {entity.osmRelationId != null ? entity.osmRelationId : "—"}
           </ReadOnlyField>
@@ -425,6 +433,14 @@ export function EntityInspector({
                 ))}
               </SelectContent>
             </Select>
+            <label className="mt-2 inline-flex items-center gap-2 text-xs text-muted-foreground">
+              <Switch
+                checked={isExactPositionValue}
+                onCheckedChange={handleIsExactPositionChange}
+                aria-label="Toggle exact position"
+              />
+              Exact position
+            </label>
             {positionModeValue === "parent" }
             {positionModeValue === "none" }
           </Field>

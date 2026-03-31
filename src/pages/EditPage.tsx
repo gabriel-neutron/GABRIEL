@@ -36,6 +36,7 @@ function entityFromGeometry(geom: DrawnGeometry, defaultLayerId: string, parentI
     layerId,
     parentId,
     affiliation: "Hostile",
+    isExactPosition: false,
   }
 }
 

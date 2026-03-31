@@ -86,6 +86,8 @@ async function migrate() {
     db.run("ALTER TABLE units ADD COLUMN sources TEXT");
   if (!unitCols.includes("position_mode"))
     db.run("ALTER TABLE units ADD COLUMN position_mode TEXT DEFAULT 'own'");
+  if (!unitCols.includes("is_exact_position"))
+    db.run("ALTER TABLE units ADD COLUMN is_exact_position INTEGER NOT NULL DEFAULT 0");
 
   for (const eid of ECHELON_IDS) {
     db.run(
@@ -95,6 +97,7 @@ async function migrate() {
   }
 
   db.run("UPDATE units SET position_mode = 'own' WHERE position_mode IS NULL");
+  db.run("UPDATE units SET is_exact_position = 0 WHERE is_exact_position IS NULL");
 
   // --- export ---
   const exported = db.export();
@@ -113,7 +116,7 @@ async function migrate() {
   console.log("units columns:", uCols.join(", "));
 
   const sStmt = verifyDb.prepare(
-    "SELECT id, layer_id, echelon, position_mode FROM units LIMIT 5",
+    "SELECT id, layer_id, echelon, position_mode, is_exact_position FROM units LIMIT 5",
   );
   while (sStmt.step()) console.log("  unit:", sStmt.getAsObject());
   sStmt.free();

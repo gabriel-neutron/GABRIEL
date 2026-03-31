@@ -48,6 +48,7 @@ export interface GpkgEntity {
   notes?: string | null
   sources?: string | null
   positionMode?: PositionMode
+  isExactPosition?: boolean
 }
 
 /** Same shape as DrawnGeometry; alias for GeoPackage read/write. */
@@ -141,10 +142,15 @@ function readLayers(geoPackage: GeoPackage): GpkgLayer[] {
 const VALID_POSITION_MODES = new Set<PositionMode>(["own", "parent", "none"])
 
 function readEntities(geoPackage: GeoPackage): GpkgEntity[] {
+  const unitColumns = geoPackage.connection.all(`PRAGMA table_info(${UNITS_TABLE})`) as Array<{
+    name?: string
+  }>
+  const hasIsExactPosition = unitColumns.some((col) => col.name === "is_exact_position")
   const result = geoPackage.connection.all(
     `SELECT id, name, layer_id, parent_id, type, nato_symbol_code,
             echelon, affiliation, domain, osm_relation_id,
-            military_unit_id, notes, sources, position_mode
+            military_unit_id, notes, sources, position_mode,
+            ${hasIsExactPosition ? "is_exact_position" : "0 AS is_exact_position"}
      FROM ${UNITS_TABLE}`,
   ) as Array<{
     id: string
@@ -161,6 +167,7 @@ function readEntities(geoPackage: GeoPackage): GpkgEntity[] {
     notes?: string | null
     sources?: string | null
     position_mode?: string | null
+    is_exact_position?: number | null
   }>
 
   return result.map((row) => {
@@ -184,6 +191,7 @@ function readEntities(geoPackage: GeoPackage): GpkgEntity[] {
       notes: row.notes != null ? String(row.notes) : undefined,
       sources: row.sources != null ? String(row.sources) : undefined,
       positionMode,
+      isExactPosition: Number(row.is_exact_position ?? 0) === 1,
     }
   })
 }
@@ -275,7 +283,8 @@ export async function saveGeoPackage(
   military_unit_id TEXT,
   notes TEXT,
   sources TEXT,
-  position_mode TEXT DEFAULT 'own'
+  position_mode TEXT DEFAULT 'own',
+  is_exact_position INTEGER NOT NULL DEFAULT 0
 )`)
 
     const geometryColumn = FeatureColumn.createGeometryColumn(
@@ -325,7 +334,7 @@ export async function saveGeoPackage(
 
     for (const e of entities) {
       geoPackage.connection.run(
-        `INSERT INTO ${UNITS_TABLE} (id, name, layer_id, parent_id, type, nato_symbol_code, echelon, affiliation, domain, osm_relation_id, military_unit_id, notes, sources, position_mode) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO ${UNITS_TABLE} (id, name, layer_id, parent_id, type, nato_symbol_code, echelon, affiliation, domain, osm_relation_id, military_unit_id, notes, sources, position_mode, is_exact_position) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           String(e.id ?? ""),
           String(e.name ?? ""),
@@ -341,6 +350,7 @@ export async function saveGeoPackage(
           e.notes != null ? String(e.notes) : null,
           e.sources != null ? String(e.sources) : null,
           e.positionMode ?? "own",
+          e.isExactPosition ? 1 : 0,
         ],
       )
     }

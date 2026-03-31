@@ -48,6 +48,8 @@ export type MapEntity = {
   sources?: string | null
   /** How the entity is positioned: own geometry, linked to parent, or unknown. Defaults to "own". */
   positionMode?: PositionMode
+  /** Whether the entity position is considered exact. Defaults to false. */
+  isExactPosition?: boolean
 }
 
 export type PositionMode = "own" | "parent" | "none"
