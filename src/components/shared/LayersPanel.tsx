@@ -2,7 +2,6 @@ import { useState, useEffect, useRef } from "react"
 import { Eye, EyeOff } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import type { Layer, MapEntity } from "@/types/domain.types"
-import { getEffectiveEntityLayerId } from "@/utils/entityLayer"
 
 type Props = {
   readOnly?: boolean
@@ -68,7 +67,7 @@ export function LayersPanel({
     (layer) =>
       layer.osmData != null ||
       layer.kind === "custom" ||
-      entities.some((e) => getEffectiveEntityLayerId(e, layers) === layer.id),
+      entities.some((e) => e.layerId === layer.id),
   )
 
   const entityHasChildren = useRef<Map<string, boolean>>(new Map())
@@ -95,7 +94,7 @@ export function LayersPanel({
           const isOsmLayer = layer.osmData != null
           const isCustomLayer = layer.kind === "custom"
           const layerEntities = entities
-            .filter((e) => getEffectiveEntityLayerId(e, layers) === layer.id)
+            .filter((e) => e.layerId === layer.id)
             .sort((a, b) => {
               // “Group” entities first (those with children), then single units; then alphabetically.
               const aGroup = entityHasChildren.current.get(a.id) === true

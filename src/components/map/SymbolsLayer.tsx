@@ -2,12 +2,10 @@ import { useMemo } from "react"
 import L from "leaflet"
 import { Marker, Popup } from "react-leaflet"
 import { getRenderedSymbolForEntity } from "@/services/symbol.service"
-import type { DrawnGeometry, Layer, MapEntity } from "@/types/domain.types"
-import { getEffectiveEntityLayerId } from "@/utils/entityLayer"
-import { getEntityDisplayPosition } from "@/utils/geometry"
+import type { DrawnGeometry, MapEntity } from "@/types/domain.types"
+import { computeAllEntityPositions } from "@/utils/geometry"
 
 type Props = {
-  layers: Layer[]
   entities: MapEntity[]
   drawnGeometries: DrawnGeometry[]
   visibleLayerIds: Set<string>
@@ -15,40 +13,51 @@ type Props = {
   onSelectEntity: (id: string | null) => void
 }
 
-function makeSymbolIcon(svg: string, anchor: { x: number; y: number }, width: number, height: number): L.DivIcon {
+function makeSymbolIcon(
+  svg: string,
+  anchor: { x: number; y: number },
+  width: number,
+  height: number,
+  opacity: number,
+): L.DivIcon {
+  const opacityStyle = opacity < 1 ? `opacity:${opacity};` : ""
   return L.divIcon({
     className: "nato-symbol-marker",
-    html: `<div class="nato-symbol-wrap" style="width:${width}px;height:${height}px;position:relative;">${svg}</div>`,
+    html: `<div class="nato-symbol-wrap" style="width:${width}px;height:${height}px;position:relative;${opacityStyle}">${svg}</div>`,
     iconSize: [width, height],
     iconAnchor: [anchor.x, anchor.y],
   })
 }
 
 export function SymbolsLayer({
-  layers,
   entities,
   drawnGeometries,
   visibleLayerIds,
   hiddenEntityIds,
   onSelectEntity,
 }: Props) {
-  const entitiesOnVisibleLayers = useMemo(
+  const positioned = useMemo(
+    () => computeAllEntityPositions(entities, drawnGeometries),
+    [entities, drawnGeometries],
+  )
+
+  const visible = useMemo(
     () =>
-      entities.filter(
-        (e) =>
-          visibleLayerIds.has(getEffectiveEntityLayerId(e, layers)) && !hiddenEntityIds?.has(e.id),
+      positioned.filter(
+        ({ entity }) =>
+          visibleLayerIds.has(entity.layerId) && !hiddenEntityIds?.has(entity.id),
       ),
-    [entities, layers, visibleLayerIds, hiddenEntityIds],
+    [positioned, visibleLayerIds, hiddenEntityIds],
   )
 
   return (
     <>
-      {entitiesOnVisibleLayers.map((entity) => {
-        const position = getEntityDisplayPosition(entity.id, drawnGeometries)
-        if (!position) return null
+      {visible.map(({ entity, position }) => {
+        const mode = entity.positionMode ?? "own"
+        const opacity = mode === "none" ? 0.75 : 1
 
         const { svg, anchor, width, height } = getRenderedSymbolForEntity(entity)
-        const icon = makeSymbolIcon(svg, anchor, width, height)
+        const icon = makeSymbolIcon(svg, anchor, width, height, opacity)
 
         return (
           <Marker

@@ -12,7 +12,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { FilterableSelect } from "@/components/tree/FilterableSelect"
-import type { DrawnGeometry, Layer, MapEntity } from "@/types/domain.types"
+import type { DrawnGeometry, Layer, MapEntity, PositionMode } from "@/types/domain.types"
 import {
   AFFILIATION_OPTIONS,
   DOMAIN_OPTIONS,
@@ -24,6 +24,12 @@ import { Trash2 } from "lucide-react"
 import { UNIT_TYPE_OPTIONS_GROUPED } from "./entityInspector.options"
 import { FindOsmAtPointDialog } from "./FindOsmAtPointDialog"
 import { useEntityInspector } from "./useEntityInspector"
+
+const POSITION_MODE_OPTIONS: { value: PositionMode; label: string }[] = [
+  { value: "own", label: "Own geometry" },
+  { value: "parent", label: "Linked to parent" },
+  { value: "none", label: "Unknown location" },
+]
 
 function geometryLabel(g: DrawnGeometry): string {
   if (g.type === "point") return `Point (${g.lat.toFixed(4)}, ${g.lng.toFixed(4)})`
@@ -49,6 +55,10 @@ function capitalizeFirst(value: string): string {
   const trimmed = value.trim()
   if (trimmed === "") return ""
   return trimmed.charAt(0).toUpperCase() + trimmed.slice(1)
+}
+
+function positionModeLabel(mode?: PositionMode): string {
+  return POSITION_MODE_OPTIONS.find((o) => o.value === mode)?.label ?? "Own geometry"
 }
 
 type Props = {
@@ -78,6 +88,7 @@ export function EntityInspector({
     layers,
     drawnGeometries,
     onUpdateEntity,
+    onDeleteGeometry,
   })
 
   const {
@@ -89,6 +100,7 @@ export function EntityInspector({
     echelonValue,
     affiliationValue,
     domainValue,
+    positionModeValue,
     parentOptions,
     firstPoint,
     isEchelonLayerSelected,
@@ -96,6 +108,8 @@ export function EntityInspector({
     setFindDialogOpen,
     handleNameChange,
     handleEchelonChange,
+    handlePositionModeChange,
+    handleParentChange,
     handleSelectOsmRelation,
     sources,
     newSource,
@@ -157,15 +171,20 @@ export function EntityInspector({
           <ReadOnlyField label="Affiliation">{entity.affiliation ?? "—"}</ReadOnlyField>
           <ReadOnlyField label="Domain">{entity.domain ?? "—"}</ReadOnlyField>
         </div>
+        <div className="grid grid-cols-2 gap-2">
+          <ReadOnlyField label="Position">
+            <span>{positionModeLabel(entity.positionMode)}</span>
+          </ReadOnlyField>
+          <ReadOnlyField label="OSM relation">
+            {entity.osmRelationId != null ? entity.osmRelationId : "—"}
+          </ReadOnlyField>
+        </div>
         <ReadOnlyField label="Layer">
           <span className="truncate">{layerName}</span>
         </ReadOnlyField>
         <ReadOnlyField label="Parent">
           <span className="truncate">{parentName ?? "—"}</span>
         </ReadOnlyField>
-        {entity.osmRelationId != null && (
-          <ReadOnlyField label="OSM relation">{entity.osmRelationId}</ReadOnlyField>
-        )}
         <div>
           <div className="text-xs font-medium text-muted-foreground">Linked geometries</div>
           {linkedGeometries.length === 0 ? (
@@ -184,8 +203,10 @@ export function EntityInspector({
     )
   }
 
+  const hasParent = entity.parentId != null
+
   return (
-    <div className="p-4">
+    <div className="p-2">
       <FieldGroup className="gap-4 [&_[data-slot=field]]:gap-1">
         <Field>
           <FieldLabel>Name</FieldLabel>
@@ -357,37 +378,55 @@ export function EntityInspector({
             </Select>
           </Field>
         </div>
+        {!isEchelonLayerSelected && (
+          <Field>
+            <FieldLabel>Layer</FieldLabel>
+            <Select value={entity.layerId} onValueChange={(v) => onUpdateEntity(entity.id, { layerId: v })}>
+              <SelectTrigger className="h-8 text-xs">
+                <SelectValue placeholder="Select layer" />
+              </SelectTrigger>
+              <SelectContent>
+                {layers.map((layer) => (
+                  <SelectItem key={layer.id} value={layer.id}>
+                    {layer.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </Field>
+        )}
         <div className="grid grid-cols-2 gap-2">
-          {!isEchelonLayerSelected && (
-            <Field>
-              <FieldLabel>Layer</FieldLabel>
-              <Select
-                value={entity.layerId}
-                onValueChange={(v) => onUpdateEntity(entity.id, { layerId: v })}
-              >
-                <SelectTrigger className="h-8 text-xs">
-                  <SelectValue placeholder="Select layer" />
-                </SelectTrigger>
-                <SelectContent>
-                  {layers.map((layer) => (
-                    <SelectItem key={layer.id} value={layer.id}>
-                      {layer.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </Field>
-          )}
-          <Field className={isEchelonLayerSelected ? "col-span-2" : undefined}>
-            <FieldLabel>Parent (optional)</FieldLabel>
+          <Field>
+            <FieldLabel>Parent</FieldLabel>
             <FilterableSelect
               options={parentOptions.map((p) => ({ id: p.id, name: p.name, echelon: p.echelon }))}
               value={entity.parentId ?? "__none__"}
-              onValueChange={(v) =>
-                onUpdateEntity(entity.id, { parentId: v === "__none__" ? null : v })
-              }
-              className="w-full"
+              onValueChange={(v) => handleParentChange(v === "__none__" ? null : v)}
             />
+          </Field>
+          <Field>
+            <FieldLabel>Position</FieldLabel>
+            <Select
+              value={positionModeValue}
+              onValueChange={(v) => handlePositionModeChange(v as PositionMode)}
+            >
+              <SelectTrigger className="h-8 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {POSITION_MODE_OPTIONS.map((opt) => (
+                  <SelectItem
+                    key={opt.value}
+                    value={opt.value}
+                    disabled={opt.value === "parent" && !hasParent}
+                  >
+                    {opt.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {positionModeValue === "parent" }
+            {positionModeValue === "none" }
           </Field>
         </div>
         <Field>
@@ -404,9 +443,6 @@ export function EntityInspector({
               })
             }}
           />
-          {entity.osmRelationId != null && (
-            <p className="text-xs text-muted-foreground">Linked geometry is shown on the map.</p>
-          )}
           {!entity.osmRelationId && firstPoint?.type === "point" && (
             <>
               <Button
@@ -427,40 +463,42 @@ export function EntityInspector({
               />
             </>
           )}
-          {!entity.osmRelationId && firstPoint?.type !== "point" && (
+          {!entity.osmRelationId && firstPoint?.type !== "point" && positionModeValue === "own" && (
             <p className="text-xs text-muted-foreground">
               Add a point geometry to suggest relations (e.g. military base).
             </p>
           )}
         </Field>
-        <Field>
-          <FieldLabel className="text-muted-foreground">Linked geometries</FieldLabel>
-          {linkedGeometries.length === 0 ? (
-            <div className="rounded border border-dashed bg-muted/20 px-2 py-2 text-xs text-muted-foreground">
-              No geometries linked. The symbol is placed at the first linked geometry. Draw on the
-              map and link to this entity to add one.
-            </div>
-          ) : (
-            <ul className="space-y-1">
-              {linkedGeometries.map((g) => (
-                <li
-                  key={g.id}
-                  className="flex items-center justify-between gap-2 rounded border bg-muted/30 px-2 py-1.5 text-sm"
-                >
-                  <span className="min-w-0 truncate">{geometryLabel(g)}</span>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-7 shrink-0 text-destructive hover:text-destructive"
-                    onClick={() => onDeleteGeometry(g.id)}
+        {positionModeValue === "own" && (
+          <Field>
+            <FieldLabel className="text-muted-foreground">Linked geometries</FieldLabel>
+            {linkedGeometries.length === 0 ? (
+              <div className="rounded border border-dashed bg-muted/20 px-2 py-2 text-xs text-muted-foreground">
+                No geometries linked. The symbol is placed at the first linked geometry. Draw on the
+                map and link to this entity to add one.
+              </div>
+            ) : (
+              <ul className="space-y-1">
+                {linkedGeometries.map((g) => (
+                  <li
+                    key={g.id}
+                    className="flex items-center justify-between gap-2 rounded border bg-muted/30 px-2 py-1.5 text-sm"
                   >
-                    Delete
-                  </Button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </Field>
+                    <span className="min-w-0 truncate">{geometryLabel(g)}</span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 shrink-0 text-destructive hover:text-destructive"
+                      onClick={() => onDeleteGeometry(g.id)}
+                    >
+                      Delete
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Field>
+        )}
         <Field>
           <Button
             variant="destructive"

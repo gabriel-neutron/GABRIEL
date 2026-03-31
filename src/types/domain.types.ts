@@ -46,7 +46,11 @@ export type MapEntity = {
   notes?: string | null
   /** Sources for this entity as a newline-delimited list of URLs/citations. */
   sources?: string | null
+  /** How the entity is positioned: own geometry, linked to parent, or unknown. Defaults to "own". */
+  positionMode?: PositionMode
 }
+
+export type PositionMode = "own" | "parent" | "none"
 
 export type DrawnGeometry =
   | { id: string; layerId: string; entityId: string | null; type: "point"; lat: number; lng: number }

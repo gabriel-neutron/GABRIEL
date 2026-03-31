@@ -12,8 +12,7 @@ import { MapBoundsReporter, type MapBounds } from "./MapBoundsReporter"
 import { useMapDrawing } from "./useMapDrawing"
 import { BASE_MAP_TILE_CONFIG } from "./mapTileConfig"
 import type { Layer, MapEntity, DrawnGeometry } from "@/types/domain.types"
-import { getEffectiveEntityLayerId } from "@/utils/entityLayer"
-import { getEntityDisplayPosition } from "@/utils/geometry"
+import { computeAllEntityPositions } from "@/utils/geometry"
 import type { BaseMapId } from "@/components/shared/BaseMapSwitcher"
 
 const markerIcon = L.divIcon({
@@ -126,7 +125,7 @@ export function MapView({
     const entityById = new Map(entities.map((e) => [e.id, e]))
     for (const g of drawnGeometries) {
       const linked = g.entityId != null ? entityById.get(g.entityId) : undefined
-      const layerKey = linked != null ? getEffectiveEntityLayerId(linked, layers) : g.layerId
+      const layerKey = linked != null ? linked.layerId : g.layerId
       const list = m.get(layerKey) ?? []
       list.push(g)
       m.set(layerKey, list)
@@ -139,9 +138,14 @@ export function MapView({
     [visibleLayersInOrder],
   )
 
+  const positionMap = useMemo(() => {
+    const all = computeAllEntityPositions(entities, drawnGeometries)
+    return new Map(all.map(({ entity, position }) => [entity.id, position]))
+  }, [entities, drawnGeometries])
+
   const getEntityPosition = useMemo(
-    () => (entity: MapEntity) => getEntityDisplayPosition(entity.id, drawnGeometries),
-    [drawnGeometries],
+    () => (entity: MapEntity) => positionMap.get(entity.id) ?? null,
+    [positionMap],
   )
 
   // Stable refs so GeoJSON callbacks never capture stale closures
@@ -195,7 +199,6 @@ export function MapView({
         )}
 
         <SymbolsLayer
-          layers={layers}
           entities={entities}
           drawnGeometries={drawnGeometries}
           visibleLayerIds={visibleLayerIds}

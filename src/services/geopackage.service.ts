@@ -13,10 +13,8 @@ import {
   setSqljsWasmLocateFile,
 } from "@ngageoint/geopackage"
 import { ECHELON_OPTIONS } from "@/types/symbol.types"
-import type { Layer, MapEntity, DrawnGeometry } from "@/types/domain.types"
-import { reconcileEntitiesAndGeometriesWithEchelon } from "@/utils/entityLayer"
+import type { Layer, MapEntity, DrawnGeometry, PositionMode } from "@/types/domain.types"
 
-// Configure WASM location - use CDN (acceptable per user preference)
 setSqljsWasmLocateFile(
   (file) => `https://unpkg.com/@ngageoint/geopackage@4.2.6/dist/${file}`,
 )
@@ -30,11 +28,8 @@ export interface GpkgLayer {
   name: string
   visible: boolean
   expanded: boolean
-  /** 'echelon' | 'custom' | 'osm'. OSM layers persist sourceQuery + cached GeoJSON. */
   kind?: "echelon" | "custom" | "osm"
-  /** Normalized Overpass QL (for kind === 'osm'). */
   sourceQuery?: string
-  /** Cached GeoJSON (for kind === 'osm'). Set on load when geojson column present; set by caller on save. */
   osmData?: GeoJSON.FeatureCollection
 }
 
@@ -52,6 +47,7 @@ export interface GpkgEntity {
   militaryUnitId?: string | null
   notes?: string | null
   sources?: string | null
+  positionMode?: PositionMode
 }
 
 /** Same shape as DrawnGeometry; alias for GeoPackage read/write. */
@@ -63,22 +59,15 @@ export interface GeoPackageLoadResult {
   geometries: GpkgGeometry[]
 }
 
-/**
- * Load and parse a GeoPackage from buffer. Throws on invalid file, corrupted DB, or unsupported schema.
- */
 export async function loadGeoPackage(buffer: ArrayBuffer): Promise<GeoPackageLoadResult> {
   let geoPackage: GeoPackage | null = null
   try {
     geoPackage = await GeoPackageAPI.open(new Uint8Array(buffer))
 
-    // Read user tables via raw SQL
     const layers = readLayers(geoPackage)
     const entities = readEntities(geoPackage)
-
-    // Read feature table as GeoJSON and map to our format
     const geometries = await readGeometries(geoPackage)
 
-    // Validate referential integrity
     const layerIds = new Set(layers.map((l) => l.id))
     const entityIds = new Set(entities.map((e) => e.id))
     for (const e of entities) {
@@ -112,91 +101,51 @@ export async function loadGeoPackage(buffer: ArrayBuffer): Promise<GeoPackageLoa
 }
 
 function readLayers(geoPackage: GeoPackage): GpkgLayer[] {
-  const hasKind = hasColumn(geoPackage, LAYERS_TABLE, "kind")
-  const hasSourceQuery = hasColumn(geoPackage, LAYERS_TABLE, "source_query")
-  const hasGeojson = hasColumn(geoPackage, LAYERS_TABLE, "geojson")
-
-  try {
-    const cols = ["id", "name", "visible", "expanded"]
-    if (hasKind) cols.push("kind")
-    if (hasSourceQuery) cols.push("source_query")
-    if (hasGeojson) cols.push("geojson")
-    const result = geoPackage.connection.all(
-      `SELECT ${cols.join(", ")} FROM ${LAYERS_TABLE}`,
-    ) as Array<{
-      id: string
-      name: string
-      visible: number
-      expanded: number
-      kind?: string
-      source_query?: string | null
-      geojson?: string | null
-    }>
-    return result.map((row) => {
-      const kind =
-        hasKind && row.kind != null && (row.kind === "echelon" || row.kind === "custom" || row.kind === "osm")
-          ? (row.kind as GpkgLayer["kind"])
-          : undefined
-      const layer: GpkgLayer = {
-        id: String(row.id ?? ""),
-        name: String(row.name ?? ""),
-        visible: Number(row.visible) === 1,
-        expanded: Number(row.expanded) === 1,
-        kind,
-      }
-      if (kind === "osm" && hasSourceQuery && row.source_query != null) {
-        layer.sourceQuery = String(row.source_query)
-      }
-      if (kind === "osm" && hasGeojson && row.geojson != null && row.geojson !== "") {
-        try {
-          layer.osmData = JSON.parse(row.geojson) as GeoJSON.FeatureCollection
-        } catch {
-          // Invalid JSON: leave osmData unset
-        }
-      }
-      return layer
-    })
-  } catch {
-    // Try minimal columns for backward compatibility
-    const result = geoPackage.connection.all(
-      `SELECT id, name, visible, expanded FROM ${LAYERS_TABLE}`,
-    ) as Array<{
-      id: string
-      name: string
-      visible: number
-      expanded: number
-    }>
-    return result.map((row) => ({
+  const result = geoPackage.connection.all(
+    `SELECT id, name, visible, expanded, kind, source_query, geojson FROM ${LAYERS_TABLE}`,
+  ) as Array<{
+    id: string
+    name: string
+    visible: number
+    expanded: number
+    kind?: string
+    source_query?: string | null
+    geojson?: string | null
+  }>
+  return result.map((row) => {
+    const kind =
+      row.kind != null && (row.kind === "echelon" || row.kind === "custom" || row.kind === "osm")
+        ? (row.kind as GpkgLayer["kind"])
+        : undefined
+    const layer: GpkgLayer = {
       id: String(row.id ?? ""),
       name: String(row.name ?? ""),
       visible: Number(row.visible) === 1,
       expanded: Number(row.expanded) === 1,
-    }))
-  }
+      kind,
+    }
+    if (kind === "osm" && row.source_query != null) {
+      layer.sourceQuery = String(row.source_query)
+    }
+    if (kind === "osm" && row.geojson != null && row.geojson !== "") {
+      try {
+        layer.osmData = JSON.parse(row.geojson) as GeoJSON.FeatureCollection
+      } catch {
+        // Invalid JSON: leave osmData unset
+      }
+    }
+    return layer
+  })
 }
 
-function hasColumn(geoPackage: GeoPackage, table: string, column: string): boolean {
-  const rows = geoPackage.connection.all(
-    `PRAGMA table_info(${table})`,
-  ) as Array<{ name: string }>
-  return rows.some((r) => r.name === column)
-}
+const VALID_POSITION_MODES = new Set<PositionMode>(["own", "parent", "none"])
 
 function readEntities(geoPackage: GeoPackage): GpkgEntity[] {
-  const hasOsmRelationId = hasColumn(geoPackage, UNITS_TABLE, "osm_relation_id")
-  const hasMilitaryUnitId = hasColumn(geoPackage, UNITS_TABLE, "military_unit_id")
-  const hasNotes = hasColumn(geoPackage, UNITS_TABLE, "notes")
-  const hasSources = hasColumn(geoPackage, UNITS_TABLE, "sources")
-  const columns = [
-    "id", "name", "layer_id", "parent_id", "type", "nato_symbol_code",
-    "echelon", "affiliation", "domain",
-    ...(hasOsmRelationId ? ["osm_relation_id"] : []),
-    ...(hasMilitaryUnitId ? ["military_unit_id"] : []),
-    ...(hasNotes ? ["notes"] : []),
-    ...(hasSources ? ["sources"] : []),
-  ].join(", ")
   const result = geoPackage.connection.all(
-    `SELECT ${columns} FROM ${UNITS_TABLE}`,
+    `SELECT id, name, layer_id, parent_id, type, nato_symbol_code,
+            echelon, affiliation, domain, osm_relation_id,
+            military_unit_id, notes, sources, position_mode
+     FROM ${UNITS_TABLE}`,
   ) as Array<{
     id: string
     name: string
@@ -211,27 +160,35 @@ function readEntities(geoPackage: GeoPackage): GpkgEntity[] {
     military_unit_id?: string | null
     notes?: string | null
     sources?: string | null
+    position_mode?: string | null
   }>
 
-  return result.map((row) => ({
-    id: String(row.id ?? ""),
-    name: String(row.name ?? ""),
-    layerId: String(row.layer_id ?? ""),
-    parentId: row.parent_id != null ? String(row.parent_id) : null,
-    type: row.type != null ? String(row.type) : undefined,
-    natoSymbolCode: row.nato_symbol_code != null ? String(row.nato_symbol_code) : null,
-    echelon: row.echelon != null ? String(row.echelon) : undefined,
-    affiliation: row.affiliation != null ? (row.affiliation as GpkgEntity["affiliation"]) : undefined,
-    domain: row.domain != null ? String(row.domain) : undefined,
-    osmRelationId: hasOsmRelationId && row.osm_relation_id != null ? Number(row.osm_relation_id) : undefined,
-    militaryUnitId: hasMilitaryUnitId && row.military_unit_id != null ? String(row.military_unit_id) : undefined,
-    notes: hasNotes && row.notes != null ? String(row.notes) : undefined,
-    sources: hasSources && row.sources != null ? String(row.sources) : undefined,
-  }))
+  return result.map((row) => {
+    const rawMode = row.position_mode as string | null
+    const positionMode: PositionMode =
+      rawMode != null && VALID_POSITION_MODES.has(rawMode as PositionMode)
+        ? (rawMode as PositionMode)
+        : "own"
+    return {
+      id: String(row.id ?? ""),
+      name: String(row.name ?? ""),
+      layerId: String(row.layer_id ?? ""),
+      parentId: row.parent_id != null ? String(row.parent_id) : null,
+      type: row.type != null ? String(row.type) : undefined,
+      natoSymbolCode: row.nato_symbol_code != null ? String(row.nato_symbol_code) : null,
+      echelon: row.echelon != null ? String(row.echelon) : undefined,
+      affiliation: row.affiliation != null ? (row.affiliation as GpkgEntity["affiliation"]) : undefined,
+      domain: row.domain != null ? String(row.domain) : undefined,
+      osmRelationId: row.osm_relation_id != null ? Number(row.osm_relation_id) : undefined,
+      militaryUnitId: row.military_unit_id != null ? String(row.military_unit_id) : undefined,
+      notes: row.notes != null ? String(row.notes) : undefined,
+      sources: row.sources != null ? String(row.sources) : undefined,
+      positionMode,
+    }
+  })
 }
 
 async function readGeometries(geoPackage: GeoPackage): Promise<GpkgGeometry[]> {
-  // Check if geometries table exists as a feature table
   const featureTables = geoPackage.getFeatureTables()
   if (!featureTables.includes(GEOMETRIES_TABLE)) {
     throw new Error(`Missing feature table '${GEOMETRIES_TABLE}'`)
@@ -281,13 +238,9 @@ async function readGeometries(geoPackage: GeoPackage): Promise<GpkgGeometry[]> {
     }
   }
 
-    return out
+  return out
 }
 
-/**
- * Build a new GeoPackage from the given data and return its bytes.
- * Pass all layers (including OSM); entities/geometries must reference non-OSM layer IDs only.
- */
 export async function saveGeoPackage(
   layers: GpkgLayer[],
   entities: GpkgEntity[],
@@ -295,13 +248,9 @@ export async function saveGeoPackage(
 ): Promise<Uint8Array> {
   let geoPackage: GeoPackage | null = null
   try {
-    // Create new GeoPackage in memory
     geoPackage = await GeoPackageAPI.create()
-
-    // Create required GeoPackage tables
     geoPackage.createRequiredTables()
 
-    // Create user tables (source_query + geojson for OSM layers)
     geoPackage.connection.run(`CREATE TABLE ${LAYERS_TABLE} (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
@@ -325,11 +274,10 @@ export async function saveGeoPackage(
   osm_relation_id INTEGER,
   military_unit_id TEXT,
   notes TEXT,
-  sources TEXT
+  sources TEXT,
+  position_mode TEXT DEFAULT 'own'
 )`)
 
-    // Create feature table with geometry column.
-    // Use TEXT primary key for id (UUIDs); createPrimaryKeyColumn uses INTEGER AUTOINCREMENT which causes "datatype mismatch".
     const geometryColumn = FeatureColumn.createGeometryColumn(
       0,
       "geometry",
@@ -343,9 +291,9 @@ export async function saveGeoPackage(
       undefined,
       true,
       undefined,
-      true, // primaryKey
+      true,
       undefined,
-      false, // no autoincrement
+      false,
     )
     const layerIdColumn = FeatureColumn.createColumn(2, "layer_id", GeoPackageDataType.TEXT, true)
     const entityIdColumn = FeatureColumn.createColumn(3, "entity_id", GeoPackageDataType.TEXT, false)
@@ -359,7 +307,6 @@ export async function saveGeoPackage(
       4326,
     )
 
-    // Insert layers (include source_query and geojson for OSM)
     for (const l of layers) {
       const isOsm = l.kind === "osm" && l.osmData != null
       geoPackage.connection.run(
@@ -376,10 +323,9 @@ export async function saveGeoPackage(
       )
     }
 
-    // Insert units
     for (const e of entities) {
       geoPackage.connection.run(
-        `INSERT INTO ${UNITS_TABLE} (id, name, layer_id, parent_id, type, nato_symbol_code, echelon, affiliation, domain, osm_relation_id, military_unit_id, notes, sources) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO ${UNITS_TABLE} (id, name, layer_id, parent_id, type, nato_symbol_code, echelon, affiliation, domain, osm_relation_id, military_unit_id, notes, sources, position_mode) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           String(e.id ?? ""),
           String(e.name ?? ""),
@@ -394,11 +340,11 @@ export async function saveGeoPackage(
           e.militaryUnitId != null ? String(e.militaryUnitId) : null,
           e.notes != null ? String(e.notes) : null,
           e.sources != null ? String(e.sources) : null,
+          e.positionMode ?? "own",
         ],
       )
     }
 
-    // Insert geometries as GeoJSON features
     for (const g of geometries) {
       let geoJSONGeometry: GeoJSON.Geometry
       if (g.type === "point") {
@@ -433,7 +379,6 @@ export async function saveGeoPackage(
       geoPackage.addGeoJSONFeatureToGeoPackage(feature, GEOMETRIES_TABLE, false)
     }
 
-    // Export to Uint8Array
     const exported = await geoPackage.export()
     if (!(exported instanceof Uint8Array)) {
       throw new Error("Export did not return Uint8Array")
@@ -481,7 +426,7 @@ export function applyGeoPackageResult(
     return fromFile ? { ...d, visible: fromFile.visible, expanded: fromFile.expanded } : d
   })
   const customLayers: Layer[] = loaded
-    .filter((l) => l.kind === "custom" || l.kind === undefined)
+    .filter((l) => l.kind === "custom")
     .map((l) => ({ id: l.id, name: l.name, visible: l.visible, expanded: l.expanded, kind: "custom" as const }))
   const osmLayers: Layer[] = loaded
     .filter((l) => l.kind === "osm" && l.osmData != null)
@@ -499,15 +444,10 @@ export function applyGeoPackageResult(
       ? currentSelectedEntityId
       : null
   const layers: Layer[] = [...echelonLayers, ...customLayers, ...osmLayers]
-  const { entities, drawnGeometries } = reconcileEntitiesAndGeometriesWithEchelon(
-    result.entities as MapEntity[],
-    result.geometries as DrawnGeometry[],
-    layers,
-  )
   return {
     layers,
-    entities,
-    drawnGeometries,
+    entities: result.entities as MapEntity[],
+    drawnGeometries: result.geometries as DrawnGeometry[],
     selectedEntityId,
   }
 }

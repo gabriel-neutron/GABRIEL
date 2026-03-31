@@ -1,7 +1,7 @@
 import { useMemo } from "react"
 import { Polyline } from "react-leaflet"
 import type { MapEntity, DrawnGeometry } from "@/types/domain.types"
-import { getEntityDisplayPosition } from "@/utils/geometry"
+import { computeAllEntityPositions } from "@/utils/geometry"
 
 const NETWORK_LINE_OPTIONS = {
   color: "#a855f7",
@@ -19,10 +19,6 @@ type Props = {
 
 const MAX_DEGREE = 3
 
-/**
- * Collects all entity IDs within MAX_DEGREE steps of the selected entity
- * (ancestors and descendants).
- */
 function visibleNetworkIds(
   selectedId: string,
   entities: MapEntity[]
@@ -53,18 +49,17 @@ function visibleNetworkIds(
   return visible
 }
 
-/**
- * Renders temporary polylines for the hierarchy subgraph within 3 degrees
- * of the selected entity (parent/children, grandparent/grandchildren,
- * great-grandparent/great-grandchildren). Not persisted; layer is cleared
- * when selection or visibility changes.
- */
 export function NetworkLinksLayer({
   entities,
   drawnGeometries,
   selectedEntityId,
   visible,
 }: Props) {
+  const positionMap = useMemo(() => {
+    const all = computeAllEntityPositions(entities, drawnGeometries)
+    return new Map(all.map(({ entity, position }) => [entity.id, position]))
+  }, [entities, drawnGeometries])
+
   const links = useMemo(() => {
     if (!visible || !selectedEntityId) return []
 
@@ -76,8 +71,8 @@ export function NetworkLinksLayer({
 
     for (const entity of entities) {
       if (!entity.parentId || !visibleIds.has(entity.parentId) || !visibleIds.has(entity.id)) continue
-      const fromPos = getEntityDisplayPosition(entity.id, drawnGeometries)
-      const toPos = getEntityDisplayPosition(entity.parentId, drawnGeometries)
+      const fromPos = positionMap.get(entity.id)
+      const toPos = positionMap.get(entity.parentId)
       if (!fromPos || !toPos) continue
       result.push({
         key: `edge-${entity.parentId}-${entity.id}`,
@@ -89,7 +84,7 @@ export function NetworkLinksLayer({
     }
 
     return result
-  }, [visible, selectedEntityId, entities, drawnGeometries])
+  }, [visible, selectedEntityId, entities, positionMap])
 
   if (links.length === 0) return null
 

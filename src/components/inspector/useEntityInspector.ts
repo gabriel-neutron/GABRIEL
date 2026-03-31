@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react"
-import type { DrawnGeometry, Layer, MapEntity } from "@/types/domain.types"
+import type { DrawnGeometry, Layer, MapEntity, PositionMode } from "@/types/domain.types"
 import type { SymbolAffiliation, SymbolDomain, SymbolEchelon } from "@/types/symbol.types"
 
 const SOURCES_DELIMITER = "\n"
@@ -29,6 +29,7 @@ export type UseEntityInspectorArgs = {
   layers: Layer[]
   drawnGeometries: DrawnGeometry[]
   onUpdateEntity: (entityId: string, patch: Partial<MapEntity>) => void
+  onDeleteGeometry: (geometryId: string) => void
 }
 
 export type EntityInspectorState = {
@@ -40,6 +41,7 @@ export type EntityInspectorState = {
   echelonValue: SymbolEchelon | ""
   affiliationValue: SymbolAffiliation
   domainValue: SymbolDomain
+  positionModeValue: PositionMode
   parentOptions: MapEntity[]
   firstPoint: DrawnGeometry | undefined
   isEchelonLayerSelected: boolean
@@ -49,6 +51,8 @@ export type EntityInspectorState = {
   setFindDialogOpen: (open: boolean) => void
   handleNameChange: (name: string) => void
   handleEchelonChange: (v: string) => void
+  handlePositionModeChange: (mode: PositionMode) => void
+  handleParentChange: (parentId: string | null) => void
   handleSelectOsmRelation: (relationId: number) => void
   setNewSource: (value: string) => void
   handleAddSource: () => void
@@ -61,6 +65,7 @@ export function useEntityInspector({
   layers,
   drawnGeometries,
   onUpdateEntity,
+  onDeleteGeometry,
 }: UseEntityInspectorArgs): EntityInspectorState {
   const [findDialogOpen, setFindDialogOpen] = useState(false)
   const [newSource, setNewSource] = useState("")
@@ -84,6 +89,7 @@ export function useEntityInspector({
   const echelonValue = (entity?.echelon as SymbolEchelon | undefined) ?? ""
   const affiliationValue = (entity?.affiliation as SymbolAffiliation) ?? "Hostile"
   const domainValue = (entity?.domain as SymbolDomain) ?? "Ground"
+  const positionModeValue: PositionMode = entity?.positionMode ?? "own"
   const parentOptions = entity ? entities.filter((e) => e.id !== entity.id) : []
   const firstPoint = linkedGeometries.find((g) => g.type === "point")
   const isEchelonLayerSelected =
@@ -114,6 +120,31 @@ export function useEntityInspector({
       onUpdateEntity(entity.id, patch)
     },
     [entity, layers, onUpdateEntity],
+  )
+
+  const handlePositionModeChange = useCallback(
+    (mode: PositionMode) => {
+      if (!entity) return
+      onUpdateEntity(entity.id, { positionMode: mode })
+      if (mode !== "own") {
+        for (const g of linkedGeometries) {
+          onDeleteGeometry(g.id)
+        }
+      }
+    },
+    [entity, linkedGeometries, onUpdateEntity, onDeleteGeometry],
+  )
+
+  const handleParentChange = useCallback(
+    (parentId: string | null) => {
+      if (!entity) return
+      const patch: Partial<MapEntity> = { parentId }
+      if (parentId == null && entity.positionMode === "parent") {
+        patch.positionMode = "none"
+      }
+      onUpdateEntity(entity.id, patch)
+    },
+    [entity, onUpdateEntity],
   )
 
   const handleSelectOsmRelation = useCallback(
@@ -153,6 +184,7 @@ export function useEntityInspector({
     echelonValue,
     affiliationValue,
     domainValue,
+    positionModeValue,
     parentOptions,
     firstPoint,
     isEchelonLayerSelected,
@@ -162,6 +194,8 @@ export function useEntityInspector({
     setFindDialogOpen,
     handleNameChange,
     handleEchelonChange,
+    handlePositionModeChange,
+    handleParentChange,
     handleSelectOsmRelation,
     setNewSource,
     handleAddSource,
