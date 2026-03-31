@@ -127,7 +127,7 @@ export function MainLayout({
   const defaultLayerId = getDefaultEntityLayerId(layers)
   const assignableLayers = layers.filter((l) => l.osmData == null)
 
-  const handleSelectEntity = (id: string | null): void => {
+  const handleSelectEntity = (id: string | null) => {
     setSelectedEntityId(id)
     setSelectedOsmObject(null)
   }
@@ -194,7 +194,7 @@ export function MainLayout({
                 entities={entities}
                 selectedEntityId={selectedEntityId}
                 hiddenEntityIds={hiddenEntityIds}
-                onSelectEntity={(id) => handleSelectEntity(id)}
+                onSelectEntity={handleSelectEntity}
                 onToggleEntityVisible={handleToggleEntityVisible}
               />
             )}

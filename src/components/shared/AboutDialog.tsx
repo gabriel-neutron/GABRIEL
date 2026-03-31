@@ -5,26 +5,20 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
 const ABOUT_EN = {
   title: "About Gabriel",
-  description:
-    "Gabriel is a local military mapping application for annotating and visualizing hierarchical units on a map. " +
-    "It uses GeoPackage as the single source of truth and supports MIL-STD-2525-style symbols. " +
-    "The view shows a read-only demo project; switch to Edit mode to load and edit your own project file.",
+  description: "Gabriel is a local military mapping application for annotating and visualizing hierarchical units on a map. It uses GeoPackage as the single source of truth and supports MIL-STD-2525-style symbols. The view shows a read-only demo project; switch to Edit mode to load and edit your own project file.",
   links: "Follow the project",
 }
 
 const ABOUT_FR = {
   title: "À propos de Gabriel",
-  description:
-    "Gabriel est une application de cartographie militaire locale pour annoter et visualiser des unités hiérarchiques sur une carte. " +
-    "Elle utilise GeoPackage comme source de vérité unique et prend en charge les symboles de type MIL-STD-2525. " +
-    "La vue affiche un projet démo en lecture seule ; passez en mode Édition pour charger et modifier votre propre fichier de projet.",
+  description: "Gabriel est une application de cartographie militaire locale pour annoter et visualiser des unités hiérarchiques sur une carte. Elle utilise GeoPackage comme source de vérité unique et prend en charge les symboles de type MIL-STD-2525. La vue affiche un projet démo en lecture seule ; passez en mode Édition pour charger et modifier votre propre fichier de projet.",
   links: "Suivre le projet",
 }
 
 const SOCIAL_LINKS = [
-  { label: "Instagram", url: "https://www.instagram.com/gabriel__0x0/", key: "instagram" },
-  { label: "YouTube", url: "https://www.youtube.com/@Gabriel__0x0", key: "youtube" },
-  { label: "TikTok", url: "https://www.tiktok.com/@gabriel__0x0", key: "tiktok" },
+  { label: "Instagram", url: "https://www.instagram.com/gabriel__0x0/" },
+  { label: "YouTube", url: "https://www.youtube.com/@Gabriel__0x0" },
+  { label: "TikTok", url: "https://www.tiktok.com/@gabriel__0x0" },
 ] as const
 
 type Props = {
@@ -78,12 +72,7 @@ export function AboutDialog({ open, onClose, onFirstClose }: Props) {
             <div className="mb-2 text-xs font-medium text-muted-foreground">{content.links}</div>
             <div className="flex flex-wrap gap-2">
               {SOCIAL_LINKS.map((link) => (
-                <Button
-                  key={link.key}
-                  variant="outline"
-                  size="sm"
-                  asChild
-                >
+                <Button key={link.label} variant="outline" size="sm" asChild>
                   <a href={link.url} target="_blank" rel="noopener noreferrer">
                     {link.label}
                   </a>

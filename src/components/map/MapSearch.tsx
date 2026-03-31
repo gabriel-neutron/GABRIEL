@@ -9,7 +9,6 @@ import {
   parseOsmIdInput,
   type NominatimResult,
 } from "@/services/nominatim.service"
-import { cn } from "@/lib/utils"
 
 const ZOOM_ON_SELECT = 14
 
@@ -21,12 +20,11 @@ export function MapSearch() {
   const [open, setOpen] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const wrapperRef = useRef<HTMLDivElement>(null)
+  const requestIdRef = useRef(0)
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
-      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
-        setOpen(false)
-      }
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) setOpen(false)
     }
     document.addEventListener("mousedown", handleClickOutside)
     return () => document.removeEventListener("mousedown", handleClickOutside)
@@ -43,19 +41,23 @@ export function MapSearch() {
     setLoading(true)
     setOpen(true)
     setResults([])
+    const requestId = ++requestIdRef.current
     try {
       const osmParsed = parseOsmIdInput(trimmed)
       if (osmParsed) {
         const one = await lookupOsmId(osmParsed.type, osmParsed.id)
-        setResults(one ? [one] : [])
+        if (requestId === requestIdRef.current) setResults(one ? [one] : [])
       } else {
-        setResults(await searchPlace(trimmed, 8))
+        const next = await searchPlace(trimmed, 8)
+        if (requestId === requestIdRef.current) setResults(next)
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Search failed")
-      setResults([])
+      if (requestId === requestIdRef.current) {
+        setError(e instanceof Error ? e.message : "Search failed")
+        setResults([])
+      }
     } finally {
-      setLoading(false)
+      if (requestId === requestIdRef.current) setLoading(false)
     }
   }
 
@@ -65,9 +67,7 @@ export function MapSearch() {
     if (Number.isFinite(lat) && Number.isFinite(lng)) {
       map.flyTo([lat, lng], ZOOM_ON_SELECT, { duration: 0.4 })
     }
-    setOpen(false)
-    setQuery("")
-    setResults([])
+    setOpen(false); setQuery(""); setResults([])
   }
 
   return (
@@ -99,12 +99,7 @@ export function MapSearch() {
       </div>
 
       {open && (
-        <div
-          className={cn(
-            "mt-1 max-h-64 overflow-auto rounded-md border bg-background",
-            "empty:hidden",
-          )}
-        >
+        <div className="mt-1 max-h-64 overflow-auto rounded-md border bg-background empty:hidden">
           {loading ? (
             <p className="px-3 py-4 text-center text-sm text-muted-foreground">
               Searching…

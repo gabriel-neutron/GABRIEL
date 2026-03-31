@@ -81,13 +81,11 @@ export function AppShell({
                 </Button>
               )}
               {readOnly ? (
-                <>
-                  {onSwitchToEdit && (
-                    <Button type="button" size="sm" variant="secondary" onClick={onSwitchToEdit} title="Switch to edit mode">
-                      Edit mode
-                    </Button>
-                  )}
-                </>
+                onSwitchToEdit && (
+                  <Button type="button" size="sm" variant="secondary" onClick={onSwitchToEdit} title="Switch to edit mode">
+                    Edit mode
+                  </Button>
+                )
               ) : (
                 <>
                   {onSwitchToView && (
@@ -100,7 +98,7 @@ export function AppShell({
                     size="sm"
                     variant="outline"
                     disabled={busy}
-                    onClick={() => onNewProject()}
+                    onClick={onNewProject}
                     title="New project"
                   >
                     New
@@ -128,13 +126,13 @@ export function AppShell({
             </div>
           </div>
 
-          {error ? (
+          {error && (
             <div className="px-5 pb-3">
               <Alert>
                 <AlertDescription>{error}</AlertDescription>
               </Alert>
             </div>
-          ) : null}
+          )}
 
           {!readOnly && (
             <input

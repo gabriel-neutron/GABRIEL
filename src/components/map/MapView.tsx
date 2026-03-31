@@ -131,7 +131,7 @@ export function MapView({
       m.set(layerKey, list)
     }
     return m
-  }, [drawnGeometries, entities, layers])
+  }, [drawnGeometries, entities])
 
   const visibleLayerIds = useMemo(
     () => new Set(visibleLayersInOrder.map((l) => l.id)),
@@ -143,10 +143,7 @@ export function MapView({
     return new Map(all.map(({ entity, position }) => [entity.id, position]))
   }, [entities, drawnGeometries])
 
-  const getEntityPosition = useMemo(
-    () => (entity: MapEntity) => positionMap.get(entity.id) ?? null,
-    [positionMap],
-  )
+  const getEntityPosition = (entity: MapEntity) => positionMap.get(entity.id) ?? null
 
   // Stable refs so GeoJSON callbacks never capture stale closures
   const onSelectOsmObjectRef = useRef(onSelectOsmObject)

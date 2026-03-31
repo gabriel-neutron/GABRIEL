@@ -83,15 +83,6 @@ export function EntityInspector({
   onDeleteEntity,
   onDeleteGeometry,
 }: Props) {
-  const state = useEntityInspector({
-    selectedEntityId,
-    entities,
-    layers,
-    drawnGeometries,
-    onUpdateEntity,
-    onDeleteGeometry,
-  })
-
   const {
     entity,
     linkedGeometries,
@@ -119,7 +110,14 @@ export function EntityInspector({
     setNewSource,
     handleAddSource,
     handleRemoveSource,
-  } = state
+  } = useEntityInspector({
+    selectedEntityId,
+    entities,
+    layers,
+    drawnGeometries,
+    onUpdateEntity,
+    onDeleteGeometry,
+  })
 
   if (!entity) {
     return <div className="p-4">No selection</div>
@@ -443,8 +441,6 @@ export function EntityInspector({
                 Exact position
               </label>
             )}
-            {positionModeValue === "parent" }
-            {positionModeValue === "none" }
           </Field>
         </div>
         <Field>

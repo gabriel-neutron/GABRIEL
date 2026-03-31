@@ -1,9 +1,3 @@
-/**
- * GeoPackage read/write via @ngageoint/geopackage library.
- * Uses standard OGC GeoPackage format.
- * No React imports. Throws on validation failure.
- */
-
 import {
   GeoPackageAPI,
   GeoPackage,
@@ -51,7 +45,6 @@ export interface GpkgEntity {
   isExactPosition?: boolean
 }
 
-/** Same shape as DrawnGeometry; alias for GeoPackage read/write. */
 export type GpkgGeometry = DrawnGeometry
 
 export interface GeoPackageLoadResult {
@@ -95,9 +88,7 @@ export async function loadGeoPackage(buffer: ArrayBuffer): Promise<GeoPackageLoa
     console.error("loadGeoPackage: parse error", errorMsg, e instanceof Error ? e.stack : undefined)
     throw new Error(`Corrupted GeoPackage or unsupported schema: ${errorMsg}`)
   } finally {
-    if (geoPackage) {
-      geoPackage.close()
-    }
+    if (geoPackage) geoPackage.close()
   }
 }
 
@@ -131,9 +122,7 @@ function readLayers(geoPackage: GeoPackage): GpkgLayer[] {
     if (kind === "osm" && row.geojson != null && row.geojson !== "") {
       try {
         layer.osmData = JSON.parse(row.geojson) as GeoJSON.FeatureCollection
-      } catch {
-        // Invalid JSON: leave osmData unset
-      }
+      } catch {}
     }
     return layer
   })
@@ -400,13 +389,10 @@ export async function saveGeoPackage(
     console.error("saveGeoPackage failed", errorMsg, e instanceof Error ? e.stack : undefined)
     throw new Error(`Failed to save GeoPackage: ${errorMsg}`)
   } finally {
-    if (geoPackage) {
-      geoPackage.close()
-    }
+    if (geoPackage) geoPackage.close()
   }
 }
 
-/** Default echelon layers for UI (Team/Crew through Theater). */
 export function getDefaultEchelonLayers(): Layer[] {
   return ECHELON_OPTIONS.map((opt) => ({
     id: opt.value,
@@ -424,7 +410,6 @@ export interface ApplyGeoPackageResultState {
   selectedEntityId: string | null
 }
 
-/** Pure: compute state from load result. Preserves current selection if still in loaded entities. */
 export function applyGeoPackageResult(
   result: GeoPackageLoadResult,
   currentSelectedEntityId: string | null,

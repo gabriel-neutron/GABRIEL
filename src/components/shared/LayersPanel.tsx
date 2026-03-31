@@ -47,9 +47,7 @@ export function LayersPanel({
     function handleClickOutside(e: MouseEvent) {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) setContextMenu(null)
     }
-    function handleEscape() {
-      setContextMenu(null)
-    }
+    function handleEscape() { setContextMenu(null) }
     document.addEventListener("mousedown", handleClickOutside)
     document.addEventListener("keydown", handleEscape)
     return () => {
@@ -62,7 +60,7 @@ export function LayersPanel({
   const isOsmContext = contextLayer?.osmData != null
   const isEchelonLayer = contextLayer?.kind === "echelon"
   const canRename = contextLayer?.kind === "custom"
-  const canRemove = contextLayer && (contextLayer.kind === "custom" || isOsmContext)
+  const canRemove = !!contextLayer && (contextLayer.kind === "custom" || isOsmContext)
   const visibleLayers = layers.filter(
     (layer) =>
       layer.osmData != null ||
@@ -96,7 +94,6 @@ export function LayersPanel({
           const layerEntities = entities
             .filter((e) => e.layerId === layer.id)
             .sort((a, b) => {
-              // “Group” entities first (those with children), then single units; then alphabetically.
               const aGroup = entityHasChildren.current.get(a.id) === true
               const bGroup = entityHasChildren.current.get(b.id) === true
               if (aGroup !== bGroup) return aGroup ? -1 : 1
@@ -132,14 +129,7 @@ export function LayersPanel({
                     </span>
                   )}
                   <div className="min-w-0">
-                    <div className="truncate text-sm font-medium">{layer.name}</div>
-                    <div className="truncate text-xs text-muted-foreground">
-                      {isOsmLayer
-                        ? "OSM layer"
-                        : `${layerEntities.length} ${
-                            layerEntities.length === 1 ? "entity" : "entities"
-                          }`}
-                    </div>
+                    <div className="truncate text-sm font-medium">{layer.name} ({layerEntities.length})</div>
                   </div>
                 </button>
                 <div className="flex shrink-0 items-center gap-1">

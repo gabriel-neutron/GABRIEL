@@ -47,6 +47,7 @@ function EntityNode({
   onToggleExpanded,
 }: NodeProps) {
   const children = entities.filter((e) => e.parentId === entity.id)
+  const hasKids = children.length > 0
   const expanded = expandedIds.has(entity.id)
   const isHidden = hiddenEntityIds.has(entity.id)
   const ancestorHidden = isAncestorHidden(entity, entities, hiddenEntityIds)
@@ -65,9 +66,9 @@ function EntityNode({
           className="flex h-5 w-5 shrink-0 items-center justify-center text-muted-foreground"
           onClick={() => onToggleExpanded(entity.id)}
           aria-label={expanded ? "Collapse" : "Expand"}
-          disabled={!hasChildren(entity.id, entities)}
+          disabled={!hasKids}
         >
-          {hasChildren(entity.id, entities) ? (expanded ? "▾" : "▸") : ""}
+          {hasKids ? (expanded ? "▾" : "▸") : ""}
         </button>
 
         {/* Entity name */}
@@ -130,6 +131,9 @@ export function HierarchyPanel({
   onToggleEntityVisible,
 }: Props) {
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
+  const anyVisible = entities.some(
+    (e) => !hiddenEntityIds.has(e.id) && !isAncestorHidden(e, entities, hiddenEntityIds),
+  )
 
   function handleToggleExpanded(id: string) {
     setExpandedIds((prev) => {
@@ -142,6 +146,10 @@ export function HierarchyPanel({
       return next
     })
   }
+  function handleToggleAllVisibility() {
+    const visible = !anyVisible
+    for (const entity of entities) onToggleEntityVisible(entity.id, visible)
+  }
 
   const roots = entities
     .filter((e) => e.parentId == null)
@@ -149,11 +157,17 @@ export function HierarchyPanel({
 
   const collapsibleRoots = roots.filter((r) => hasChildren(r.id, entities))
   const leafRoots = roots.filter((r) => !hasChildren(r.id, entities))
+  const orderedRoots = [...collapsibleRoots, ...leafRoots]
 
   return (
     <div className="flex min-w-0 flex-col">
       <div className="shrink-0 border-b border-border px-4 py-3">
-        <h2 className="text-sm font-semibold">Hierarchy</h2>
+        <div className="flex items-center justify-between gap-2">
+          <h2 className="text-sm font-semibold">Hierarchy</h2>
+          <Button type="button" variant="outline" size="xs" onClick={handleToggleAllVisibility}>
+            {anyVisible ? "Hide all" : "Show all"}
+          </Button>
+        </div>
       </div>
       <div className="min-h-0 flex-1 space-y-px overflow-y-auto p-2">
         {roots.length === 0 ? (
@@ -162,21 +176,7 @@ export function HierarchyPanel({
           </div>
         ) : (
           <>
-            {collapsibleRoots.map((root) => (
-              <EntityNode
-                key={root.id}
-                entity={root}
-                depth={0}
-                entities={entities}
-                selectedEntityId={selectedEntityId}
-                hiddenEntityIds={hiddenEntityIds}
-                expandedIds={expandedIds}
-                onSelectEntity={onSelectEntity}
-                onToggleEntityVisible={onToggleEntityVisible}
-                onToggleExpanded={handleToggleExpanded}
-              />
-            ))}
-            {leafRoots.map((root) => (
+            {orderedRoots.map((root) => (
               <EntityNode
                 key={root.id}
                 entity={root}
