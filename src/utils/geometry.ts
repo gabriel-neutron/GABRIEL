@@ -1,4 +1,4 @@
-import type { DrawnGeometry, MapEntity, PositionMode } from "@/types/domain.types"
+import type { DrawnGeometry, MapEntity } from "@/types/domain.types"
 
 /**
  * Returns a representative point for symbol placement from the first geometry
