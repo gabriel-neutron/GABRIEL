@@ -433,14 +433,16 @@ export function EntityInspector({
                 ))}
               </SelectContent>
             </Select>
-            <label className="mt-2 inline-flex items-center gap-2 text-xs text-muted-foreground">
-              <Switch
-                checked={isExactPositionValue}
-                onCheckedChange={handleIsExactPositionChange}
-                aria-label="Toggle exact position"
-              />
-              Exact position
-            </label>
+            {positionModeValue === "own" && (
+              <label className="mt-2 inline-flex items-center gap-2 text-xs text-muted-foreground">
+                <Switch
+                  checked={isExactPositionValue}
+                  onCheckedChange={handleIsExactPositionChange}
+                  aria-label="Toggle exact position"
+                />
+                Exact position
+              </label>
+            )}
             {positionModeValue === "parent" }
             {positionModeValue === "none" }
           </Field>

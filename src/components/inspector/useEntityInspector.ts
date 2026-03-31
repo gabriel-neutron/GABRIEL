@@ -128,7 +128,10 @@ export function useEntityInspector({
   const handlePositionModeChange = useCallback(
     (mode: PositionMode) => {
       if (!entity) return
-      onUpdateEntity(entity.id, { positionMode: mode })
+      onUpdateEntity(entity.id, {
+        positionMode: mode,
+        isExactPosition: mode === "own" ? (entity.isExactPosition ?? false) : false,
+      })
       if (mode !== "own") {
         for (const g of linkedGeometries) {
           onDeleteGeometry(g.id)
