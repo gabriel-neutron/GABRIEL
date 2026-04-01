@@ -22,6 +22,7 @@ export const UNIT_TYPE_OPTIONS_GROUPED: { label: string; options: UnitTypeOption
       { value: "sniper", label: "Sniper" },
       { value: "special forces", label: "Special forces" },
       { value: "special operations", label: "Special operations" },
+      { value: "unmanned systems", label: "UAV / drone" },
     ],
   },
   {

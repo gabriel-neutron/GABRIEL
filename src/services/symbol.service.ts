@@ -19,14 +19,14 @@ const VERSION_2525D = "10"
 /** Standard identity (position 2). In milsymbol: 0 = Reality, 1 = Exercise, 2 = Simulation. Use 0 so Hostile is not treated as Joker (Hostile+Exercise → Friend shape). */
 const STANDARD_IDENTITY_REALITY = "0"
 
-/** Affiliation to SIDC digit (position 3): 2=Friend, 5=Hostile, 4=Neutral, 1=Unknown. */
+/** Affiliation to SIDC digit (position 4): 3=Friend, 6=Hostile/Faker, 4=Neutral, 1=Unknown, 2=Assumed Friend, 5=Suspect/Joker. */
 const AFFILIATION_TO_DIGIT: Record<SymbolAffiliation, string> = {
-  Friend: "2",
-  Hostile: "5",
+  Friend: "3",
+  Hostile: "6",
   Neutral: "4",
   Unknown: "1",
   "Assumed Friend": "2",
-  Suspect: "6",
+  Suspect: "5",
 }
 
 /** Echelon to amplifier (positions 9-10) per milsymbol numeric SIDC. */
@@ -118,7 +118,14 @@ const UNIT_TYPE_TO_FUNCTION_ID: Record<string, string> = {
 const DEFAULT_ECHELON_AMPLIFIER = "21" // Division
 const DEFAULT_AFFILIATION: SymbolAffiliation = "Friend"
 const DEFAULT_DOMAIN: SymbolDomain = "Ground"
-const LAND_UNIT_SYMBOL_SET = "10"
+const DOMAIN_TO_SYMBOL_SET: Record<SymbolDomain, string> = {
+  Air: "01",
+  Ground: "10",
+  Sea: "30",
+  Space: "05",
+  Subsurface: "35",
+}
+const UNKNOWN_FUNCTION_ID = "000000"
 
 let standardSet = false
 
@@ -142,13 +149,13 @@ function normalizeUnitType(type: string): string {
  */
 function buildDerivedSidc(
   affiliation: SymbolAffiliation,
+  symbolSet: string,
   echelonAmplifier: string,
   functionId: string,
 ): string {
   const pos3 = AFFILIATION_TO_DIGIT[affiliation] ?? "1"
   const version = VERSION_2525D
   const standardId = STANDARD_IDENTITY_REALITY
-  const symbolSet = LAND_UNIT_SYMBOL_SET
   const status = "0"
   const hq = "0"
   const mod1 = "00"
@@ -231,14 +238,14 @@ export function getSymbolForUnit(input: SymbolServiceInput): SymbolServiceOutput
     sidc = unit.nato_symbol_code
   } else {
     const typeKey = normalizeUnitType(unit.type)
-    const functionId = UNIT_TYPE_TO_FUNCTION_ID[typeKey] ?? UNIT_TYPE_TO_FUNCTION_ID.unknown
+    const symbolSet = DOMAIN_TO_SYMBOL_SET[domain] ?? DOMAIN_TO_SYMBOL_SET.Ground
     const echelon = input.echelon
     const echelonAmplifier = echelon ? ECHELON_TO_AMPLIFIER[echelon] : DEFAULT_ECHELON_AMPLIFIER
-    if (domain !== "Ground") {
-      sidc = buildDerivedSidc(affiliation, echelonAmplifier, UNIT_TYPE_TO_FUNCTION_ID.unknown)
-    } else {
-      sidc = buildDerivedSidc(affiliation, echelonAmplifier, functionId)
-    }
+    const functionId =
+      domain === "Ground"
+        ? (UNIT_TYPE_TO_FUNCTION_ID[typeKey] ?? UNIT_TYPE_TO_FUNCTION_ID.unknown)
+        : UNKNOWN_FUNCTION_ID
+    sidc = buildDerivedSidc(affiliation, symbolSet, echelonAmplifier, functionId)
   }
 
   return {

@@ -27,6 +27,17 @@ function hasChildren(entityId: string, entities: MapEntity[]): boolean {
   return entities.some((e) => e.parentId === entityId)
 }
 
+function compareByName(a: MapEntity, b: MapEntity): number {
+  return a.name.localeCompare(b.name, undefined, { sensitivity: "base" })
+}
+
+function getOrderedEntities(items: MapEntity[], allEntities: MapEntity[]): MapEntity[] {
+  const sortedItems = [...items].sort(compareByName)
+  const collapsibleItems = sortedItems.filter((item) => hasChildren(item.id, allEntities))
+  const nonCollapsibleItems = sortedItems.filter((item) => !hasChildren(item.id, allEntities))
+  return [...collapsibleItems, ...nonCollapsibleItems]
+}
+
 function isAncestorHidden(entity: MapEntity, entities: MapEntity[], hiddenEntityIds: Set<string>): boolean {
   if (entity.parentId == null) return false
   if (hiddenEntityIds.has(entity.parentId)) return true
@@ -46,7 +57,10 @@ function EntityNode({
   onToggleEntityVisible,
   onToggleExpanded,
 }: NodeProps) {
-  const children = entities.filter((e) => e.parentId === entity.id)
+  const children = getOrderedEntities(
+    entities.filter((e) => e.parentId === entity.id),
+    entities,
+  )
   const hasKids = children.length > 0
   const expanded = expandedIds.has(entity.id)
   const isHidden = hiddenEntityIds.has(entity.id)
@@ -151,13 +165,8 @@ export function HierarchyPanel({
     for (const entity of entities) onToggleEntityVisible(entity.id, visible)
   }
 
-  const roots = entities
-    .filter((e) => e.parentId == null)
-    .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }))
-
-  const collapsibleRoots = roots.filter((r) => hasChildren(r.id, entities))
-  const leafRoots = roots.filter((r) => !hasChildren(r.id, entities))
-  const orderedRoots = [...collapsibleRoots, ...leafRoots]
+  const roots = entities.filter((e) => e.parentId == null)
+  const orderedRoots = getOrderedEntities(roots, entities)
 
   return (
     <div className="flex min-w-0 flex-col">
