@@ -184,7 +184,7 @@ export function MapView({
         />
         {onMapBoundsChange && <MapBoundsReporter onBoundsChange={onMapBoundsChange} />}
         {!readOnly && <MapToolSelector mapTool={mapTool} onMapToolChange={setMapTool} />}
-        <MapSearch />
+        <MapSearch layers={layers} entityOsmGeometries={entityOsmGeometries} entities={entities} />
 
         <TileLayer url={tileConfig.url} attribution={tileConfig.attribution} />
         {tileConfig.overlay && (

@@ -27,4 +27,8 @@ export default meta
 
 type Story = StoryObj<typeof MapSearch>
 
-export const Default: Story = {}
+export const Default: Story = {
+  args: {
+    layers: [],
+  },
+}
