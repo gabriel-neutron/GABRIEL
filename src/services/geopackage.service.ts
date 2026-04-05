@@ -21,7 +21,6 @@ export interface GpkgLayer {
   id: string
   name: string
   visible: boolean
-  expanded: boolean
   kind?: "echelon" | "custom" | "osm"
   sourceQuery?: string
   osmData?: GeoJSON.FeatureCollection
@@ -113,7 +112,6 @@ function readLayers(geoPackage: GeoPackage): GpkgLayer[] {
       id: String(row.id ?? ""),
       name: String(row.name ?? ""),
       visible: Number(row.visible) === 1,
-      expanded: Number(row.expanded) === 1,
       kind,
     }
     if (kind === "osm" && row.source_query != null) {
@@ -313,7 +311,7 @@ export async function saveGeoPackage(
           String(l.id ?? ""),
           String(l.name ?? ""),
           l.visible ? 1 : 0,
-          l.expanded ? 1 : 0,
+          1,
           l.kind != null ? String(l.kind) : null,
           isOsm && l.sourceQuery != null ? String(l.sourceQuery) : null,
           isOsm ? JSON.stringify(l.osmData) : null,
@@ -398,7 +396,6 @@ export function getDefaultEchelonLayers(): Layer[] {
     id: opt.value,
     name: opt.label,
     visible: true,
-    expanded: true,
     kind: "echelon" as const,
   }))
 }
@@ -418,18 +415,17 @@ export function applyGeoPackageResult(
   const echelonById = new Map(loaded.filter((l) => l.kind === "echelon").map((l) => [l.id, l]))
   const echelonLayers: Layer[] = getDefaultEchelonLayers().map((d) => {
     const fromFile = echelonById.get(d.id)
-    return fromFile ? { ...d, visible: fromFile.visible, expanded: fromFile.expanded } : d
+    return fromFile ? { ...d, visible: fromFile.visible } : d
   })
   const customLayers: Layer[] = loaded
     .filter((l) => l.kind === "custom")
-    .map((l) => ({ id: l.id, name: l.name, visible: l.visible, expanded: l.expanded, kind: "custom" as const }))
+    .map((l) => ({ id: l.id, name: l.name, visible: l.visible, kind: "custom" as const }))
   const osmLayers: Layer[] = loaded
     .filter((l) => l.kind === "osm" && l.osmData != null)
     .map((l) => ({
       id: l.id,
       name: l.name,
       visible: l.visible,
-      expanded: l.expanded,
       kind: "osm" as const,
       osmData: l.osmData,
       sourceQuery: l.sourceQuery,

@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react"
 import { useState } from "react"
-import { FilterableSelect, type ParentOption } from "@/components/tree/FilterableSelect"
+import { FilterableSelect, type ParentOption } from "@/components/shared/FilterableSelect"
 
 const meta: Meta<typeof FilterableSelect> = {
   component: FilterableSelect,

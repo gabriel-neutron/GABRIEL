@@ -60,6 +60,10 @@ export type UnitType =
   | "command"
   | "unknown"
 
+/**
+ * Narrow input for NATO symbol / SIDC generation — not a duplicate of `MapEntity`.
+ * Callers map from `MapEntity` (and related fields) into this shape for symbol.service.
+ */
 export interface SymbolServiceInput {
   unit: {
     id: string

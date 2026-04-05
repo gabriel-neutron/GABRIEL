@@ -51,7 +51,7 @@ export function AboutDialog({ open, onClose, onFirstClose }: Props) {
       aria-labelledby="about-dialog-title"
     >
       <Card className="relative w-full max-w-lg border bg-card shadow-lg">
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardHeader className="flex flex-row items-center justify-between space-y-0">
           <CardTitle id="about-dialog-title">{content.title}</CardTitle>
           <Button size="sm" variant="ghost" onClick={handleClose} aria-label="Close">
             Close
@@ -67,18 +67,14 @@ export function AboutDialog({ open, onClose, onFirstClose }: Props) {
               <p>{content.description}</p>
             </div>
           </Tabs>
-
-          <div>
-            <div className="mb-2 text-xs font-medium text-muted-foreground">{content.links}</div>
-            <div className="flex flex-wrap gap-2">
-              {SOCIAL_LINKS.map((link) => (
-                <Button key={link.label} variant="outline" size="sm" asChild>
-                  <a href={link.url} target="_blank" rel="noopener noreferrer">
-                    {link.label}
-                  </a>
-                </Button>
-              ))}
-            </div>
+          <div className="flex flex-wrap gap-2">
+            {SOCIAL_LINKS.map((link) => (
+              <Button key={link.label} variant="outline" size="sm" asChild>
+                <a href={link.url} target="_blank" rel="noopener noreferrer">
+                  {link.label}
+                </a>
+              </Button>
+            ))}
           </div>
         </CardContent>
       </Card>

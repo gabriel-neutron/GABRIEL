@@ -1,5 +1,7 @@
 /**
- * Search loaded OSM GeoJSON (layer overlays and entity-linked caches) by all tag/property values.
+ * Search loaded OSM GeoJSON (layer overlays and entity-linked caches).
+ * Matching uses all tag/property values. OSM element id is matched exactly for digit-only
+ * queries so "123" does not match node/123456 via substring on the id string.
  */
 
 import { centroid } from "@turf/turf"
@@ -15,6 +17,7 @@ export type LocalOsmSearchHit = {
   detail?: string
 }
 
+/** Preferred keys for human-readable titles in results (matching uses all properties). */
 const NAME_KEYS = ["name", "official_name", "short_name", "ref", "operator", "brand"] as const
 
 function collectStrings(value: unknown, out: string[]): void {
@@ -33,10 +36,10 @@ function collectStrings(value: unknown, out: string[]): void {
   }
 }
 
-function featureSearchHaystack(feature: GeoJSON.Feature & { id?: string | number }): string {
+/** Lowercased blob of all property values for substring search (excludes GeoJSON feature.id). */
+function propertiesHaystack(props: Record<string, unknown>): string {
   const parts: string[] = []
-  if (feature.id != null) parts.push(String(feature.id))
-  collectStrings(feature.properties, parts)
+  collectStrings(props, parts)
   return parts.join("\u0001").toLowerCase()
 }
 
@@ -48,10 +51,17 @@ function pickDisplayName(props: Record<string, unknown>): string | null {
   return null
 }
 
-function osmIdSuffix(feature: GeoJSON.Feature & { id?: string }, props: Record<string, unknown>): string | null {
+/**
+ * Read OSM numeric id from loaded GeoJSON (osmtogeojson uses ids like "node/123").
+ * Used only for exact digit-only search matches and fallback labels — not for parsing user input.
+ */
+function readOsmNumericIdString(
+  feature: GeoJSON.Feature & { id?: string },
+  props: Record<string, unknown>,
+): string | null {
   if (typeof feature.id === "string") {
-    const m = /^(node|way|relation)\/(\d+)$/.exec(feature.id)
-    if (m) return `${m[1]}/${m[2]}`
+    const m = /^(?:node|way|relation)\/(\d+)$/.exec(feature.id)
+    if (m) return m[1]
   }
   const t = props["@type"] ?? props.type
   const id = props["@id"] ?? props.id
@@ -59,9 +69,24 @@ function osmIdSuffix(feature: GeoJSON.Feature & { id?: string }, props: Record<s
     (t === "node" || t === "way" || t === "relation") &&
     (typeof id === "number" || (typeof id === "string" && /^\d+$/.test(id)))
   ) {
-    return `${t}/${id}`
+    return String(id)
   }
   return null
+}
+
+function featureMatchesQuery(feature: GeoJSON.Feature & { id?: string }, qRaw: string): boolean {
+  const q = qRaw.trim().toLowerCase()
+  if (!q) return false
+  const props = (feature.properties ?? {}) as Record<string, unknown>
+  const tags = propertiesHaystack(props)
+
+  if (/^\d+$/.test(q)) {
+    const idNum = readOsmNumericIdString(feature, props)
+    if (idNum !== null && idNum === q) return true
+    return tags.includes(q)
+  }
+
+  return tags.includes(q)
 }
 
 function representativeLatLng(feature: GeoJSON.Feature): [number, number] | null {
@@ -82,11 +107,11 @@ function labelFeature(
 ): { display_name: string; detail?: string } {
   const props = (feature.properties ?? {}) as Record<string, unknown>
   const title = pickDisplayName(props)
-  const osmRef = osmIdSuffix(feature, props)
+  const idNum = readOsmNumericIdString(feature, props)
   const geomType = feature.geometry?.type
-  const display_name = title ?? osmRef ?? geomType ?? "OSM feature"
+  const display_name = title ?? (idNum != null ? `OSM #${idNum}` : null) ?? geomType ?? "OSM feature"
   const detailParts: string[] = [layerLabel]
-  if (title && osmRef) detailParts.push(osmRef)
+  if (title && idNum != null) detailParts.push(`#${idNum}`)
   else if (!title && geomType != null) detailParts.push(geomType)
   const detail = detailParts.length > 1 ? detailParts.join(" · ") : layerLabel
   return { display_name, detail }
@@ -101,8 +126,8 @@ export function searchLocalOsmFeatures(
     limit?: number
   } = {},
 ): LocalOsmSearchHit[] {
-  const q = query.trim().toLowerCase()
-  if (!q) return []
+  const qRaw = query.trim()
+  if (!qRaw) return []
 
   const limit = options.limit ?? 12
   const entityNameById = options.entityNameById ?? new Map<string, string>()
@@ -116,7 +141,7 @@ export function searchLocalOsmFeatures(
   ): boolean {
     if (hits.length >= limit) return false
     if (seen.has(dedupeKey)) return false
-    if (!featureSearchHaystack(feature).includes(q)) return false
+    if (!featureMatchesQuery(feature, qRaw)) return false
     const pos = representativeLatLng(feature)
     if (!pos) return false
     seen.add(dedupeKey)

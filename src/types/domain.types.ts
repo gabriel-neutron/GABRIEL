@@ -14,7 +14,6 @@ export type Layer = {
   id: string
   name: string
   visible: boolean
-  expanded: boolean
   /** Echelon = automatic by echelon; custom = user-created; osm = OSM overlay with cached GeoJSON. */
   kind?: "echelon" | "custom" | "osm"
   /** When set, this layer is an OSM overlay (GeoJSON). */
@@ -23,9 +22,11 @@ export type Layer = {
   sourceQuery?: string
 }
 
+/** Unit/entity in the project; persisted in GeoPackage `units` table. */
 export type MapEntity = {
   id: string
   name: string
+  /** Required: every entity sits on a layer. New geometry uses `getDefaultEntityLayerId` when picking a layer. */
   layerId: string
   parentId: string | null
   /** Unit type for symbol derivation (e.g. infantry, armored, artillery). */
@@ -40,7 +41,7 @@ export type MapEntity = {
   domain?: "Ground" | "Air" | "Sea" | "Subsurface" | "Space"
   /** OSM relation id (e.g. multipolygon for military base). */
   osmRelationId?: number | null
-  /** Military unit identifier */
+  /** Military unit identifier (MUN)*/
   militaryUnitId?: string | null
   /** Free-form notes. */
   notes?: string | null
@@ -54,6 +55,10 @@ export type MapEntity = {
 
 export type PositionMode = "own" | "parent" | "none"
 
+/**
+ * User-drawn map geometry stored in GeoPackage `geometries` (point, line, or polygon).
+ * Linked to a layer; optionally linked to a unit entity via `entityId`.
+ */
 export type DrawnGeometry =
   | { id: string; layerId: string; entityId: string | null; type: "point"; lat: number; lng: number }
   | { id: string; layerId: string; entityId: string | null; type: "line"; positions: [number, number][] }

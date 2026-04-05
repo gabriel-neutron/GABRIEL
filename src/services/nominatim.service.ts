@@ -1,5 +1,5 @@
 /**
- * Nominatim (OSM) search and lookup. Used for map place/city/OSM ID search.
+ * Nominatim (OSM) search. Used for map place/city search.
  * Usage policy: https://operations.osmfoundation.org/policies/nominatim/
  */
 
@@ -32,36 +32,4 @@ export async function searchPlace(query: string, limit = 8): Promise<NominatimRe
   if (!res.ok) throw new Error("Search failed")
   const data = (await res.json()) as NominatimResult[]
   return data
-}
-
-/** Parse "123", "way 123", "node/456" style input for OSM lookup */
-export function parseOsmIdInput(query: string): { type: "node" | "way" | "relation"; id: number } | null {
-  const trimmed = query.trim()
-  const simple = /^(\d+)$/.exec(trimmed)
-  if (simple) {
-    const id = parseInt(simple[1], 10)
-    if (Number.isInteger(id) && id > 0) return { type: "way", id }
-    return null
-  }
-  const prefixed = /^(node|way|relation)\s*[\/\s]*(\d+)$/i.exec(trimmed)
-  if (prefixed) {
-    const id = parseInt(prefixed[2], 10)
-    if (Number.isInteger(id) && id > 0)
-      return { type: prefixed[1].toLowerCase() as "node" | "way" | "relation", id }
-  }
-  return null
-}
-
-export async function lookupOsmId(
-  type: "node" | "way" | "relation",
-  id: number
-): Promise<NominatimResult | null> {
-  const prefix = type === "node" ? "N" : type === "way" ? "W" : "R"
-  const osmIds = `${prefix}${id}`
-  const params = new URLSearchParams({ osm_ids: osmIds, format: "json" })
-  const res = await fetch(`${NOMINATIM_BASE}/lookup?${params}`, { headers: HEADERS })
-  if (!res.ok) return null
-  const data = (await res.json()) as NominatimResult[]
-  const first = data[0]
-  return first ?? null
 }

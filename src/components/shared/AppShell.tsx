@@ -6,6 +6,12 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { cn } from "@/lib/utils"
 import { useTheme } from "@/provider/theme-provider"
 
+export type ProjectFileActions = {
+  onNewProject: () => void
+  onOpenProject: (file: File) => void
+  onSaveProject: () => void
+}
+
 type Props = {
   mapSlot: ReactNode
   treeSlot: ReactNode
@@ -17,9 +23,7 @@ type Props = {
   onCloseDetail: () => void
   busy: boolean
   error: string | null
-  onNewProject: () => void
-  onOpenProject: (file: File) => void
-  onSaveProject: () => void
+  projectFileActions: ProjectFileActions
   readOnly?: boolean
   onOpenAbout?: () => void
   onSwitchToEdit?: () => void
@@ -37,9 +41,7 @@ export function AppShell({
   onCloseDetail,
   busy,
   error,
-  onNewProject,
-  onOpenProject,
-  onSaveProject,
+  projectFileActions,
   readOnly = false,
   onOpenAbout,
   onSwitchToEdit,
@@ -98,7 +100,7 @@ export function AppShell({
                     size="sm"
                     variant="outline"
                     disabled={busy}
-                    onClick={onNewProject}
+                    onClick={projectFileActions.onNewProject}
                     title="New project"
                   >
                     New
@@ -116,7 +118,7 @@ export function AppShell({
                     size="sm"
                     variant="secondary"
                     disabled={busy}
-                    onClick={onSaveProject}
+                    onClick={projectFileActions.onSaveProject}
                     title="Save project"
                   >
                     Save
@@ -142,7 +144,7 @@ export function AppShell({
               className="hidden"
               onChange={(e) => {
                 const file = e.currentTarget.files?.[0]
-                if (file) onOpenProject(file)
+                if (file) projectFileActions.onOpenProject(file)
                 e.currentTarget.value = ""
               }}
             />

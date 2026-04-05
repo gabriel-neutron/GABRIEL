@@ -1,7 +1,7 @@
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
-import { FilterableSelect } from "@/components/tree/FilterableSelect"
+import { FilterableSelect } from "@/components/shared/FilterableSelect"
 import type { MapEntity } from "@/types/domain.types"
 
 type Props = {

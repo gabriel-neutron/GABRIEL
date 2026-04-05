@@ -8,24 +8,13 @@ import {
   type GpkgLayer,
 } from "@/services/geopackage.service"
 import { loadProject, saveProject, clearProject } from "@/services/projectStorage.service"
-import { fetchRelationGeometry } from "@/services/overpass.service"
+import { useMapProjectState } from "@/hooks/useMapProjectState"
 import type { Layer, MapEntity, DrawnGeometry } from "@/types/domain.types"
 import { getDefaultEntityLayerId } from "@/utils/entityLayer"
-import type { BaseMapId } from "@/components/shared/BaseMapSwitcher"
-
-type SelectedOsmObject = {
-  type: "node" | "way" | "relation"
-  id: number
-  cachedFeature?: GeoJSON.Feature & { id?: string }
-} | null
-
 export type EditPageProps = {
   onViewMode?: () => void
   onOpenAbout?: () => void
 }
-
-const EMPTY_ENTITIES: MapEntity[] = []
-const EMPTY_GEOMETRIES: DrawnGeometry[] = []
 
 function entityFromGeometry(geom: DrawnGeometry, defaultLayerId: string, parentId: string | null): MapEntity {
   const id = crypto.randomUUID()
@@ -41,16 +30,29 @@ function entityFromGeometry(geom: DrawnGeometry, defaultLayerId: string, parentI
 }
 
 export function EditPage({ onViewMode, onOpenAbout }: EditPageProps): React.ReactElement {
-  const [layers, setLayers] = useState<Layer[]>(() => getDefaultEchelonLayers())
-  const [entities, setEntities] = useState<MapEntity[]>(EMPTY_ENTITIES)
-  const [drawnGeometries, setDrawnGeometries] = useState<DrawnGeometry[]>(EMPTY_GEOMETRIES)
-  const [selectedEntityId, setSelectedEntityId] = useState<string | null>(null)
-  const [selectedOsmObject, setSelectedOsmObject] = useState<SelectedOsmObject>(null)
-  const [showNetworks, setShowNetworks] = useState(true)
-  const [baseMap, setBaseMap] = useState<BaseMapId>("osm")
+  const p = useMapProjectState({ initialShowNetworks: true })
+  const {
+    layers,
+    setLayers,
+    entities,
+    setEntities,
+    drawnGeometries,
+    setDrawnGeometries,
+    selectedEntityId,
+    setSelectedEntityId,
+    selectedOsmObject,
+    setSelectedOsmObject,
+    showNetworks,
+    setShowNetworks,
+    baseMap,
+    setBaseMap,
+    entityOsmGeometries,
+    setLayerVisible,
+    handleCloseDetail: hookHandleCloseDetail,
+  } = p
+
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [entityOsmGeometries, setEntityOsmGeometries] = useState<Record<string, GeoJSON.FeatureCollection>>({})
   const [restoredFromSession, setRestoredFromSession] = useState(false)
 
   useEffect(function restoreSession() {
@@ -67,7 +69,7 @@ export function EditPage({ onViewMode, onOpenAbout }: EditPageProps): React.Reac
         })
         .catch(() => {})
     })
-  }, [])
+  }, [setLayers, setEntities, setDrawnGeometries, setSelectedEntityId])
 
   useEffect(
     function clearRestoredBanner() {
@@ -78,39 +80,6 @@ export function EditPage({ onViewMode, onOpenAbout }: EditPageProps): React.Reac
     [restoredFromSession],
   )
 
-  useEffect(
-    function fetchOsmRelationGeometries() {
-      const entityIdsWithRelation = new Set(
-        entities.filter((e) => e.osmRelationId != null).map((e) => e.id),
-      )
-      setEntityOsmGeometries((prev) => {
-        const next = { ...prev }
-        for (const id of Object.keys(next)) {
-          if (!entityIdsWithRelation.has(id)) delete next[id]
-        }
-        return next
-      })
-      for (const e of entities) {
-        if (e.osmRelationId == null) continue
-        const relationId = e.osmRelationId
-        const entityId = e.id
-        fetchRelationGeometry(relationId).then(
-          (fc) => setEntityOsmGeometries((prev) => ({ ...prev, [entityId]: fc })),
-          () => {},
-        )
-      }
-    },
-    [entities],
-  )
-
-  function setLayerVisible(id: string, visible: boolean): void {
-    setLayers((prev) => prev.map((l) => (l.id === id ? { ...l, visible } : l)))
-  }
-
-  function setLayerExpanded(id: string, expanded: boolean): void {
-    setLayers((prev) => prev.map((l) => (l.id === id ? { ...l, expanded } : l)))
-  }
-
   function addLayer(layer: Layer): void {
     setLayers((prev) => [...prev, layer])
   }
@@ -120,7 +89,7 @@ export function EditPage({ onViewMode, onOpenAbout }: EditPageProps): React.Reac
     const names = layers.filter((l) => l.kind === "custom" || l.osmData != null).map((l) => l.name)
     let name = "New layer"
     for (let n = 1; names.includes(name); n++) name = `New layer ${n}`
-    addLayer({ id, name, visible: true, expanded: true, kind: "custom" })
+    addLayer({ id, name, visible: true, kind: "custom" })
   }
 
   function renameLayer(layerId: string, name: string): void {
@@ -199,11 +168,6 @@ export function EditPage({ onViewMode, onOpenAbout }: EditPageProps): React.Reac
     setSelectedEntityId(null)
   }
 
-  function handleCloseDetail(): void {
-    setSelectedEntityId(null)
-    setSelectedOsmObject(null)
-  }
-
   const writeGeoPackageToFile = useCallback(async (bytes: Uint8Array): Promise<void> => {
     const showSave = (window as Window & { showSaveFilePicker?: (opts?: unknown) => Promise<FileSystemFileHandle> })
       .showSaveFilePicker
@@ -241,7 +205,6 @@ export function EditPage({ onViewMode, onOpenAbout }: EditPageProps): React.Reac
         id: l.id,
         name: l.name,
         visible: l.visible,
-        expanded: l.expanded,
         kind: l.kind,
       }))
       const bytes = await saveGeoPackage(gpkgLayers, [], [])
@@ -254,7 +217,7 @@ export function EditPage({ onViewMode, onOpenAbout }: EditPageProps): React.Reac
     } finally {
       setBusy(false)
     }
-  }, [writeGeoPackageToFile])
+  }, [setLayers, setEntities, setDrawnGeometries, setSelectedEntityId, writeGeoPackageToFile])
 
   const handleOpenProject = useCallback(async (file: File): Promise<void> => {
     setBusy(true)
@@ -274,7 +237,7 @@ export function EditPage({ onViewMode, onOpenAbout }: EditPageProps): React.Reac
     } finally {
       setBusy(false)
     }
-  }, [])
+  }, [setLayers, setEntities, setDrawnGeometries, setSelectedEntityId])
 
   const handleSaveProject = useCallback(async (): Promise<void> => {
     const nonOsmLayerIds = new Set(layers.filter((l) => l.osmData == null).map((l) => l.id))
@@ -289,7 +252,6 @@ export function EditPage({ onViewMode, onOpenAbout }: EditPageProps): React.Reac
       id: l.id,
       name: l.name,
       visible: l.visible,
-      expanded: l.expanded,
       kind: l.kind ?? (l.osmData != null ? ("osm" as const) : undefined),
       sourceQuery: l.sourceQuery,
       osmData: l.osmData,
@@ -312,6 +274,12 @@ export function EditPage({ onViewMode, onOpenAbout }: EditPageProps): React.Reac
     }
   }, [layers, entities, drawnGeometries, writeGeoPackageToFile])
 
+  const projectFileActions = {
+    onNewProject: handleNewProject,
+    onOpenProject: handleOpenProject,
+    onSaveProject: handleSaveProject,
+  }
+
   return (
     <MainLayout
       readOnly={false}
@@ -331,7 +299,6 @@ export function EditPage({ onViewMode, onOpenAbout }: EditPageProps): React.Reac
       entityOsmGeometries={entityOsmGeometries}
       restoredFromSession={restoredFromSession}
       setLayerVisible={setLayerVisible}
-      setLayerExpanded={setLayerExpanded}
       removeLayer={removeLayer}
       renameLayer={renameLayer}
       addNewLayer={addNewLayer}
@@ -343,12 +310,10 @@ export function EditPage({ onViewMode, onOpenAbout }: EditPageProps): React.Reac
       handleUpdateEntity={handleUpdateEntity}
       handleDeleteGeometry={handleDeleteGeometry}
       handleSelectOsmObject={handleSelectOsmObject}
-      handleCloseDetail={handleCloseDetail}
+      handleCloseDetail={hookHandleCloseDetail}
       busy={busy}
       error={error}
-      onNewProject={handleNewProject}
-      onOpenProject={handleOpenProject}
-      onSaveProject={handleSaveProject}
+      projectFileActions={projectFileActions}
     />
   )
 }

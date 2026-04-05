@@ -56,7 +56,6 @@ export function OsmQueryMenu({ layers, onAddLayer }: Props) {
         id: crypto.randomUUID(),
         name,
         visible: true,
-        expanded: false,
         kind: "osm",
         osmData: result.geojson,
         sourceQuery: normalizedQuery,

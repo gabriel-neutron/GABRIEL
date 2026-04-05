@@ -18,8 +18,8 @@ export default meta
 const noop = () => {}
 
 const defaultLayers: Layer[] = [
-  { id: "layer-1", name: "Units", visible: true, expanded: true, kind: "custom" },
-  { id: "Division", name: "Division", visible: true, expanded: true, kind: "echelon" },
+  { id: "layer-1", name: "Units", visible: true, kind: "custom" },
+  { id: "Division", name: "Division", visible: true, kind: "echelon" },
 ]
 
 const defaultEntities: MapEntity[] = [

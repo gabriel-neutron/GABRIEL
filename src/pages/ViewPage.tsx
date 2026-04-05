@@ -1,23 +1,15 @@
 import { useState, useEffect } from "react"
+import { Loader2 } from "lucide-react"
 import { MainLayout } from "@/components/shared/MainLayout"
-import { loadGeoPackage, applyGeoPackageResult, getDefaultEchelonLayers } from "@/services/geopackage.service"
-import { fetchRelationGeometry } from "@/services/overpass.service"
+import type { ProjectFileActions } from "@/components/shared/AppShell"
+import { loadGeoPackage, applyGeoPackageResult } from "@/services/geopackage.service"
+import { useMapProjectState } from "@/hooks/useMapProjectState"
 import type { Layer, MapEntity, DrawnGeometry } from "@/types/domain.types"
-import type { BaseMapId } from "@/components/shared/BaseMapSwitcher"
 
 export type ViewPageProps = {
   onEditMode?: () => void
   onOpenAbout?: () => void
 }
-
-type SelectedOsmObject = {
-  type: "node" | "way" | "relation"
-  id: number
-  cachedFeature?: GeoJSON.Feature & { id?: string }
-} | null
-
-const EMPTY_ENTITIES: MapEntity[] = []
-const EMPTY_GEOMETRIES: DrawnGeometry[] = []
 
 const READ_ONLY_HANDLERS = {
   removeLayer: (_id: string) => {},
@@ -31,23 +23,23 @@ const READ_ONLY_HANDLERS = {
   handleUpdateEntity: (_entityId: string, _patch: Partial<MapEntity>) => {},
   handleDeleteGeometry: (_geometryId: string) => {},
   handleSelectOsmObject: (_type: "node" | "way" | "relation", _id: number, _f?: GeoJSON.Feature & { id?: string }) => {},
+} as const
+
+const READ_ONLY_FILE_ACTIONS: ProjectFileActions = {
   onNewProject: () => {},
   onOpenProject: (_file: File) => {},
   onSaveProject: () => {},
-} as const
+}
 
 export function ViewPage({ onEditMode, onOpenAbout }: ViewPageProps): React.ReactElement {
-  const [layers, setLayers] = useState<Layer[]>(() => getDefaultEchelonLayers())
-  const [entities, setEntities] = useState<MapEntity[]>(EMPTY_ENTITIES)
-  const [drawnGeometries, setDrawnGeometries] = useState<DrawnGeometry[]>(EMPTY_GEOMETRIES)
-  const [selectedEntityId, setSelectedEntityId] = useState<string | null>(null)
-  const [selectedOsmObject, setSelectedOsmObject] = useState<SelectedOsmObject>(null)
-  const [showNetworks, setShowNetworks] = useState(false)
-  const [baseMap, setBaseMap] = useState<BaseMapId>("osm")
-  const [entityOsmGeometries, setEntityOsmGeometries] = useState<Record<string, GeoJSON.FeatureCollection>>({})
+  const [projectLoading, setProjectLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
 
+  const p = useMapProjectState({ initialShowNetworks: false })
+  const { setLayers, setEntities, setDrawnGeometries, setSelectedEntityId } = p
+
   useEffect(function loadDemoProject() {
+    setProjectLoading(true)
     fetch("/project.gpkg")
       .then((res) => {
         if (!res.ok) throw new Error("Failed to load demo project")
@@ -66,43 +58,10 @@ export function ViewPage({ onEditMode, onOpenAbout }: ViewPageProps): React.Reac
         setLoadError(e instanceof Error ? e.message : "Failed to load demo")
         console.error("ViewPage load project.gpkg failed", e)
       })
-  }, [])
-
-  useEffect(
-    function fetchOsmRelationGeometries() {
-      const entityIdsWithRelation = new Set(
-        entities.filter((e) => e.osmRelationId != null).map((e) => e.id),
-      )
-      setEntityOsmGeometries((prev) => {
-        const next = { ...prev }
-        for (const id of Object.keys(next)) {
-          if (!entityIdsWithRelation.has(id)) delete next[id]
-        }
-        return next
+      .finally(() => {
+        setProjectLoading(false)
       })
-      for (const e of entities) {
-        if (e.osmRelationId == null) continue
-        fetchRelationGeometry(e.osmRelationId).then(
-          (fc) => setEntityOsmGeometries((prev) => ({ ...prev, [e.id]: fc })),
-          () => {},
-        )
-      }
-    },
-    [entities],
-  )
-
-  function setLayerVisible(id: string, visible: boolean): void {
-    setLayers((prev) => prev.map((l) => (l.id === id ? { ...l, visible } : l)))
-  }
-
-  function setLayerExpanded(id: string, expanded: boolean): void {
-    setLayers((prev) => prev.map((l) => (l.id === id ? { ...l, expanded } : l)))
-  }
-
-  function handleCloseDetail(): void {
-    setSelectedEntityId(null)
-    setSelectedOsmObject(null)
-  }
+  }, [setLayers, setEntities, setDrawnGeometries, setSelectedEntityId])
 
   if (loadError !== null) {
     return (
@@ -112,25 +71,33 @@ export function ViewPage({ onEditMode, onOpenAbout }: ViewPageProps): React.Reac
     )
   }
 
+  if (projectLoading) {
+    return (
+      <div className="flex h-dvh w-dvw flex-col items-center justify-center gap-4 bg-background text-muted-foreground">
+        <Loader2 className="size-10 animate-spin text-primary" aria-hidden />
+        <p className="text-sm">Loading project…</p>
+      </div>
+    )
+  }
+
   return (
     <MainLayout
       readOnly
       onOpenAbout={onOpenAbout}
       onSwitchToEdit={onEditMode}
-      layers={layers}
-      entities={entities}
-      drawnGeometries={drawnGeometries}
-      selectedEntityId={selectedEntityId}
-      setSelectedEntityId={setSelectedEntityId}
-      selectedOsmObject={selectedOsmObject}
-      setSelectedOsmObject={setSelectedOsmObject}
-      showNetworks={showNetworks}
-      setShowNetworks={setShowNetworks}
-      baseMap={baseMap}
-      setBaseMap={setBaseMap}
-      entityOsmGeometries={entityOsmGeometries}
-      setLayerVisible={setLayerVisible}
-      setLayerExpanded={setLayerExpanded}
+      layers={p.layers}
+      entities={p.entities}
+      drawnGeometries={p.drawnGeometries}
+      selectedEntityId={p.selectedEntityId}
+      setSelectedEntityId={p.setSelectedEntityId}
+      selectedOsmObject={p.selectedOsmObject}
+      setSelectedOsmObject={p.setSelectedOsmObject}
+      showNetworks={p.showNetworks}
+      setShowNetworks={p.setShowNetworks}
+      baseMap={p.baseMap}
+      setBaseMap={p.setBaseMap}
+      entityOsmGeometries={p.entityOsmGeometries}
+      setLayerVisible={p.setLayerVisible}
       removeLayer={READ_ONLY_HANDLERS.removeLayer}
       renameLayer={READ_ONLY_HANDLERS.renameLayer}
       addNewLayer={READ_ONLY_HANDLERS.addNewLayer}
@@ -142,12 +109,10 @@ export function ViewPage({ onEditMode, onOpenAbout }: ViewPageProps): React.Reac
       handleUpdateEntity={READ_ONLY_HANDLERS.handleUpdateEntity}
       handleDeleteGeometry={READ_ONLY_HANDLERS.handleDeleteGeometry}
       handleSelectOsmObject={READ_ONLY_HANDLERS.handleSelectOsmObject}
-      handleCloseDetail={handleCloseDetail}
+      handleCloseDetail={p.handleCloseDetail}
       busy={false}
       error={null}
-      onNewProject={READ_ONLY_HANDLERS.onNewProject}
-      onOpenProject={READ_ONLY_HANDLERS.onOpenProject}
-      onSaveProject={READ_ONLY_HANDLERS.onSaveProject}
+      projectFileActions={READ_ONLY_FILE_ACTIONS}
     />
   )
 }

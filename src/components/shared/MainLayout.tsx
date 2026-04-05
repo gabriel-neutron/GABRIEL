@@ -2,7 +2,7 @@ import { useState } from "react"
 import { MapView } from "@/components/map/MapView"
 import { EntityInspector } from "@/components/inspector/EntityInspector"
 import { OsmObjectInspector } from "@/components/inspector/OsmObjectInspector"
-import { AppShell } from "@/components/shared/AppShell"
+import { AppShell, type ProjectFileActions } from "@/components/shared/AppShell"
 import { LayersPanel } from "@/components/shared/LayersPanel"
 import { HierarchyPanel } from "@/components/shared/HierarchyPanel"
 import { ShowNetworksToggle } from "@/components/shared/ShowNetworksToggle"
@@ -13,6 +13,7 @@ import { ModeToggle } from "@/components/shared/ModeToggle"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import type { Layer, MapEntity, DrawnGeometry } from "@/types/domain.types"
 import { getDefaultEntityLayerId } from "@/utils/entityLayer"
+import type { SelectedOsmObject } from "@/hooks/useMapProjectState"
 
 function collectDescendants(entities: MapEntity[], rootId: string): string[] {
   const result: string[] = [rootId]
@@ -28,12 +29,6 @@ function collectDescendants(entities: MapEntity[], rootId: string): string[] {
   }
   return result
 }
-
-type SelectedOsmObject = {
-  type: "node" | "way" | "relation"
-  id: number
-  cachedFeature?: GeoJSON.Feature & { id?: string }
-} | null
 
 export type MainLayoutProps = {
   readOnly: boolean
@@ -54,7 +49,6 @@ export type MainLayoutProps = {
   entityOsmGeometries: Record<string, GeoJSON.FeatureCollection>
   restoredFromSession?: boolean
   setLayerVisible: (id: string, visible: boolean) => void
-  setLayerExpanded: (id: string, expanded: boolean) => void
   removeLayer: (id: string) => void
   renameLayer: (layerId: string, name: string) => void
   addNewLayer: () => void
@@ -69,9 +63,7 @@ export type MainLayoutProps = {
   handleCloseDetail: () => void
   busy: boolean
   error: string | null
-  onNewProject: () => void
-  onOpenProject: (file: File) => void
-  onSaveProject: () => void
+  projectFileActions: ProjectFileActions
 }
 
 export function MainLayout({
@@ -93,7 +85,6 @@ export function MainLayout({
   entityOsmGeometries,
   restoredFromSession = false,
   setLayerVisible,
-  setLayerExpanded,
   removeLayer,
   renameLayer,
   addNewLayer,
@@ -108,9 +99,7 @@ export function MainLayout({
   handleCloseDetail,
   busy,
   error,
-  onNewProject,
-  onOpenProject,
-  onSaveProject,
+  projectFileActions,
 }: MainLayoutProps) {
   const [leftMode, setLeftMode] = useState<"layers" | "hierarchy">("layers")
   const [hiddenEntityIds, setHiddenEntityIds] = useState<Set<string>>(new Set())
@@ -182,7 +171,6 @@ export function MainLayout({
                 selectedEntityId={selectedEntityId}
                 onSelectEntity={handleSelectEntity}
                 onToggleVisible={setLayerVisible}
-                onToggleExpanded={setLayerExpanded}
                 onRemoveLayer={removeLayer}
                 onRenameLayer={renameLayer}
                 onAddLayer={addNewLayer}
@@ -237,9 +225,7 @@ export function MainLayout({
       }
       busy={busy}
       error={error}
-      onNewProject={onNewProject}
-      onOpenProject={onOpenProject}
-      onSaveProject={onSaveProject}
+      projectFileActions={projectFileActions}
     />
   )
 }

@@ -10,7 +10,6 @@ type Props = {
   selectedEntityId: string | null
   onSelectEntity: (id: string) => void
   onToggleVisible: (layerId: string, visible: boolean) => void
-  onToggleExpanded: (layerId: string, expanded: boolean) => void
   onRemoveLayer: (layerId: string) => void
   onRenameLayer: (layerId: string, name: string) => void
   onAddLayer: () => void
@@ -32,15 +31,27 @@ export function LayersPanel({
   selectedEntityId,
   onSelectEntity,
   onToggleVisible,
-  onToggleExpanded,
   onRemoveLayer,
   onRenameLayer,
   onAddLayer,
   onRemoveEntity,
   onMoveLayer,
 }: Props) {
+  /** Layer list expand/collapse is session-only; omitted key means expanded. */
+  const [expandedByLayerId, setExpandedByLayerId] = useState<Record<string, boolean>>({})
   const [contextMenu, setContextMenu] = useState<{ layerId: string; x: number; y: number } | null>(null)
   const menuRef = useRef<HTMLDivElement>(null)
+
+  function isLayerRowExpanded(layerId: string): boolean {
+    return expandedByLayerId[layerId] !== false
+  }
+
+  function handleToggleLayerRowExpanded(layerId: string): void {
+    setExpandedByLayerId((prev) => {
+      const cur = prev[layerId] !== false
+      return { ...prev, [layerId]: !cur }
+    })
+  }
 
   useEffect(() => {
     if (!contextMenu) return
@@ -91,6 +102,7 @@ export function LayersPanel({
         {visibleLayers.map((layer, index) => {
           const isOsmLayer = layer.osmData != null
           const isCustomLayer = layer.kind === "custom"
+          const rowExpanded = isLayerRowExpanded(layer.id)
           const layerEntities = entities
             .filter((e) => e.layerId === layer.id)
             .sort((a, b) => {
@@ -120,12 +132,12 @@ export function LayersPanel({
                 <button
                   type="button"
                   className="flex min-w-0 flex-1 items-center gap-2 text-left"
-                  onClick={() => !isOsmLayer && onToggleExpanded(layer.id, !layer.expanded)}
-                  title={getLayerTitle(isOsmLayer, layer.expanded, readOnly)}
+                  onClick={() => !isOsmLayer && handleToggleLayerRowExpanded(layer.id)}
+                  title={getLayerTitle(isOsmLayer, rowExpanded, readOnly)}
                 >
                   {!isOsmLayer && (
                     <span className="text-muted-foreground">
-                      {layer.expanded ? "▾" : "▸"}
+                      {rowExpanded ? "▾" : "▸"}
                     </span>
                   )}
                   <div className="min-w-0">
@@ -175,7 +187,7 @@ export function LayersPanel({
                   </Button>
                 </div>
               </div>
-              {!isOsmLayer && layer.expanded && layerEntities.length > 0 && (
+              {!isOsmLayer && rowExpanded && layerEntities.length > 0 && (
                 <div className="border-t bg-muted/30 px-3 py-2">
                   <div className="flex flex-col gap-1">
                     {layerEntities.map((entity) => (

@@ -12,7 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { FilterableSelect } from "@/components/tree/FilterableSelect"
+import { FilterableSelect } from "@/components/shared/FilterableSelect"
 import type { DrawnGeometry, Layer, MapEntity, PositionMode } from "@/types/domain.types"
 import {
   AFFILIATION_OPTIONS,

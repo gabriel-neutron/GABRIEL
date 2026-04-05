@@ -27,7 +27,7 @@ export function BaseMapSwitcher({ value, onValueChange }: Props) {
       <SelectTrigger size="sm" className="w-[160px]" title="Map background">
         <SelectValue placeholder="Map" />
       </SelectTrigger>
-      <SelectContent>
+      <SelectContent className="max-h-none overflow-y-visible [&_[data-slot=select-scroll-up-button]]:hidden [&_[data-slot=select-scroll-down-button]]:hidden">
         {BASE_MAP_IDS.map((id) => (
           <SelectItem key={id} value={id}>
             {LABELS[id]}

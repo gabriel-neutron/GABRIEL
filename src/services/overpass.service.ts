@@ -1,5 +1,6 @@
 /**
- * Overpass API execution and OSM JSON → GeoJSON conversion.
+ * Overpass API: run structured OSM queries and convert responses to GeoJSON.
+ * Nominatim (`nominatim.service`) does place search by name; it does not execute Overpass QL.
  * No React; pure functions.
  */
 
