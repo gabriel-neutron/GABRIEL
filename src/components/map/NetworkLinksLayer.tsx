@@ -1,7 +1,6 @@
 import { useMemo } from "react"
 import { Polyline } from "react-leaflet"
-import type { MapEntity, DrawnGeometry } from "@/types/domain.types"
-import { computeAllEntityPositions } from "@/utils/geometry"
+import type { MapEntity } from "@/types/domain.types"
 
 const NETWORK_LINE_OPTIONS = {
   color: "#a855f7",
@@ -12,7 +11,7 @@ const NETWORK_LINE_OPTIONS = {
 
 type Props = {
   entities: MapEntity[]
-  drawnGeometries: DrawnGeometry[]
+  positionMap: Map<string, [number, number]>
   selectedEntityId: string | null
   visible: boolean
 }
@@ -51,14 +50,10 @@ function visibleNetworkIds(
 
 export function NetworkLinksLayer({
   entities,
-  drawnGeometries,
+  positionMap,
   selectedEntityId,
   visible,
 }: Props) {
-  const positionMap = useMemo(() => {
-    const all = computeAllEntityPositions(entities, drawnGeometries)
-    return new Map(all.map(({ entity, position }) => [entity.id, position]))
-  }, [entities, drawnGeometries])
 
   const links = useMemo(() => {
     if (!visible || !selectedEntityId) return []

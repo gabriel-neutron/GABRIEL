@@ -37,18 +37,18 @@ export function LayersPanel({
   onRemoveEntity,
   onMoveLayer,
 }: Props) {
-  /** Layer list expand/collapse is session-only; omitted key means expanded. */
+  /** Layer list expand/collapse is session-only; omitted key means collapsed. */
   const [expandedByLayerId, setExpandedByLayerId] = useState<Record<string, boolean>>({})
   const [contextMenu, setContextMenu] = useState<{ layerId: string; x: number; y: number } | null>(null)
   const menuRef = useRef<HTMLDivElement>(null)
 
   function isLayerRowExpanded(layerId: string): boolean {
-    return expandedByLayerId[layerId] !== false
+    return expandedByLayerId[layerId] === true
   }
 
   function handleToggleLayerRowExpanded(layerId: string): void {
     setExpandedByLayerId((prev) => {
-      const cur = prev[layerId] !== false
+      const cur = prev[layerId] === true
       return { ...prev, [layerId]: !cur }
     })
   }

@@ -85,7 +85,13 @@ export function FilterableSelect({
       <SelectTrigger className={cn("h-8 text-xs", className)}>
         <SelectValue placeholder={placeholder} />
       </SelectTrigger>
-      <SelectContent className="!max-h-80">
+      <SelectContent
+        className="!max-h-80"
+        position="popper"
+        side="bottom"
+        align="start"
+        sideOffset={4}
+      >
         {availableEchelons.length > 0 ? (
           <div className="-mx-1 mb-1 border-b px-1 pb-2 pt-1">
             <div className="mb-1 flex items-center justify-between gap-2 px-1">

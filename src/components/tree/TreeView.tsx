@@ -86,6 +86,7 @@ export function TreeView({ entities, selectedEntityId, onSelectEntity }: Props) 
       nodeMap.set(nodeId, {
         id: nodeId,
         type: "militarySymbol",
+        className: "tree-symbol-node",
         position,
         data: { label: entity.name, entity },
         sourcePosition: Position.Bottom,
@@ -107,7 +108,7 @@ export function TreeView({ entities, selectedEntityId, onSelectEntity }: Props) 
   const nodesWithSelection = useMemo(() => {
     return nodes.map((node) => ({
       ...node,
-      className: `tree-symbol-node${node.id === selectedEntityId ? " selected" : ""}`,
+      selected: node.id === selectedEntityId,
     }))
   }, [nodes, selectedEntityId])
 

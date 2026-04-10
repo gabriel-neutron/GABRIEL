@@ -39,14 +39,17 @@ export function ViewPage({ onEditMode, onOpenAbout }: ViewPageProps): React.Reac
   const { setLayers, setEntities, setDrawnGeometries, setSelectedEntityId } = p
 
   useEffect(function loadDemoProject() {
+    let mounted = true
+    const controller = new AbortController()
     setProjectLoading(true)
-    fetch("/project.gpkg")
+    fetch("/project.gpkg", { signal: controller.signal })
       .then((res) => {
         if (!res.ok) throw new Error("Failed to load demo project")
         return res.arrayBuffer()
       })
       .then((buffer) => loadGeoPackage(buffer))
       .then((result) => {
+        if (!mounted) return
         const next = applyGeoPackageResult(result, null)
         setLayers(next.layers)
         setEntities(next.entities)
@@ -55,12 +58,17 @@ export function ViewPage({ onEditMode, onOpenAbout }: ViewPageProps): React.Reac
         setLoadError(null)
       })
       .catch((e) => {
+        if (!mounted || (e instanceof Error && e.name === "AbortError")) return
         setLoadError(e instanceof Error ? e.message : "Failed to load demo")
         console.error("ViewPage load project.gpkg failed", e)
       })
       .finally(() => {
-        setProjectLoading(false)
+        if (mounted) setProjectLoading(false)
       })
+    return () => {
+      mounted = false
+      controller.abort()
+    }
   }, [setLayers, setEntities, setDrawnGeometries, setSelectedEntityId])
 
   if (loadError !== null) {

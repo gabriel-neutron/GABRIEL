@@ -56,10 +56,12 @@ export function EditPage({ onViewMode, onOpenAbout }: EditPageProps): React.Reac
   const [restoredFromSession, setRestoredFromSession] = useState(false)
 
   useEffect(function restoreSession() {
+    let mounted = true
     loadProject().then((stored) => {
-      if (!stored) return
+      if (!stored || !mounted) return
       loadGeoPackage(stored.buffer)
         .then((result) => {
+          if (!mounted) return
           const next = applyGeoPackageResult(result, null)
           setLayers(next.layers)
           setEntities(next.entities)
@@ -69,6 +71,7 @@ export function EditPage({ onViewMode, onOpenAbout }: EditPageProps): React.Reac
         })
         .catch(() => {})
     })
+    return () => { mounted = false }
   }, [setLayers, setEntities, setDrawnGeometries, setSelectedEntityId])
 
   useEffect(

@@ -1,4 +1,4 @@
-import { useMemo, useEffect, useRef } from "react"
+import { useMemo, useEffect, useRef, useCallback } from "react"
 import L from "leaflet"
 import { MapContainer, TileLayer, Marker, Popup, Polyline, Polygon, GeoJSON } from "react-leaflet"
 import { MapToolSelector } from "./MapToolSelector"
@@ -118,7 +118,26 @@ export function MapView({
     if (mapTool !== "pan" && selectedEntityId !== null) onSelectEntity(null)
   }, [mapTool, selectedEntityId, onSelectEntity])
 
-  const visibleLayersInOrder = layers.filter((l) => l.visible)
+  // #region agent log - Hypothesis A: visibleLayersInOrder not memoized
+  const renderCountRef = useRef(0)
+  renderCountRef.current += 1
+  const renderCount = renderCountRef.current
+  const prevLayersRef = useRef(layers)
+  const prevEntitiesRef = useRef(entities)
+  const prevOnSelectRef = useRef(onSelectEntity)
+  const changedProps: string[] = []
+  if (prevLayersRef.current !== layers) changedProps.push("layers")
+  if (prevEntitiesRef.current !== entities) changedProps.push("entities")
+  if (prevOnSelectRef.current !== onSelectEntity) changedProps.push("onSelectEntity")
+  prevLayersRef.current = layers
+  prevEntitiesRef.current = entities
+  prevOnSelectRef.current = onSelectEntity
+  if (renderCount > 1) {
+    fetch('http://127.0.0.1:7621/ingest/5d09de12-2036-4626-a2d7-a250cef5312b',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'d20a2f'},body:JSON.stringify({sessionId:'d20a2f',location:'MapView.tsx:render',message:'MapView render',data:{renderCount,changedProps},timestamp:Date.now(),hypothesisId:'B'})}).catch(()=>{})
+  }
+  // #endregion
+
+  const visibleLayersInOrder = useMemo(() => layers.filter((l) => l.visible), [layers])
 
   const drawnByLayerId = useMemo(() => {
     const m = new Map<string, DrawnGeometry[]>()
@@ -133,17 +152,22 @@ export function MapView({
     return m
   }, [drawnGeometries, entities])
 
-  const visibleLayerIds = useMemo(
-    () => new Set(visibleLayersInOrder.map((l) => l.id)),
-    [visibleLayersInOrder],
-  )
+  const visibleLayerIds = useMemo(() => {
+    // #region agent log - Hypothesis A: track visibleLayerIds recompute
+    fetch('http://127.0.0.1:7621/ingest/5d09de12-2036-4626-a2d7-a250cef5312b',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'d20a2f'},body:JSON.stringify({sessionId:'d20a2f',location:'MapView.tsx:visibleLayerIds',message:'visibleLayerIds recomputed',data:{layerCount:visibleLayersInOrder.length},timestamp:Date.now(),hypothesisId:'A'})}).catch(()=>{})
+    // #endregion
+    return new Set(visibleLayersInOrder.map((l) => l.id))
+  }, [visibleLayersInOrder])
 
   const positionMap = useMemo(() => {
     const all = computeAllEntityPositions(entities, drawnGeometries)
     return new Map(all.map(({ entity, position }) => [entity.id, position]))
   }, [entities, drawnGeometries])
 
-  const getEntityPosition = (entity: MapEntity) => positionMap.get(entity.id) ?? null
+  const getEntityPosition = useCallback(
+    (entity: MapEntity) => positionMap.get(entity.id) ?? null,
+    [positionMap],
+  )
 
   // Stable refs so GeoJSON callbacks never capture stale closures
   const onSelectOsmObjectRef = useRef(onSelectOsmObject)
@@ -197,14 +221,14 @@ export function MapView({
 
         <SymbolsLayer
           entities={entities}
-          drawnGeometries={drawnGeometries}
+          positionMap={positionMap}
           visibleLayerIds={visibleLayerIds}
           hiddenEntityIds={hiddenEntityIds}
           onSelectEntity={onSelectEntity}
         />
         <NetworkLinksLayer
           entities={entities}
-          drawnGeometries={drawnGeometries}
+          positionMap={positionMap}
           selectedEntityId={selectedEntityId}
           visible={showNetworks}
         />

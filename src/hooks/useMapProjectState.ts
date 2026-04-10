@@ -30,9 +30,12 @@ export function useMapProjectState(options: Options) {
 
   useEffect(
     function fetchOsmRelationGeometries() {
+      let cancelled = false
+
       const entityIdsWithRelation = new Set(
         entities.filter((e) => e.osmRelationId != null).map((e) => e.id),
       )
+
       setEntityOsmGeometries((prev) => {
         const next = { ...prev }
         for (const id of Object.keys(next)) {
@@ -40,13 +43,18 @@ export function useMapProjectState(options: Options) {
         }
         return next
       })
+
       for (const e of entities) {
         if (e.osmRelationId == null) continue
         fetchRelationGeometry(e.osmRelationId).then(
-          (fc) => setEntityOsmGeometries((prev) => ({ ...prev, [e.id]: fc })),
+          (fc) => {
+            if (!cancelled) setEntityOsmGeometries((prev) => ({ ...prev, [e.id]: fc }))
+          },
           () => {},
         )
       }
+
+      return () => { cancelled = true }
     },
     [entities],
   )

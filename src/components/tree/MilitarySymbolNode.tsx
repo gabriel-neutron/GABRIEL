@@ -1,3 +1,4 @@
+import { memo, useMemo } from "react"
 import { Handle, type NodeProps, Position } from "reactflow"
 import { getRenderedSymbolForEntity } from "@/services/symbol.service"
 import type { MapEntity } from "@/types/domain.types"
@@ -9,9 +10,15 @@ export type MilitarySymbolNodeData = {
   entity: MapEntity
 }
 
-export function MilitarySymbolNode({ data }: NodeProps<MilitarySymbolNodeData>) {
+export const MilitarySymbolNode = memo(function MilitarySymbolNode({
+  data,
+}: NodeProps<MilitarySymbolNodeData>) {
   const entity = data.entity
-  const { svg, width, height } = getRenderedSymbolForEntity(entity, TREE_SYMBOL_SIZE)
+  const { svg, width, height } = useMemo(
+    () => getRenderedSymbolForEntity(entity, TREE_SYMBOL_SIZE),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [entity.natoSymbolCode, entity.echelon, entity.affiliation, entity.domain],
+  )
 
   return (
     <div
@@ -24,4 +31,4 @@ export function MilitarySymbolNode({ data }: NodeProps<MilitarySymbolNodeData>) 
       <Handle type="source" position={Position.Bottom} isConnectable={false} />
     </div>
   )
-}
+})

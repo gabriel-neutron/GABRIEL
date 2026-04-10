@@ -13,7 +13,14 @@ export function CenterOnSelection({ selectedEntityId, entities, getEntityPositio
   const map = useMap()
   const lastSelectedIdRef = useRef<string | null>(null)
 
+  // #region agent log - Hypothesis C: CenterOnSelection effect re-runs
+  const effectCountRef = useRef(0)
+  // #endregion
   useEffect(() => {
+    // #region agent log - Hypothesis C
+    effectCountRef.current += 1
+    fetch('http://127.0.0.1:7621/ingest/5d09de12-2036-4626-a2d7-a250cef5312b',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'d20a2f'},body:JSON.stringify({sessionId:'d20a2f',location:'CenterOnSelection.tsx:effect',message:'CenterOnSelection effect run',data:{runCount:effectCountRef.current,selectedEntityId},timestamp:Date.now(),hypothesisId:'C'})}).catch(()=>{})
+    // #endregion
     if (!selectedEntityId) {
       lastSelectedIdRef.current = null
       return
