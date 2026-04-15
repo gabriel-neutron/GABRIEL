@@ -4,6 +4,7 @@ import { MainLayout } from "@/components/shared/MainLayout"
 import type { ProjectFileActions } from "@/components/shared/AppShell"
 import { loadGeoPackage, applyGeoPackageResult } from "@/services/geopackage.service"
 import { useMapProjectState } from "@/hooks/useMapProjectState"
+import { useEnrichment } from "@/hooks/useEnrichment"
 import type { Layer, MapEntity, DrawnGeometry } from "@/types/domain.types"
 
 export type ViewPageProps = {
@@ -37,6 +38,12 @@ export function ViewPage({ onEditMode, onOpenAbout }: ViewPageProps): React.Reac
 
   const p = useMapProjectState({ initialShowNetworks: false })
   const { setLayers, setEntities, setDrawnGeometries, setSelectedEntityId } = p
+  const enrichment = useEnrichment({
+    entities: p.entities,
+    drawnGeometries: p.drawnGeometries,
+    selectedEntityId: p.selectedEntityId,
+    onApplyAccepted: READ_ONLY_HANDLERS.handleUpdateEntity,
+  })
 
   useEffect(function loadDemoProject() {
     let mounted = true
@@ -121,6 +128,33 @@ export function ViewPage({ onEditMode, onOpenAbout }: ViewPageProps): React.Reac
       busy={false}
       error={null}
       projectFileActions={READ_ONLY_FILE_ACTIONS}
+      enrichment={{
+        isDrawerOpen: enrichment.isDrawerOpen,
+        selectedEntity: enrichment.selectedEntity,
+        context: enrichment.context,
+        overlay: enrichment.overlay,
+        prompt: enrichment.draftPrompt,
+        status: enrichment.state.run.status,
+        queryTrace: enrichment.state.run.queryTrace,
+        depthUsed: enrichment.state.run.depthUsed,
+        unresolvedFields: enrichment.state.run.unresolvedFields,
+        notes: enrichment.state.run.notes,
+        proposals: enrichment.state.run.proposals,
+        decisions:
+          enrichment.selectedEntityId == null
+            ? {}
+            : enrichment.state.decisions[enrichment.selectedEntityId] ?? {},
+        errorMessage: enrichment.state.run.error?.details ?? null,
+        closeNotice: enrichment.closeNotice,
+        setPrompt: enrichment.setDraftPrompt,
+        openDrawer: enrichment.openDrawer,
+        closeDrawer: enrichment.closeDrawer,
+        run: enrichment.run,
+        accept: enrichment.accept,
+        reject: enrichment.reject,
+        ignore: enrichment.ignore,
+        clearOverlayForSelected: enrichment.clearOverlayForSelected,
+      }}
     />
   )
 }

@@ -9,6 +9,7 @@ import {
 } from "@/services/geopackage.service"
 import { loadProject, saveProject, clearProject } from "@/services/projectStorage.service"
 import { useMapProjectState } from "@/hooks/useMapProjectState"
+import { useEnrichment } from "@/hooks/useEnrichment"
 import type { Layer, MapEntity, DrawnGeometry } from "@/types/domain.types"
 import { getDefaultEntityLayerId } from "@/utils/entityLayer"
 export type EditPageProps = {
@@ -54,6 +55,12 @@ export function EditPage({ onViewMode, onOpenAbout }: EditPageProps): React.Reac
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [restoredFromSession, setRestoredFromSession] = useState(false)
+  const enrichment = useEnrichment({
+    entities,
+    drawnGeometries,
+    selectedEntityId,
+    onApplyAccepted: handleUpdateEntity,
+  })
 
   useEffect(function restoreSession() {
     let mounted = true
@@ -317,6 +324,33 @@ export function EditPage({ onViewMode, onOpenAbout }: EditPageProps): React.Reac
       busy={busy}
       error={error}
       projectFileActions={projectFileActions}
+      enrichment={{
+        isDrawerOpen: enrichment.isDrawerOpen,
+        selectedEntity: enrichment.selectedEntity,
+        context: enrichment.context,
+        overlay: enrichment.overlay,
+        prompt: enrichment.draftPrompt,
+        status: enrichment.state.run.status,
+        queryTrace: enrichment.state.run.queryTrace,
+        depthUsed: enrichment.state.run.depthUsed,
+        unresolvedFields: enrichment.state.run.unresolvedFields,
+        notes: enrichment.state.run.notes,
+        proposals: enrichment.state.run.proposals,
+        decisions:
+          enrichment.selectedEntityId == null
+            ? {}
+            : enrichment.state.decisions[enrichment.selectedEntityId] ?? {},
+        errorMessage: enrichment.state.run.error?.details ?? null,
+        closeNotice: enrichment.closeNotice,
+        setPrompt: enrichment.setDraftPrompt,
+        openDrawer: enrichment.openDrawer,
+        closeDrawer: enrichment.closeDrawer,
+        run: enrichment.run,
+        accept: enrichment.accept,
+        reject: enrichment.reject,
+        ignore: enrichment.ignore,
+        clearOverlayForSelected: enrichment.clearOverlayForSelected,
+      }}
     />
   )
 }

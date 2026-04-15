@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { cn } from "@/lib/utils"
 import { useTheme } from "@/provider/theme-provider"
+import { AiProviderSettingsDialog } from "./AiProviderSettingsDialog"
 
 export type ProjectFileActions = {
   onNewProject: () => void
@@ -17,6 +18,7 @@ type Props = {
   treeSlot: ReactNode
   leftSlot?: ReactNode
   rightSlot?: ReactNode
+  detailHeaderActions?: ReactNode
   headerSlot?: ReactNode
   selectedEntityId: string | null
   selectedOsmObject?: { type: "node" | "way" | "relation"; id: number } | null
@@ -35,6 +37,7 @@ export function AppShell({
   treeSlot,
   leftSlot,
   rightSlot,
+  detailHeaderActions,
   headerSlot,
   selectedEntityId,
   selectedOsmObject,
@@ -48,6 +51,7 @@ export function AppShell({
   onSwitchToView,
 }: Props) {
   const [activeView, setActiveView] = useState<"map" | "tree">("map")
+  const [aiSettingsOpen, setAiSettingsOpen] = useState(false)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const { theme } = useTheme()
   const isDark = theme === "dark"
@@ -76,6 +80,17 @@ export function AppShell({
 
             <div className="flex items-center gap-2">
               {headerSlot}
+              {!readOnly && (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setAiSettingsOpen(true)}
+                  title="Configure AI provider keys"
+                >
+                  AI keys
+                </Button>
+              )}
 
               {onOpenAbout && (
                 <Button type="button" size="sm" variant="outline" onClick={onOpenAbout} title="About">
@@ -174,7 +189,10 @@ export function AppShell({
                 : "hidden"
             }
           >
-            <div className="flex shrink-0 items-center justify-end border-b border-border px-2 py-1">
+            <div className="flex shrink-0 items-center justify-between gap-2 border-b border-border px-2 py-1">
+              <div className="flex min-w-0 items-center gap-2">
+                {detailHeaderActions}
+              </div>
               <Button size="sm" variant="ghost" onClick={onCloseDetail} title="Close detail">
                 Close
               </Button>
@@ -185,6 +203,10 @@ export function AppShell({
           </aside>
         </div>
       </div>
+      <AiProviderSettingsDialog
+        open={aiSettingsOpen}
+        onClose={() => setAiSettingsOpen(false)}
+      />
     </div>
   )
 }

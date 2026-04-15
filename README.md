@@ -15,10 +15,31 @@ npm run dev
 
 Open the URL shown (e.g. http://localhost:5173). No backend; everything runs in the browser.
 
+## AI enrichment setup (v2.1)
+
+AI enrichment runs inside the frontend app (no local API server, no `.env` required).
+
+Use the `AI keys` button in the top bar to store provider keys in browser local storage:
+- OpenAI API key
+- Gemini API key
+- Brave API key
+
+Notes:
+- Keys are persisted per browser/domain and survive page changes and multi-day sessions (Netlify compatible).
+- If keys are missing, enrichment runs in degraded mode with deterministic fallback behavior.
+- Retrieval providers can fail due to CORS/rate limits. The UI shows explicit errors and unresolved fields.
+- Accepting proposals updates session overlay state only; authoritative GeoPackage data changes only when you use the existing Save flow.
+
 ## Build
 
 ```bash
 npm run build
+```
+
+## Tests
+
+```bash
+npm run test
 ```
 
 Output in `dist/`. Serve with any static host.

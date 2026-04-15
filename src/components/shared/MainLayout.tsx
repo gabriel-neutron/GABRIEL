@@ -1,6 +1,7 @@
 import { useState } from "react"
 import { MapView } from "@/components/map/MapView"
 import { EntityInspector } from "@/components/inspector/EntityInspector"
+import { EnrichDrawer } from "@/components/inspector/enrichment"
 import { OsmObjectInspector } from "@/components/inspector/OsmObjectInspector"
 import { AppShell, type ProjectFileActions } from "@/components/shared/AppShell"
 import { LayersPanel } from "@/components/shared/LayersPanel"
@@ -10,10 +11,12 @@ import { TreeView } from "@/components/tree/TreeView"
 import { OsmQueryMenu } from "@/components/shared/OsmQueryMenu"
 import { BaseMapSwitcher, type BaseMapId } from "@/components/shared/BaseMapSwitcher"
 import { ModeToggle } from "@/components/shared/ModeToggle"
+import { Button } from "@/components/ui/button"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import type { Layer, MapEntity, DrawnGeometry } from "@/types/domain.types"
 import { getDefaultEntityLayerId } from "@/utils/entityLayer"
 import type { SelectedOsmObject } from "@/hooks/useMapProjectState"
+import type { EnrichmentContext, EnrichmentProposal } from "@/types/enrichment.types"
 
 function collectDescendants(entities: MapEntity[], rootId: string): string[] {
   const result: string[] = [rootId]
@@ -64,6 +67,30 @@ export type MainLayoutProps = {
   busy: boolean
   error: string | null
   projectFileActions: ProjectFileActions
+  enrichment: {
+    isDrawerOpen: boolean
+    selectedEntity: MapEntity | null
+    context: EnrichmentContext | null
+    overlay: Record<string, unknown>
+    prompt: string
+    status: "idle" | "running" | "success" | "partial" | "failed"
+    queryTrace: string[]
+    depthUsed: number
+    unresolvedFields: string[]
+    notes: string
+    proposals: EnrichmentProposal[]
+    decisions: Record<string, "accepted" | "rejected" | "pending">
+    errorMessage: string | null
+    closeNotice: string | null
+    setPrompt: (value: string) => void
+    openDrawer: () => void
+    closeDrawer: () => void
+    run: () => void
+    accept: (proposal: EnrichmentProposal) => void
+    reject: (proposal: EnrichmentProposal) => void
+    ignore: (proposal: EnrichmentProposal) => void
+    clearOverlayForSelected: () => void
+  }
 }
 
 export function MainLayout({
@@ -100,6 +127,7 @@ export function MainLayout({
   busy,
   error,
   projectFileActions,
+  enrichment,
 }: MainLayoutProps) {
   const [leftMode, setLeftMode] = useState<"layers" | "hierarchy">("layers")
   const [hiddenEntityIds, setHiddenEntityIds] = useState<Set<string>>(new Set())
@@ -122,12 +150,13 @@ export function MainLayout({
   }
 
   return (
-    <AppShell
-      readOnly={readOnly}
-      onOpenAbout={onOpenAbout}
-      onSwitchToEdit={onSwitchToEdit}
-      onSwitchToView={onSwitchToView}
-      mapSlot={
+    <>
+      <AppShell
+        readOnly={readOnly}
+        onOpenAbout={onOpenAbout}
+        onSwitchToEdit={onSwitchToEdit}
+        onSwitchToView={onSwitchToView}
+        mapSlot={
         <MapView
           readOnly={readOnly}
           layers={layers}
@@ -203,29 +232,73 @@ export function MainLayout({
       selectedEntityId={selectedEntityId}
       selectedOsmObject={selectedOsmObject}
       onCloseDetail={handleCloseDetail}
-      rightSlot={
-        selectedOsmObject ? (
-          <OsmObjectInspector
-            type={selectedOsmObject.type}
-            id={selectedOsmObject.id}
-            cachedFeature={selectedOsmObject.cachedFeature}
-          />
-        ) : (
-          <EntityInspector
-            readOnly={readOnly}
-            selectedEntityId={selectedEntityId}
-            entities={entities}
-            layers={assignableLayers}
-            drawnGeometries={drawnGeometries}
-            onUpdateEntity={handleUpdateEntity}
-            onDeleteEntity={handleDeleteEntity}
-            onDeleteGeometry={handleDeleteGeometry}
-          />
-        )
+      detailHeaderActions={
+        !readOnly && selectedEntityId !== null && selectedOsmObject === null ? (
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={enrichment.openDrawer}
+          >
+            Enrich with AI
+          </Button>
+        ) : null
       }
-      busy={busy}
-      error={error}
-      projectFileActions={projectFileActions}
-    />
+        rightSlot={
+          selectedOsmObject ? (
+            <OsmObjectInspector
+              type={selectedOsmObject.type}
+              id={selectedOsmObject.id}
+              cachedFeature={selectedOsmObject.cachedFeature}
+            />
+          ) : (
+            <EntityInspector
+              readOnly={readOnly}
+              selectedEntityId={selectedEntityId}
+              entities={entities}
+              layers={assignableLayers}
+              drawnGeometries={drawnGeometries}
+              enrichedOverlay={enrichment.overlay}
+              onUpdateEntity={handleUpdateEntity}
+              onDeleteEntity={handleDeleteEntity}
+              onDeleteGeometry={handleDeleteGeometry}
+            />
+          )
+        }
+        busy={busy}
+        error={error}
+        projectFileActions={projectFileActions}
+      />
+      <EnrichDrawer
+        open={enrichment.isDrawerOpen}
+        entity={enrichment.selectedEntity}
+        context={enrichment.context}
+        prompt={enrichment.prompt}
+        status={enrichment.status}
+        queryTrace={enrichment.queryTrace}
+        depthUsed={enrichment.depthUsed}
+        unresolvedFields={enrichment.unresolvedFields}
+        notes={enrichment.notes}
+        proposals={enrichment.proposals}
+        decisions={enrichment.decisions}
+        errorMessage={enrichment.errorMessage}
+        closeNotice={enrichment.closeNotice}
+        onClose={enrichment.closeDrawer}
+        onPromptChange={enrichment.setPrompt}
+        onRun={enrichment.run}
+        onAccept={(field) => {
+          const proposal = enrichment.proposals.find((item) => item.field === field)
+          if (proposal) enrichment.accept(proposal)
+        }}
+        onReject={(field) => {
+          const proposal = enrichment.proposals.find((item) => item.field === field)
+          if (proposal) enrichment.reject(proposal)
+        }}
+        onIgnore={(field) => {
+          const proposal = enrichment.proposals.find((item) => item.field === field)
+          if (proposal) enrichment.ignore(proposal)
+        }}
+      />
+    </>
   )
 }

@@ -68,6 +68,7 @@ type Props = {
   entities: MapEntity[]
   layers: Layer[]
   drawnGeometries: DrawnGeometry[]
+  enrichedOverlay?: Record<string, unknown>
   onUpdateEntity: (entityId: string, patch: Partial<MapEntity>) => void
   onDeleteEntity: (entityId: string) => void
   onDeleteGeometry: (geometryId: string) => void
@@ -79,6 +80,7 @@ export function EntityInspector({
   entities,
   layers,
   drawnGeometries,
+  enrichedOverlay = {},
   onUpdateEntity,
   onDeleteEntity,
   onDeleteGeometry,
@@ -162,6 +164,18 @@ export function EntityInspector({
             </ul>
           </ReadOnlyField>
         )}
+        {Object.keys(enrichedOverlay).length > 0 && (
+          <ReadOnlyField label="Enriched (session)">
+            <ul className="mt-1 space-y-1 text-xs">
+              {Object.entries(enrichedOverlay).map(([field, value]) => (
+                <li key={field}>
+                  <span className="font-medium">{field}:</span> {String(value)}{" "}
+                  <span className="text-emerald-600">(Enriched)</span>
+                </li>
+              ))}
+            </ul>
+          </ReadOnlyField>
+        )}
         <div className="grid grid-cols-2 gap-2">
           <ReadOnlyField label="Echelon">{entity.echelon ?? "—"}</ReadOnlyField>
           <ReadOnlyField label="Type">
@@ -214,6 +228,18 @@ export function EntityInspector({
   return (
     <div className="p-2">
       <FieldGroup className="gap-4 [&_[data-slot=field]]:gap-1">
+        <Field>
+          {Object.keys(enrichedOverlay).length > 0 && (
+            <div className="rounded border bg-muted/30 p-2 text-xs">
+              {Object.entries(enrichedOverlay).map(([field, value]) => (
+                <p key={field}>
+                  <span className="font-medium">{field}:</span> {String(value)}{" "}
+                  <span className="text-emerald-600">(Enriched)</span>
+                </p>
+              ))}
+            </div>
+          )}
+        </Field>
         <Field>
           <FieldLabel>Name</FieldLabel>
           <Input
