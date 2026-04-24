@@ -21,8 +21,17 @@ import { shouldSkipEntity, DEFAULT_RICHNESS_THRESHOLD } from "./entity-richness"
 export type LayeredResearchResult = {
   results: Record<string, EnrichmentResponse>
   cacheAdditions: Array<{ url: string; content: string }>
-  /** Entity IDs skipped due to abort or error. */
+  /** Entity IDs skipped because a run was aborted or batch-capped before reaching them. */
   skippedEntityIds: string[]
+  /** Entity IDs that were attempted but failed. */
+  failedEntityIds: string[]
+  /** Non-fatal and fatal issues captured per entity, for UI diagnostics. */
+  warnings: Array<{
+    entityId: string
+    name: string
+    source: "enrichment" | "overpass"
+    message: string
+  }>
   /** Entity IDs skipped because they already exceed the richness threshold. */
   skippedRichEntityIds: string[]
   /** Per-entity token usage for cost tracking. */
@@ -167,6 +176,13 @@ export async function runLayeredResearch(
   const usageByEntityId: Record<string, EnrichmentUsage> = {}
   const cacheAdditions: Array<{ url: string; content: string }> = []
   const skippedEntityIds: string[] = []
+  const failedEntityIds: string[] = []
+  const warnings: Array<{
+    entityId: string
+    name: string
+    source: "enrichment" | "overpass"
+    message: string
+  }> = []
   const skippedRichEntityIds: string[] = []
   let sourcesFromCache = 0
   let totalInputTokens = 0
@@ -276,8 +292,18 @@ export async function runLayeredResearch(
                 .join("\n")
               response.notes = response.notes ? `${response.notes}\n${osmNotes}` : osmNotes
             }
-          } catch {
-            // Overpass failure is non-fatal
+          } catch (error) {
+            // Overpass failure is non-fatal, but we surface it to the UI.
+            const message =
+              error instanceof Error
+                ? `Overpass lookup failed: ${error.message}`
+                : "Overpass lookup failed while enriching this entity."
+            warnings.push({
+              entityId: entity.id,
+              name: entity.name,
+              source: "overpass",
+              message,
+            })
           }
         }
 
@@ -289,7 +315,13 @@ export async function runLayeredResearch(
           skippedEntityIds.push(entity.id)
           break outer
         }
-        skippedEntityIds.push(entity.id)
+        failedEntityIds.push(entity.id)
+        warnings.push({
+          entityId: entity.id,
+          name: entity.name,
+          source: "enrichment",
+          message: error instanceof Error ? error.message : "Unknown enrichment error",
+        })
       }
 
       done += 1
@@ -304,6 +336,8 @@ export async function runLayeredResearch(
     results,
     cacheAdditions,
     skippedEntityIds,
+    failedEntityIds,
+    warnings,
     skippedRichEntityIds,
     usageByEntityId,
     stats: {

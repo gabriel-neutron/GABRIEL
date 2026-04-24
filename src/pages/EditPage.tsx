@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from "react"
 import { MainLayout } from "@/components/shared/MainLayout"
+import { ToastStack, type ToastItem } from "@/components/shared/ToastStack"
 import {
   loadGeoPackage,
   saveGeoPackage,
@@ -57,13 +58,23 @@ export function EditPage({ onViewMode, onOpenAbout }: EditPageProps): React.Reac
   const [error, setError] = useState<string | null>(null)
   const [restoredFromSession, setRestoredFromSession] = useState(false)
   const [sourceCache, setSourceCache] = useState<Map<string, string>>(() => new Map())
+  const [toasts, setToasts] = useState<ToastItem[]>([])
+  const handleDismissToast = useCallback((id: string) => {
+    setToasts((prev) => prev.filter((item) => item.id !== id))
+  }, [])
   const enrichment = useEnrichment({
     entities,
     drawnGeometries,
     selectedEntityId,
     onApplyAccepted: handleUpdateEntity,
   })
-  const layeredResearch = useLayeredResearch(entities, drawnGeometries)
+  const layeredResearch = useLayeredResearch(entities, drawnGeometries, {
+    onEntityAnalyzed: (entityId, analyzedAt) => {
+      setEntities((prev) =>
+        prev.map((entity) => (entity.id === entityId ? { ...entity, analyzedAt } : entity)),
+      )
+    },
+  })
 
   // When a batch run finishes, merge new URL→snippet pairs into sourceCache.
   useEffect(() => {
@@ -76,6 +87,29 @@ export function EditPage({ onViewMode, onOpenAbout }: EditPageProps): React.Reac
       return next
     })
   }, [layeredResearch.cacheAdditions])
+
+  // Show clear user-facing warnings when layered research hits endpoint/provider issues.
+  useEffect(() => {
+    if (layeredResearch.lastWarnings.length === 0) return
+    setToasts((prev) => {
+      const seen = new Set(prev.map((item) => item.id))
+      const additions: ToastItem[] = []
+      for (const warning of layeredResearch.lastWarnings) {
+        const id = `${warning.source}:${warning.entityId}:${warning.message}`
+        if (seen.has(id)) continue
+        additions.push({
+          id,
+          title:
+            warning.source === "overpass"
+              ? `OSM endpoint issue (${warning.name})`
+              : `Research failed (${warning.name})`,
+          description: warning.message,
+        })
+      }
+      if (additions.length === 0) return prev
+      return [...prev, ...additions].slice(-4)
+    })
+  }, [layeredResearch.lastWarnings])
 
   // Tracks whether the enrichment drawer was opened via a batch result so we
   // can advance the review queue when it closes.
@@ -377,40 +411,41 @@ export function EditPage({ onViewMode, onOpenAbout }: EditPageProps): React.Reac
   }
 
   return (
-    <MainLayout
-      readOnly={false}
-      onOpenAbout={onOpenAbout}
-      onSwitchToView={onViewMode}
-      layers={layers}
-      entities={entities}
-      drawnGeometries={drawnGeometries}
-      selectedEntityId={selectedEntityId}
-      setSelectedEntityId={setSelectedEntityId}
-      selectedOsmObject={selectedOsmObject}
-      setSelectedOsmObject={setSelectedOsmObject}
-      showNetworks={showNetworks}
-      setShowNetworks={setShowNetworks}
-      baseMap={baseMap}
-      setBaseMap={setBaseMap}
-      entityOsmGeometries={entityOsmGeometries}
-      restoredFromSession={restoredFromSession}
-      setLayerVisible={setLayerVisible}
-      removeLayer={removeLayer}
-      renameLayer={renameLayer}
-      addNewLayer={addNewLayer}
-      handleDeleteEntity={handleDeleteEntity}
-      moveLayer={moveLayer}
-      addLayer={addLayer}
-      handleCreateNewEntity={handleCreateNewEntity}
-      handleLinkGeometryToEntity={handleLinkGeometryToEntity}
-      handleUpdateEntity={handleUpdateEntity}
-      handleDeleteGeometry={handleDeleteGeometry}
-      handleSelectOsmObject={handleSelectOsmObject}
-      handleCloseDetail={hookHandleCloseDetail}
-      busy={busy}
-      error={error}
-      projectFileActions={projectFileActions}
-      enrichment={{
+    <>
+      <MainLayout
+        readOnly={false}
+        onOpenAbout={onOpenAbout}
+        onSwitchToView={onViewMode}
+        layers={layers}
+        entities={entities}
+        drawnGeometries={drawnGeometries}
+        selectedEntityId={selectedEntityId}
+        setSelectedEntityId={setSelectedEntityId}
+        selectedOsmObject={selectedOsmObject}
+        setSelectedOsmObject={setSelectedOsmObject}
+        showNetworks={showNetworks}
+        setShowNetworks={setShowNetworks}
+        baseMap={baseMap}
+        setBaseMap={setBaseMap}
+        entityOsmGeometries={entityOsmGeometries}
+        restoredFromSession={restoredFromSession}
+        setLayerVisible={setLayerVisible}
+        removeLayer={removeLayer}
+        renameLayer={renameLayer}
+        addNewLayer={addNewLayer}
+        handleDeleteEntity={handleDeleteEntity}
+        moveLayer={moveLayer}
+        addLayer={addLayer}
+        handleCreateNewEntity={handleCreateNewEntity}
+        handleLinkGeometryToEntity={handleLinkGeometryToEntity}
+        handleUpdateEntity={handleUpdateEntity}
+        handleDeleteGeometry={handleDeleteGeometry}
+        handleSelectOsmObject={handleSelectOsmObject}
+        handleCloseDetail={hookHandleCloseDetail}
+        busy={busy}
+        error={error}
+        projectFileActions={projectFileActions}
+        enrichment={{
         isDrawerOpen: enrichment.isDrawerOpen,
         selectedEntity: enrichment.selectedEntity,
         context: enrichment.context,
@@ -437,7 +472,7 @@ export function EditPage({ onViewMode, onOpenAbout }: EditPageProps): React.Reac
         ignore: enrichment.ignore,
         clearOverlayForSelected: enrichment.clearOverlayForSelected,
       }}
-      layeredResearch={{
+        layeredResearch={{
         status: layeredResearch.status,
         progress: layeredResearch.progress,
         reviewQueueLength: layeredResearch.reviewQueue.length,
@@ -457,7 +492,12 @@ export function EditPage({ onViewMode, onOpenAbout }: EditPageProps): React.Reac
         onRun: () => layeredResearch.run(sourceCache),
         onCancel: layeredResearch.cancel,
         onReviewNext: handleReviewNext,
-      }}
-    />
+        }}
+      />
+      <ToastStack
+        items={toasts}
+        onDismiss={handleDismissToast}
+      />
+    </>
   )
 }

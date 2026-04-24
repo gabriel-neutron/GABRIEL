@@ -44,6 +44,13 @@ function renderChildren(context: EnrichmentContext | null): string {
   return context.children.map((child) => child.name).join(", ")
 }
 
+function formatAnalyzedAt(value: string | null | undefined): string {
+  if (!value) return "Never"
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return "Never"
+  return date.toLocaleString()
+}
+
 
 export function EnrichDrawer({
   open,
@@ -127,6 +134,9 @@ export function EnrichDrawer({
                     </div>
                     <div className="rounded-md border bg-muted/30 px-2 py-1 font-medium">
                       Children: {renderChildren(context)}
+                    </div>
+                    <div className="rounded-md border bg-muted/30 px-2 py-1 font-medium">
+                      Last analyzed: {formatAnalyzedAt(entity.analyzedAt)}
                     </div>
                   </div>
                 </Card>

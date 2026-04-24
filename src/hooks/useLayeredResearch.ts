@@ -13,6 +13,7 @@ export type EntityResearchStatus =
   | "running"       // currently being enriched
   | "done"          // completed with actionable proposals
   | "done-empty"    // completed, no proposals found
+  | "failed"        // attempted but failed
   | "skipped-rich"  // skipped — entity already has enough information
   | "skipped-abort" // skipped — run was stopped before this entity
 
@@ -26,7 +27,18 @@ type ProgressState = {
   total: number
 }
 
-export function useLayeredResearch(entities: MapEntity[], drawnGeometries: DrawnGeometry[]) {
+export type LayeredResearchWarning = LayeredResearchResult["warnings"][number]
+
+type UseLayeredResearchOptions = {
+  onEntityAnalyzed?: (entityId: string, analyzedAt: string) => void
+}
+
+export function useLayeredResearch(
+  entities: MapEntity[],
+  drawnGeometries: DrawnGeometry[],
+  options: UseLayeredResearchOptions = {},
+) {
+  const { onEntityAnalyzed } = options
   const [status, setStatus] = useState<LayeredResearchStatus>("idle")
   const [progress, setProgress] = useState<ProgressState | null>(null)
   const [batchResults, setBatchResults] = useState<Record<string, EnrichmentResponse>>({})
@@ -35,6 +47,7 @@ export function useLayeredResearch(entities: MapEntity[], drawnGeometries: Drawn
   const [lastStats, setLastStats] = useState<LayeredResearchResult["stats"] | null>(null)
   const [entityStatuses, setEntityStatuses] = useState<Record<string, EntityResearchStatus>>({})
   const [totalUsage, setTotalUsage] = useState({ inputTokens: 0, outputTokens: 0 })
+  const [lastWarnings, setLastWarnings] = useState<LayeredResearchWarning[]>([])
   const [dialogOpen, setDialogOpen] = useState(false)
   const [batchSize, setBatchSize] = useState(20)
   const [richnessThreshold, setRichnessThreshold] = useState(DEFAULT_RICHNESS_THRESHOLD)
@@ -68,6 +81,7 @@ export function useLayeredResearch(entities: MapEntity[], drawnGeometries: Drawn
       setProgress(null)
       setCacheAdditions([])
       setLastStats(null)
+      setLastWarnings([])
       // Preserve batchResults and reviewQueue from previous batches
 
       try {
@@ -84,6 +98,7 @@ export function useLayeredResearch(entities: MapEntity[], drawnGeometries: Drawn
           },
 
           onEntityComplete: (entityId, response, usage) => {
+            const analyzedAt = new Date().toISOString()
             // Update incrementally so UI reflects results without waiting for full run
             setBatchResults((prev) => ({ ...prev, [entityId]: response }))
             if ((response.proposals?.length ?? 0) > 0) {
@@ -100,6 +115,7 @@ export function useLayeredResearch(entities: MapEntity[], drawnGeometries: Drawn
               outputTokens: prev.outputTokens + usage.estimatedOutputTokens,
             }))
             processedEntityIdsRef.current.add(entityId)
+            onEntityAnalyzed?.(entityId, analyzedAt)
           },
         })
 
@@ -109,6 +125,10 @@ export function useLayeredResearch(entities: MapEntity[], drawnGeometries: Drawn
         // Apply final statuses for entities the service marked as skipped
         setEntityStatuses((prev) => {
           const next = { ...prev }
+          for (const id of result.failedEntityIds) {
+            next[id] = "failed"
+            processedEntityIdsRef.current.add(id)
+          }
           for (const id of result.skippedRichEntityIds) {
             next[id] = "skipped-rich"
           }
@@ -121,6 +141,7 @@ export function useLayeredResearch(entities: MapEntity[], drawnGeometries: Drawn
         })
 
         setLastStats(result.stats)
+        setLastWarnings(result.warnings)
         setStatus("done")
       } catch (error) {
         const isAbort =
@@ -132,7 +153,7 @@ export function useLayeredResearch(entities: MapEntity[], drawnGeometries: Drawn
         setProgress(null)
       }
     },
-    [entities, drawnGeometries, batchSize, richnessThreshold],
+    [entities, drawnGeometries, batchSize, richnessThreshold, onEntityAnalyzed],
   )
 
   const cancel = useCallback(() => {
@@ -162,6 +183,7 @@ export function useLayeredResearch(entities: MapEntity[], drawnGeometries: Drawn
     cancel,
     cacheAdditions,
     lastStats,
+    lastWarnings,
     // Live per-entity status map (for the dialog)
     entityStatuses,
     // Aggregated token totals across all batches

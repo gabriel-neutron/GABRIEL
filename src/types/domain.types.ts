@@ -47,6 +47,8 @@ export type MapEntity = {
   notes?: string | null
   /** Sources for this entity as a newline-delimited list of URLs/citations. */
   sources?: string | null
+  /** ISO timestamp of the latest completed batch analysis for this entity. */
+  analyzedAt?: string | null
   /** How the entity is positioned: own geometry, linked to parent, or unknown. Defaults to "own". */
   positionMode?: PositionMode
   /** Whether the entity position is considered exact. Defaults to false. */

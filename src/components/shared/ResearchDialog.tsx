@@ -44,6 +44,8 @@ function StatusIcon({ status }: { status: EntityResearchStatus | undefined }) {
       return <span className="text-green-600 font-mono">✓</span>
     case "done-empty":
       return <span className="text-muted-foreground font-mono">✓</span>
+    case "failed":
+      return <span className="text-red-600 font-mono">!</span>
     case "skipped-rich":
       return <span className="text-amber-500 font-mono">—</span>
     case "skipped-abort":
@@ -59,6 +61,7 @@ function StatusLabel({ status }: { status: EntityResearchStatus | undefined }) {
     case "running": return <span className="text-blue-500 text-xs">running</span>
     case "done": return <span className="text-green-600 text-xs">done</span>
     case "done-empty": return <span className="text-muted-foreground text-xs">no results</span>
+    case "failed": return <span className="text-red-600 text-xs">failed</span>
     case "skipped-rich": return <span className="text-amber-500 text-xs">rich — skipped</span>
     case "skipped-abort": return <span className="text-muted-foreground text-xs">not reached</span>
     default: return <span className="text-muted-foreground text-xs">pending</span>
@@ -68,6 +71,13 @@ function StatusLabel({ status }: { status: EntityResearchStatus | undefined }) {
 function formatTokens(n: number): string {
   if (n >= 1000) return `~${(n / 1000).toFixed(1)}k`
   return `~${n}`
+}
+
+function formatAnalyzedAt(value: string | null | undefined): string {
+  if (!value) return "—"
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return "—"
+  return date.toLocaleString()
 }
 
 export function ResearchDialog({
@@ -230,6 +240,7 @@ export function ResearchDialog({
                     <th className="px-3 py-1.5 text-left font-medium hidden sm:table-cell">Echelon</th>
                     <th className="px-3 py-1.5 text-right font-medium">Src</th>
                     <th className="px-3 py-1.5 text-left font-medium">Status</th>
+                    <th className="px-3 py-1.5 text-left font-medium hidden md:table-cell">Analyzed</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -263,6 +274,9 @@ export function ResearchDialog({
                         </td>
                         <td className="px-3 py-1.5">
                           <StatusLabel status={st} />
+                        </td>
+                        <td className="px-3 py-1.5 text-xs text-muted-foreground hidden md:table-cell">
+                          {formatAnalyzedAt(entity.analyzedAt)}
                         </td>
                       </tr>
                     )

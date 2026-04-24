@@ -212,5 +212,41 @@ describe("runEnrichment", () => {
     const result = await runEnrichment(makeRequest(), { providers })
     expect(result.response.proposals.some((proposal) => proposal.field === "commander")).toBe(false)
   })
+
+  it('does not propose placeholder "no source" values', async () => {
+    const providers: ProviderBundle = {
+      model: {
+        async generateQueries() {
+          return ["64th Separate Motor Rifle Brigade HQ garrison 2023"]
+        },
+        async synthesize() {
+          return {
+            notes: "No source",
+            sources: "No sources found",
+          }
+        },
+      },
+      retrieval: [
+        {
+          name: "mock",
+          async search() {
+            return [
+              {
+                url: "https://example.com/hq",
+                title: "HQ source",
+                snippet: "HQ and garrison confirmed in Khabarovsk Krai by open reporting.",
+              },
+            ]
+          },
+        },
+      ],
+    }
+
+    const result = await runEnrichment(makeRequest(), { providers })
+    expect(result.response.proposals).toHaveLength(0)
+    expect(result.response.unresolvedFields).toEqual(
+      expect.arrayContaining(["notes", "sources"]),
+    )
+  })
 })
 

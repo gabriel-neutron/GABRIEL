@@ -133,6 +133,8 @@ export class OpenAIModelAdapter implements AiModelAdapter {
       "If Wikipedia is the only available source for a claim, note it but also report any primary source it cites. Never use Wikipedia as the sole citation.",
       "Return only the required fields; do not add extra keys.",
       "If evidence is missing for a field, set the field to null.",
+      "Never output placeholders such as \"no source\", \"source not found\", \"unknown\", \"n/a\", \"none\", or similar text.",
+      "For the `sources` field, return newline-delimited `https://...` URLs only, or null when there is no supported URL evidence.",
       `Required fields: ${JSON.stringify(input.outputSchemaFields)}`,
     ].join("\n")
 
