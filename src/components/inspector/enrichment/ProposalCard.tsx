@@ -38,7 +38,7 @@ function ValueBlock({ label, value, tone, actionLabel, onAction, disabled }: Val
       }
     >
       <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
-      <p className="mt-1 min-h-12 break-words text-base font-medium leading-6 text-foreground">
+      <p className="mt-1 min-h-12 break-words whitespace-pre-wrap text-base font-medium leading-6 text-foreground">
         {renderValue(value)}
       </p>
       <Button

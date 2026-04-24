@@ -31,12 +31,15 @@ function parseJsonObject(text: string): Record<string, unknown> {
 
 export class OpenAIModelAdapter implements AiModelAdapter {
   private readonly apiKey: string | null
+  private readonly synthesisModel: string
 
-  constructor(apiKey: string | null) {
+  constructor(apiKey: string | null, synthesisModel = "gpt-4.1-mini") {
     this.apiKey = apiKey
+    this.synthesisModel = synthesisModel
   }
 
   private async callOpenAI(
+    model: string,
     systemInstructions: string,
     userPayload: Record<string, unknown>,
     signal?: AbortSignal,
@@ -53,7 +56,7 @@ export class OpenAIModelAdapter implements AiModelAdapter {
       },
       signal,
       body: JSON.stringify({
-        model: "gpt-4.1-mini",
+        model,
         input: [
           {
             role: "system",
@@ -81,20 +84,22 @@ export class OpenAIModelAdapter implements AiModelAdapter {
   async generateQueries(input: QueryGenerationInput, signal?: AbortSignal): Promise<string[]> {
     const instructions = [
       "Generate 4 to 6 web research queries for ORBAT enrichment.",
-      "Focus strictly on headquarters (HQ) and garrison information.",
-      "Do not search for deployment areas, combat operations, or front-line movements.",
+      "Focus exclusively on permanent garrison locations, military bases, training grounds, and headquarters (voennyy gorodok / voennaya baza).",
+      "Ignore deployment areas, front-line positions, and operational movements.",
       `Only target unresolved fields: ${JSON.stringify(input.unresolvedFields)}.`,
       "Queries must include English and Russian Cyrillic variants.",
+      "Prioritize sources in this order: (1) official Russian military/government (mil.ru, kremlin.ru, .gov.ru, CSTO), (2) OSINT reports/news (Bellingcat, RFE/RL, ISW, Meduza, BBC), (3) social media (Telegram, VK), (4) Wikipedia — use only if nothing else is available.",
       "Return strict JSON only in this shape: {\"queries\": [\"...\"]}.",
     ].join("\n")
 
     const payload = await this.callOpenAI(
+      "gpt-4.1-mini",
       instructions,
       {
-      feature: input.feature,
-      context: input.context,
-      prompt: input.prompt,
-      unresolvedFields: input.unresolvedFields,
+        feature: input.feature,
+        context: input.context,
+        prompt: input.prompt,
+        unresolvedFields: input.unresolvedFields,
       },
       signal,
     )
@@ -121,14 +126,18 @@ export class OpenAIModelAdapter implements AiModelAdapter {
       "Return strict JSON object only.",
       "Use only provided evidence chunks.",
       "Do not invent URLs or claims.",
-      "Focus strictly on HQ and garrison evidence.",
+      "Focus exclusively on permanent garrison locations, military bases, training grounds, and headquarters (voennyy gorodok / voennaya baza).",
       "Do not infer deployment-area or operational theater claims.",
+      "If evidence is found but its relevance to garrison is uncertain, include the source URL and append a brief note rather than discarding it.",
+      "Prioritize sources in this order: (1) official Russian military/government (mil.ru, kremlin.ru, .gov.ru, CSTO), (2) OSINT reports/news (Bellingcat, RFE/RL, ISW, Meduza, BBC), (3) social media (Telegram, VK), (4) Wikipedia.",
+      "If Wikipedia is the only available source for a claim, note it but also report any primary source it cites. Never use Wikipedia as the sole citation.",
       "Return only the required fields; do not add extra keys.",
       "If evidence is missing for a field, set the field to null.",
       `Required fields: ${JSON.stringify(input.outputSchemaFields)}`,
     ].join("\n")
 
     return this.callOpenAI(
+      this.synthesisModel,
       instructions,
       {
         feature: input.feature,

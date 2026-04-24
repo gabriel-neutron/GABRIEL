@@ -3,6 +3,7 @@ import { MapView } from "@/components/map/MapView"
 import { EntityInspector } from "@/components/inspector/EntityInspector"
 import { EnrichDrawer } from "@/components/inspector/enrichment"
 import { OsmObjectInspector } from "@/components/inspector/OsmObjectInspector"
+import { ResearchDialog } from "@/components/shared/ResearchDialog"
 import { AppShell, type ProjectFileActions } from "@/components/shared/AppShell"
 import { LayersPanel } from "@/components/shared/LayersPanel"
 import { HierarchyPanel } from "@/components/shared/HierarchyPanel"
@@ -17,6 +18,30 @@ import type { Layer, MapEntity, DrawnGeometry } from "@/types/domain.types"
 import { getDefaultEntityLayerId } from "@/utils/entityLayer"
 import type { SelectedOsmObject } from "@/hooks/useMapProjectState"
 import type { EnrichmentContext, EnrichmentProposal } from "@/types/enrichment.types"
+import type { EntityResearchStatus } from "@/hooks/useLayeredResearch"
+import type { LayeredResearchResult } from "@/services/research/layered-research.service"
+
+type LayeredResearchControls = {
+  status: "idle" | "running" | "done" | "failed"
+  progress: { entityId: string; name: string; layer: number; done: number; total: number } | null
+  reviewQueueLength: number
+  hasNextInQueue: boolean
+  entityStatuses: Record<string, EntityResearchStatus>
+  totalUsage: { inputTokens: number; outputTokens: number }
+  cacheAdditions: Array<{ url: string; content: string }>
+  lastStats: LayeredResearchResult["stats"] | null
+  dialogOpen: boolean
+  batchSize: number
+  setBatchSize: (n: number) => void
+  richnessThreshold: number
+  setRichnessThreshold: (n: number) => void
+  hasProcessedEntities: boolean
+  openDialog: () => void
+  closeDialog: () => void
+  onRun: () => void
+  onCancel: () => void
+  onReviewNext: () => void
+}
 
 function collectDescendants(entities: MapEntity[], rootId: string): string[] {
   const result: string[] = [rootId]
@@ -91,6 +116,7 @@ export type MainLayoutProps = {
     ignore: (proposal: EnrichmentProposal) => void
     clearOverlayForSelected: () => void
   }
+  layeredResearch?: LayeredResearchControls
 }
 
 export function MainLayout({
@@ -128,6 +154,7 @@ export function MainLayout({
   error,
   projectFileActions,
   enrichment,
+  layeredResearch,
 }: MainLayoutProps) {
   const [leftMode, setLeftMode] = useState<"layers" | "hierarchy">("layers")
   const [hiddenEntityIds, setHiddenEntityIds] = useState<Set<string>>(new Set())
@@ -226,6 +253,21 @@ export function MainLayout({
           <ShowNetworksToggle checked={showNetworks} onCheckedChange={setShowNetworks} />
           <BaseMapSwitcher value={baseMap} onValueChange={setBaseMap} />
           {!readOnly && <OsmQueryMenu layers={layers} onAddLayer={addLayer} />}
+          {!readOnly && layeredResearch && (
+            <Button
+              type="button"
+              size="sm"
+              variant={layeredResearch.status === "running" ? "secondary" : "outline"}
+              onClick={layeredResearch.openDialog}
+              title="Research all entities layer by layer"
+            >
+              {layeredResearch.status === "running"
+                ? "Researching…"
+                : layeredResearch.reviewQueueLength > 0
+                  ? `Review (${layeredResearch.reviewQueueLength})`
+                  : "Research all"}
+            </Button>
+          )}
           <ModeToggle />
         </>
       }
@@ -269,6 +311,28 @@ export function MainLayout({
         error={error}
         projectFileActions={projectFileActions}
       />
+      {layeredResearch && (
+        <ResearchDialog
+          open={layeredResearch.dialogOpen}
+          onClose={layeredResearch.closeDialog}
+          entities={entities}
+          entityStatuses={layeredResearch.entityStatuses}
+          totalUsage={layeredResearch.totalUsage}
+          cacheAdditions={layeredResearch.cacheAdditions}
+          lastStats={layeredResearch.lastStats}
+          runStatus={layeredResearch.status}
+          progress={layeredResearch.progress}
+          reviewQueueLength={layeredResearch.reviewQueueLength}
+          batchSize={layeredResearch.batchSize}
+          setBatchSize={layeredResearch.setBatchSize}
+          richnessThreshold={layeredResearch.richnessThreshold}
+          setRichnessThreshold={layeredResearch.setRichnessThreshold}
+          hasProcessedEntities={layeredResearch.hasProcessedEntities}
+          onRun={layeredResearch.onRun}
+          onCancel={layeredResearch.onCancel}
+          onReviewNext={layeredResearch.onReviewNext}
+        />
+      )}
       <EnrichDrawer
         open={enrichment.isDrawerOpen}
         entity={enrichment.selectedEntity}

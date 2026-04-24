@@ -92,6 +92,39 @@ function getAllowedSchemaFields(schema: EnrichmentOutputSchema): string[] {
   return getSchemaFields(schema).filter((field) => ALLOWED_ENRICHMENT_FIELDS.has(field))
 }
 
+/**
+ * Normalizes a raw synthesis value for a known field.
+ * Models sometimes return string fields as arrays (of strings or objects),
+ * or number fields as strings.  We coerce to the expected types so downstream
+ * code never sees unexpected types.
+ */
+function normalizeSynthesisValue(field: string, value: unknown): unknown {
+  if (value === null || value === undefined) return null
+  if (field === "sources" || field === "notes" || field === "militaryUnitId") {
+    if (Array.isArray(value)) {
+      // Each item may be a plain string or an object with a `url` property
+      // (e.g. [{url:"https://...", title:"..."}] — a common GPT-4o response shape).
+      const lines = value
+        .map((item) => {
+          if (typeof item === "string") return item.trim()
+          if (item !== null && typeof item === "object" && "url" in item) {
+            return String((item as Record<string, unknown>).url).trim()
+          }
+          return String(item)
+        })
+        .filter(Boolean)
+      return lines.join("\n")
+    }
+    if (typeof value !== "string") return String(value)
+    return value
+  }
+  if (field === "osmRelationId") {
+    const n = typeof value === "number" ? value : Number(value)
+    return Number.isFinite(n) ? n : null
+  }
+  return value
+}
+
 function sanitizeSynthesisObject(
   synthesisObject: Record<string, unknown>,
   allowedFields: string[],
@@ -99,7 +132,7 @@ function sanitizeSynthesisObject(
   const sanitized: Record<string, unknown> = {}
   for (const field of allowedFields) {
     if (field in synthesisObject) {
-      sanitized[field] = synthesisObject[field]
+      sanitized[field] = normalizeSynthesisValue(field, synthesisObject[field])
     }
   }
   return sanitized

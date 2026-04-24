@@ -37,25 +37,17 @@ export function SymbolsLayer({
 }: Props) {
   const iconCache = useRef(new Map<string, L.DivIcon>())
 
-  // #region agent log - Hypotheses A, D
-  const visibleRecomputeRef = useRef(0)
   const visible = useMemo(() => {
-    visibleRecomputeRef.current += 1
-    fetch('http://127.0.0.1:7621/ingest/5d09de12-2036-4626-a2d7-a250cef5312b',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'d20a2f'},body:JSON.stringify({sessionId:'d20a2f',location:'SymbolsLayer.tsx:visible',message:'visible recomputed',data:{recomputeCount:visibleRecomputeRef.current,entityCount:entities.length},timestamp:Date.now(),hypothesisId:'A'})}).catch(()=>{})
     return entities.flatMap((entity) => {
       if (!visibleLayerIds.has(entity.layerId) || hiddenEntityIds?.has(entity.id)) return []
       const position = positionMap.get(entity.id)
       return position ? [{ entity, position }] : []
     })
   }, [entities, positionMap, visibleLayerIds, hiddenEntityIds])
-  // #endregion
 
   return (
     <>
       {(() => {
-        // #region agent log - Hypothesis D: IIFE render timing
-        const iifeStart = performance.now()
-        // #endregion
         const usedKeys = new Set<string>()
         const markers = visible.map(({ entity, position }) => {
           const mode = entity.positionMode ?? "own"
@@ -87,11 +79,6 @@ export function SymbolsLayer({
         for (const key of iconCache.current.keys()) {
           if (!usedKeys.has(key)) iconCache.current.delete(key)
         }
-
-        // #region agent log - Hypothesis D: IIFE render timing
-        const iifeMs = performance.now() - iifeStart
-        if (iifeMs > 2) fetch('http://127.0.0.1:7621/ingest/5d09de12-2036-4626-a2d7-a250cef5312b',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'d20a2f'},body:JSON.stringify({sessionId:'d20a2f',location:'SymbolsLayer.tsx:iife',message:'IIFE render time',data:{iifeMs:Math.round(iifeMs),visibleCount:visible.length},timestamp:Date.now(),hypothesisId:'D'})}).catch(()=>{})
-        // #endregion
 
         return markers
       })()}

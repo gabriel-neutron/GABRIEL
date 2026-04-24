@@ -50,6 +50,8 @@ export interface GeoPackageLoadResult {
   layers: GpkgLayer[]
   entities: GpkgEntity[]
   geometries: GpkgGeometry[]
+  /** URL → cached snippet map loaded from the `research_sources` table. Empty map for older projects. */
+  sourceCache: Map<string, string>
 }
 
 export async function loadGeoPackage(buffer: ArrayBuffer): Promise<GeoPackageLoadResult> {
@@ -60,6 +62,7 @@ export async function loadGeoPackage(buffer: ArrayBuffer): Promise<GeoPackageLoa
     const layers = readLayers(geoPackage)
     const entities = readEntities(geoPackage)
     const geometries = await readGeometries(geoPackage)
+    const sourceCache = readSourceCache(geoPackage)
 
     const layerIds = new Set(layers.map((l) => l.id))
     const entityIds = new Set(entities.map((e) => e.id))
@@ -80,7 +83,7 @@ export async function loadGeoPackage(buffer: ArrayBuffer): Promise<GeoPackageLoa
       }
     }
 
-    return { layers, entities, geometries }
+    return { layers, entities, geometries, sourceCache }
   } catch (e) {
     if (e instanceof Error && e.message.startsWith("Unsupported schema")) throw e
     const errorMsg = e instanceof Error ? e.message : String(e)
@@ -183,6 +186,27 @@ function readEntities(geoPackage: GeoPackage): GpkgEntity[] {
   })
 }
 
+function readSourceCache(geoPackage: GeoPackage): Map<string, string> {
+  try {
+    const tables = geoPackage.connection.all(
+      `SELECT name FROM sqlite_master WHERE type='table' AND name='research_sources'`,
+    ) as Array<{ name: string }>
+    if (tables.length === 0) return new Map()
+    const rows = geoPackage.connection.all(
+      `SELECT url, content FROM research_sources`,
+    ) as Array<{ url: string; content: string | null }>
+    const cache = new Map<string, string>()
+    for (const row of rows) {
+      if (row.url && row.content) {
+        cache.set(row.url, row.content)
+      }
+    }
+    return cache
+  } catch {
+    return new Map()
+  }
+}
+
 async function readGeometries(geoPackage: GeoPackage): Promise<GpkgGeometry[]> {
   const featureTables = geoPackage.getFeatureTables()
   if (!featureTables.includes(GEOMETRIES_TABLE)) {
@@ -240,6 +264,7 @@ export async function saveGeoPackage(
   layers: GpkgLayer[],
   entities: GpkgEntity[],
   geometries: GpkgGeometry[],
+  researchSources?: Map<string, string>,
 ): Promise<Uint8Array> {
   let geoPackage: GeoPackage | null = null
   try {
@@ -302,6 +327,22 @@ export async function saveGeoPackage(
       undefined,
       4326,
     )
+
+    geoPackage.connection.run(`CREATE TABLE research_sources (
+  id TEXT PRIMARY KEY,
+  url TEXT UNIQUE NOT NULL,
+  content TEXT,
+  fetched_at TEXT
+)`)
+
+    if (researchSources) {
+      for (const [url, content] of researchSources.entries()) {
+        geoPackage.connection.run(
+          `INSERT INTO research_sources (id, url, content, fetched_at) VALUES (?, ?, ?, ?)`,
+          [crypto.randomUUID(), url, content, new Date().toISOString()],
+        )
+      }
+    }
 
     for (const l of layers) {
       const isOsm = l.kind === "osm" && l.osmData != null

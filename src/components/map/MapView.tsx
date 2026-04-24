@@ -118,25 +118,6 @@ export function MapView({
     if (mapTool !== "pan" && selectedEntityId !== null) onSelectEntity(null)
   }, [mapTool, selectedEntityId, onSelectEntity])
 
-  // #region agent log - Hypothesis A: visibleLayersInOrder not memoized
-  const renderCountRef = useRef(0)
-  renderCountRef.current += 1
-  const renderCount = renderCountRef.current
-  const prevLayersRef = useRef(layers)
-  const prevEntitiesRef = useRef(entities)
-  const prevOnSelectRef = useRef(onSelectEntity)
-  const changedProps: string[] = []
-  if (prevLayersRef.current !== layers) changedProps.push("layers")
-  if (prevEntitiesRef.current !== entities) changedProps.push("entities")
-  if (prevOnSelectRef.current !== onSelectEntity) changedProps.push("onSelectEntity")
-  prevLayersRef.current = layers
-  prevEntitiesRef.current = entities
-  prevOnSelectRef.current = onSelectEntity
-  if (renderCount > 1) {
-    fetch('http://127.0.0.1:7621/ingest/5d09de12-2036-4626-a2d7-a250cef5312b',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'d20a2f'},body:JSON.stringify({sessionId:'d20a2f',location:'MapView.tsx:render',message:'MapView render',data:{renderCount,changedProps},timestamp:Date.now(),hypothesisId:'B'})}).catch(()=>{})
-  }
-  // #endregion
-
   const visibleLayersInOrder = useMemo(() => layers.filter((l) => l.visible), [layers])
 
   const drawnByLayerId = useMemo(() => {
@@ -152,12 +133,10 @@ export function MapView({
     return m
   }, [drawnGeometries, entities])
 
-  const visibleLayerIds = useMemo(() => {
-    // #region agent log - Hypothesis A: track visibleLayerIds recompute
-    fetch('http://127.0.0.1:7621/ingest/5d09de12-2036-4626-a2d7-a250cef5312b',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'d20a2f'},body:JSON.stringify({sessionId:'d20a2f',location:'MapView.tsx:visibleLayerIds',message:'visibleLayerIds recomputed',data:{layerCount:visibleLayersInOrder.length},timestamp:Date.now(),hypothesisId:'A'})}).catch(()=>{})
-    // #endregion
-    return new Set(visibleLayersInOrder.map((l) => l.id))
-  }, [visibleLayersInOrder])
+  const visibleLayerIds = useMemo(
+    () => new Set(visibleLayersInOrder.map((l) => l.id)),
+    [visibleLayersInOrder],
+  )
 
   const positionMap = useMemo(() => {
     const all = computeAllEntityPositions(entities, drawnGeometries)

@@ -30,5 +30,41 @@ export class OverpassAdapter implements RetrievalAdapter {
       snippet: JSON.stringify(element.tags ?? {}),
     }))
   }
+
+  async searchByUnitId(unitId: string, signal?: AbortSignal): Promise<ProviderSearchResult[]> {
+    const escaped = unitId.replace(/\\/g, "\\\\").replace(/"/g, '\\"')
+    const overpassQuery = [
+      "[out:json][timeout:10];",
+      "(",
+      `  way["military"]["ref"~"${escaped}",i];`,
+      `  relation["military"]["ref"~"${escaped}",i];`,
+      `  way["military"]["name"~"${escaped}",i];`,
+      `  relation["military"]["name"~"${escaped}",i];`,
+      ");",
+      "out body 3;",
+    ].join("\n")
+
+    const response = await fetch(OVERPASS_ENDPOINT, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain" },
+      body: overpassQuery,
+      signal,
+    })
+    if (!response.ok) {
+      throw new Error(`Overpass unit-ID query failed (${response.status})`)
+    }
+    const payload = (await response.json()) as {
+      elements?: Array<{
+        id?: number
+        type?: string
+        tags?: Record<string, string>
+      }>
+    }
+    return (payload.elements ?? []).slice(0, 3).map((element) => ({
+      url: `https://www.openstreetmap.org/${element.type ?? "way"}/${element.id ?? 0}`,
+      title: element.tags?.name ?? `OSM military ${element.type ?? "object"}`,
+      snippet: JSON.stringify(element.tags ?? {}),
+    }))
+  }
 }
 

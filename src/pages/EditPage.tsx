@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react"
+import { useState, useCallback, useEffect, useRef } from "react"
 import { MainLayout } from "@/components/shared/MainLayout"
 import {
   loadGeoPackage,
@@ -10,6 +10,7 @@ import {
 import { loadProject, saveProject, clearProject } from "@/services/projectStorage.service"
 import { useMapProjectState } from "@/hooks/useMapProjectState"
 import { useEnrichment } from "@/hooks/useEnrichment"
+import { useLayeredResearch } from "@/hooks/useLayeredResearch"
 import type { Layer, MapEntity, DrawnGeometry } from "@/types/domain.types"
 import { getDefaultEntityLayerId } from "@/utils/entityLayer"
 export type EditPageProps = {
@@ -55,12 +56,30 @@ export function EditPage({ onViewMode, onOpenAbout }: EditPageProps): React.Reac
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [restoredFromSession, setRestoredFromSession] = useState(false)
+  const [sourceCache, setSourceCache] = useState<Map<string, string>>(() => new Map())
   const enrichment = useEnrichment({
     entities,
     drawnGeometries,
     selectedEntityId,
     onApplyAccepted: handleUpdateEntity,
   })
+  const layeredResearch = useLayeredResearch(entities, drawnGeometries)
+
+  // When a batch run finishes, merge new URL→snippet pairs into sourceCache.
+  useEffect(() => {
+    if (layeredResearch.cacheAdditions.length === 0) return
+    setSourceCache((prev) => {
+      const next = new Map(prev)
+      for (const { url, content } of layeredResearch.cacheAdditions) {
+        next.set(url, content)
+      }
+      return next
+    })
+  }, [layeredResearch.cacheAdditions])
+
+  // Tracks whether the enrichment drawer was opened via a batch result so we
+  // can advance the review queue when it closes.
+  const isBatchReviewRef = useRef(false)
 
   useEffect(function restoreSession() {
     let mounted = true
@@ -74,6 +93,7 @@ export function EditPage({ onViewMode, onOpenAbout }: EditPageProps): React.Reac
           setEntities(next.entities)
           setDrawnGeometries(next.drawnGeometries)
           setSelectedEntityId(next.selectedEntityId)
+          setSourceCache(result.sourceCache)
           setRestoredFromSession(true)
         })
         .catch(() => {})
@@ -240,6 +260,7 @@ export function EditPage({ onViewMode, onOpenAbout }: EditPageProps): React.Reac
       setEntities(next.entities)
       setDrawnGeometries(next.drawnGeometries)
       setSelectedEntityId(next.selectedEntityId)
+      setSourceCache(result.sourceCache)
       await saveProject(buffer, { fileName: file.name })
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load GeoPackage")
@@ -269,7 +290,7 @@ export function EditPage({ onViewMode, onOpenAbout }: EditPageProps): React.Reac
     setBusy(true)
     setError(null)
     try {
-      const bytes = await saveGeoPackage(gpkgLayers, persistedEntities, persistedGeometries)
+      const bytes = await saveGeoPackage(gpkgLayers, persistedEntities, persistedGeometries, sourceCache)
       await writeGeoPackageToFile(bytes)
       const buffer = new ArrayBuffer(bytes.length)
       new Uint8Array(buffer).set(bytes)
@@ -283,6 +304,71 @@ export function EditPage({ onViewMode, onOpenAbout }: EditPageProps): React.Reac
       setBusy(false)
     }
   }, [layers, entities, drawnGeometries, writeGeoPackageToFile])
+
+  // Opens the next entity in the batch review queue and loads its pre-computed
+  // result into the enrichment drawer.
+  const handleReviewNext = useCallback(() => {
+    const entityId = layeredResearch.nextInQueue
+    if (!entityId) return
+    const result = layeredResearch.getResult(entityId)
+    if (!result) return
+    setSelectedEntityId(entityId)
+    isBatchReviewRef.current = true
+    enrichment.loadBatchResult(result)
+  }, [layeredResearch, enrichment, setSelectedEntityId])
+
+  // Wraps the normal closeDrawer so the review queue advances after the user
+  // manually closes the drawer while in batch-review mode.
+  const handleCloseEnrichmentDrawer = useCallback(() => {
+    const outcome = enrichment.closeDrawer()
+    if (outcome.closed && isBatchReviewRef.current) {
+      isBatchReviewRef.current = false
+      layeredResearch.advanceQueue()
+    }
+  }, [enrichment, layeredResearch])
+
+  // Keep a stable ref to the latest enrichment object so the auto-advance
+  // effect can read current methods without them being in the dep array
+  // (which would cause the effect to re-fire on every state change).
+  const enrichmentRef = useRef(enrichment)
+  enrichmentRef.current = enrichment
+
+  // Auto-advance: when every proposal for the current entity has been
+  // accepted or rejected, immediately apply the accepted patches, pop the
+  // queue, and load the next entity — without requiring the user to close
+  // and reopen the drawer.
+  useEffect(() => {
+    if (!enrichment.allProposalsResolved || !isBatchReviewRef.current) return
+
+    const enrich = enrichmentRef.current
+    enrich.advanceBatchReview()
+
+    // Peek at the entity that will become the new head after we advance
+    const nextEntityId = layeredResearch.reviewQueue[1] ?? null
+    layeredResearch.advanceQueue()
+
+    if (nextEntityId) {
+      const result = layeredResearch.getResult(nextEntityId)
+      if (result) {
+        setSelectedEntityId(nextEntityId)
+        enrich.loadBatchResult(result)
+      } else {
+        // Result missing (shouldn't happen) — end batch review
+        isBatchReviewRef.current = false
+        enrich.forceCloseDrawer()
+      }
+    } else {
+      // Queue exhausted — close the drawer and exit batch mode
+      isBatchReviewRef.current = false
+      enrich.forceCloseDrawer()
+    }
+  }, [
+    enrichment.allProposalsResolved,
+    layeredResearch.reviewQueue,
+    layeredResearch.advanceQueue,
+    layeredResearch.getResult,
+    setSelectedEntityId,
+  ])
 
   const projectFileActions = {
     onNewProject: handleNewProject,
@@ -344,12 +430,33 @@ export function EditPage({ onViewMode, onOpenAbout }: EditPageProps): React.Reac
         closeNotice: enrichment.closeNotice,
         setPrompt: enrichment.setDraftPrompt,
         openDrawer: enrichment.openDrawer,
-        closeDrawer: enrichment.closeDrawer,
+        closeDrawer: handleCloseEnrichmentDrawer,
         run: enrichment.run,
         accept: enrichment.accept,
         reject: enrichment.reject,
         ignore: enrichment.ignore,
         clearOverlayForSelected: enrichment.clearOverlayForSelected,
+      }}
+      layeredResearch={{
+        status: layeredResearch.status,
+        progress: layeredResearch.progress,
+        reviewQueueLength: layeredResearch.reviewQueue.length,
+        hasNextInQueue: layeredResearch.nextInQueue !== null,
+        entityStatuses: layeredResearch.entityStatuses,
+        totalUsage: layeredResearch.totalUsage,
+        cacheAdditions: layeredResearch.cacheAdditions,
+        lastStats: layeredResearch.lastStats,
+        dialogOpen: layeredResearch.dialogOpen,
+        batchSize: layeredResearch.batchSize,
+        setBatchSize: layeredResearch.setBatchSize,
+        richnessThreshold: layeredResearch.richnessThreshold,
+        setRichnessThreshold: layeredResearch.setRichnessThreshold,
+        hasProcessedEntities: layeredResearch.hasProcessedEntities,
+        openDialog: layeredResearch.openDialog,
+        closeDialog: layeredResearch.closeDialog,
+        onRun: () => layeredResearch.run(sourceCache),
+        onCancel: layeredResearch.cancel,
+        onReviewNext: handleReviewNext,
       }}
     />
   )

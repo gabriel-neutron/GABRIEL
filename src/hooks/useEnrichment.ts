@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { buildDefaultEnrichmentPrompt, DEFAULT_ENRICHMENT_OUTPUT_SCHEMA, ENRICHMENT_MAX_DEPTH_DEFAULT, runEnrichment } from "@/services/enrichment"
 import {
   acceptProposalToOverlay,
@@ -17,7 +17,7 @@ import {
   type EnrichmentUiState,
 } from "@/store/enrichment.store"
 import type { DrawnGeometry, MapEntity } from "@/types/domain.types"
-import type { EnrichmentContext, EnrichmentFeature, EnrichmentProposal } from "@/types/enrichment.types"
+import type { EnrichmentContext, EnrichmentFeature, EnrichmentProposal, EnrichmentResponse } from "@/types/enrichment.types"
 
 function firstGeometryPoint(geometries: DrawnGeometry[]): [number, number] {
   const point = geometries.find((geometry) => geometry.type === "point")
@@ -123,6 +123,67 @@ export function useEnrichment({
     setIsDrawerOpen(true)
   }, [context, feature])
 
+  /**
+   * Shared apply logic used by both closeDrawer and advanceBatchReview.
+   *
+   * For every accepted proposal:
+   * - The field value is applied to the entity.
+   * - The evidence URLs cited by that proposal are merged into entity.sources
+   *   (deduped with existing sources) so that accepting any field automatically
+   *   records where the information came from.
+   * - If the "sources" field itself was accepted its proposed URLs are merged in
+   *   rather than replacing existing ones.
+   */
+  const applyAcceptedProposals = useCallback(
+    (runFeatureId: string) => {
+      if (!onApplyAccepted) return
+      const decisions = state.decisions[runFeatureId] ?? {}
+      const overlay = state.overlay[runFeatureId] ?? {}
+      const hasAccepted = Object.values(decisions).some((d) => d === "accepted")
+      if (!hasAccepted) return
+
+      const patch: Record<string, unknown> = {}
+
+      // Apply every accepted field except "sources" — handled separately below
+      for (const [field, decision] of Object.entries(decisions)) {
+        if (decision === "accepted" && field !== "sources" && field in overlay) {
+          patch[field] = overlay[field]
+        }
+      }
+
+      // Build merged source URL list:
+      // 1. existing entity sources
+      const entity = entities.find((e) => e.id === runFeatureId)
+      const existingUrls =
+        typeof entity?.sources === "string"
+          ? entity.sources.split("\n").map((s) => s.trim()).filter(Boolean)
+          : []
+
+      // 2. URLs from an accepted "sources" proposal value
+      const proposedUrls =
+        decisions["sources"] === "accepted" && "sources" in overlay
+          ? String(overlay["sources"] ?? "").split("\n").map((s) => s.trim()).filter(Boolean)
+          : []
+
+      // 3. Evidence URLs cited by other accepted proposals (adds provenance automatically)
+      const evidenceUrls = state.run.proposals
+        .filter((p) => p.field !== "sources" && decisions[p.field] === "accepted")
+        .flatMap((p) => p.sources.map((s) => s.url).filter(Boolean))
+
+      const mergedUrls = [...new Set([...existingUrls, ...proposedUrls, ...evidenceUrls])]
+      const mergedSources = mergedUrls.join("\n")
+
+      if (mergedSources !== (entity?.sources ?? "")) {
+        patch.sources = mergedSources || null
+      }
+
+      if (Object.keys(patch).length > 0) {
+        onApplyAccepted(runFeatureId, patch as Partial<MapEntity>)
+      }
+    },
+    [entities, onApplyAccepted, state],
+  )
+
   const closeDrawer = useCallback(() => {
     const runFeatureId = state.run.featureId
     if (state.run.status === "running") {
@@ -139,18 +200,7 @@ export function useEnrichment({
     }
 
     if (runFeatureId) {
-      const decisions = state.decisions[runFeatureId] ?? {}
-      const overlay = state.overlay[runFeatureId] ?? {}
-      const acceptedEntries = Object.entries(decisions).filter(([, decision]) => decision === "accepted")
-      if (acceptedEntries.length > 0 && onApplyAccepted) {
-        const patch = acceptedEntries.reduce<Record<string, unknown>>((acc, [field]) => {
-          if (field in overlay) acc[field] = overlay[field]
-          return acc
-        }, {})
-        if (Object.keys(patch).length > 0) {
-          onApplyAccepted(runFeatureId, patch as Partial<MapEntity>)
-        }
-      }
+      applyAcceptedProposals(runFeatureId)
       setState((current) => clearFeatureEnrichmentState(current, runFeatureId))
     } else {
       setState((current) => resetEnrichmentRun(current))
@@ -161,7 +211,45 @@ export function useEnrichment({
     setIsCancellingRun(false)
     setIsDrawerOpen(false)
     return { closed: true as const, reason: "closed" as const }
-  }, [onApplyAccepted, state])
+  }, [applyAcceptedProposals, state])
+
+  /**
+   * True when the drawer is open, has proposals, and every proposal has been
+   * accepted or rejected (none remain "pending").  Used to trigger auto-advance
+   * in the batch review flow without requiring the user to click Close.
+   */
+  const allProposalsResolved = useMemo(() => {
+    if (!isDrawerOpen) return false
+    if (state.run.proposals.length === 0) return false
+    const featureId = state.run.featureId
+    if (!featureId) return false
+    return !hasPendingProposalsForFeature(state, featureId, state.run.proposals)
+  }, [isDrawerOpen, state])
+
+  /**
+   * Applies accepted proposals for the current entity and clears its enrichment
+   * state WITHOUT closing the drawer.  Called by the auto-advance logic in
+   * EditPage so the drawer can transition directly to the next entity.
+   */
+  const advanceBatchReview = useCallback(() => {
+    const runFeatureId = state.run.featureId
+    if (!runFeatureId) return
+    applyAcceptedProposals(runFeatureId)
+    setState((current) => clearFeatureEnrichmentState(current, runFeatureId))
+  }, [applyAcceptedProposals, state])
+
+  /**
+   * Closes the drawer immediately, bypassing the pending-proposals check.
+   * Used when the review queue is exhausted so the last entity's drawer
+   * can close without showing the "Resolve all proposals" notice.
+   */
+  const forceCloseDrawer = useCallback(() => {
+    setState((current) => resetEnrichmentRun(current))
+    setCloseNotice(null)
+    setIsCancellingRun(false)
+    closeAfterCancelRef.current = false
+    setIsDrawerOpen(false)
+  }, [])
 
   const run = useCallback(async () => {
     if (!selectedEntity || !feature || !context) return
@@ -286,6 +374,16 @@ export function useEnrichment({
     setState((current) => clearOverlayForFeature(current, selectedEntity.id))
   }, [selectedEntity])
 
+  /**
+   * Loads a pre-computed EnrichmentResponse directly into the enrichment UI
+   * state, bypassing the live runEnrichment call. Used by the layered research
+   * review flow to step through batch results one entity at a time.
+   */
+  const loadBatchResult = useCallback((response: EnrichmentResponse) => {
+    setState((current) => completeEnrichmentRun(current, response))
+    setIsDrawerOpen(true)
+  }, [])
+
   return {
     selectedEntityId,
     selectedEntity,
@@ -303,8 +401,12 @@ export function useEnrichment({
     reject,
     ignore,
     clearOverlayForSelected,
+    loadBatchResult,
     closeNotice,
     isCancellingRun,
+    allProposalsResolved,
+    advanceBatchReview,
+    forceCloseDrawer,
   }
 }
 
