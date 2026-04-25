@@ -1,6 +1,7 @@
 import { useCallback, useState } from "react"
-import type { DrawnGeometry, Layer, MapEntity, PositionMode } from "@/types/domain.types"
+import type { DrawnGeometry, MapEntity, PositionMode } from "@/types/domain.types"
 import type { SymbolAffiliation, SymbolDomain, SymbolEchelon } from "@/types/symbol.types"
+import { useProjectStore } from "@/store/useProjectStore"
 
 const SOURCES_DELIMITER = "\n"
 
@@ -21,15 +22,6 @@ function detectEchelonFromName(name: string): SymbolEchelon | null {
   if (n.includes("company") || n.includes("compagnie")) return "Company/battery/troop"
   if (n.includes("platoon") || n.includes("section")) return "Platoon/detachment"
   return null
-}
-
-export type UseEntityInspectorArgs = {
-  selectedEntityId: string | null
-  entities: MapEntity[]
-  layers: Layer[]
-  drawnGeometries: DrawnGeometry[]
-  onUpdateEntity: (entityId: string, patch: Partial<MapEntity>) => void
-  onDeleteGeometry: (geometryId: string) => void
 }
 
 export type EntityInspectorState = {
@@ -61,14 +53,16 @@ export type EntityInspectorState = {
   handleRemoveSource: (index: number) => void
 }
 
-export function useEntityInspector({
-  selectedEntityId,
-  entities,
-  layers,
-  drawnGeometries,
-  onUpdateEntity,
-  onDeleteGeometry,
-}: UseEntityInspectorArgs): EntityInspectorState {
+export function useEntityInspector(): EntityInspectorState {
+  const {
+    selectedEntityId,
+    entities,
+    layers,
+    drawnGeometries,
+    updateEntity,
+    deleteGeometry,
+  } = useProjectStore()
+
   const [findDialogOpen, setFindDialogOpen] = useState(false)
   const [newSource, setNewSource] = useState("")
 
@@ -110,9 +104,9 @@ export function useEntityInspector({
           patch.echelon = detected
         }
       }
-      onUpdateEntity(entity.id, patch)
+      updateEntity(entity.id, patch)
     },
-    [entity, onUpdateEntity],
+    [entity, updateEntity],
   )
 
   const handleEchelonChange = useCallback(
@@ -120,25 +114,25 @@ export function useEntityInspector({
       if (!entity) return
       const patch: Partial<MapEntity> = { echelon: v }
       if (layers.some((l) => l.id === v)) patch.layerId = v
-      onUpdateEntity(entity.id, patch)
+      updateEntity(entity.id, patch)
     },
-    [entity, layers, onUpdateEntity],
+    [entity, layers, updateEntity],
   )
 
   const handlePositionModeChange = useCallback(
     (mode: PositionMode) => {
       if (!entity) return
-      onUpdateEntity(entity.id, {
+      updateEntity(entity.id, {
         positionMode: mode,
         isExactPosition: mode === "own" ? (entity.isExactPosition ?? false) : false,
       })
       if (mode !== "own") {
         for (const g of linkedGeometries) {
-          onDeleteGeometry(g.id)
+          deleteGeometry(g.id)
         }
       }
     },
-    [entity, linkedGeometries, onUpdateEntity, onDeleteGeometry],
+    [entity, linkedGeometries, updateEntity, deleteGeometry],
   )
 
   const handleParentChange = useCallback(
@@ -148,26 +142,26 @@ export function useEntityInspector({
       if (parentId == null && entity.positionMode === "parent") {
         patch.positionMode = "none"
       }
-      onUpdateEntity(entity.id, patch)
+      updateEntity(entity.id, patch)
     },
-    [entity, onUpdateEntity],
+    [entity, updateEntity],
   )
 
   const handleIsExactPositionChange = useCallback(
     (value: boolean) => {
       if (!entity) return
-      onUpdateEntity(entity.id, { isExactPosition: value })
+      updateEntity(entity.id, { isExactPosition: value })
     },
-    [entity, onUpdateEntity],
+    [entity, updateEntity],
   )
 
   const handleSelectOsmRelation = useCallback(
     (relationId: number) => {
       if (!entity) return
-      onUpdateEntity(entity.id, { osmRelationId: relationId })
+      updateEntity(entity.id, { osmRelationId: relationId })
       setFindDialogOpen(false)
     },
-    [entity, onUpdateEntity],
+    [entity, updateEntity],
   )
 
   const handleAddSource = useCallback(() => {
@@ -175,18 +169,18 @@ export function useEntityInspector({
     const value = newSource.trim()
     if (value === "") return
     const next = entity.sources ? `${entity.sources}${SOURCES_DELIMITER}${value}` : value
-    onUpdateEntity(entity.id, { sources: next })
+    updateEntity(entity.id, { sources: next })
     setNewSource("")
-  }, [entity, newSource, onUpdateEntity, sources])
+  }, [entity, newSource, updateEntity, sources])
 
   const handleRemoveSource = useCallback(
     (index: number) => {
       if (!entity) return
       const updated = sources.filter((_, i) => i !== index)
       const next = updated.join(SOURCES_DELIMITER)
-      onUpdateEntity(entity.id, { sources: next === "" ? null : next })
+      updateEntity(entity.id, { sources: next === "" ? null : next })
     },
-    [entity, onUpdateEntity, sources],
+    [entity, updateEntity, sources],
   )
 
   return {

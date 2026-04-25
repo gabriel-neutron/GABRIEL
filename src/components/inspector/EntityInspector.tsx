@@ -1,3 +1,4 @@
+import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
@@ -13,7 +14,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { FilterableSelect } from "@/components/shared/FilterableSelect"
-import type { DrawnGeometry, Layer, MapEntity, PositionMode } from "@/types/domain.types"
+import type { DrawnGeometry, PositionMode } from "@/types/domain.types"
 import {
   AFFILIATION_OPTIONS,
   DOMAIN_OPTIONS,
@@ -25,6 +26,7 @@ import { Trash2 } from "lucide-react"
 import { UNIT_TYPE_OPTIONS_GROUPED } from "./entityInspector.options"
 import { FindOsmAtPointDialog } from "./FindOsmAtPointDialog"
 import { useEntityInspector } from "./useEntityInspector"
+import { useProjectStore } from "@/store/useProjectStore"
 
 const POSITION_MODE_OPTIONS: { value: PositionMode; label: string }[] = [
   { value: "own", label: "Own geometry" },
@@ -64,27 +66,13 @@ function positionModeLabel(mode?: PositionMode): string {
 
 type Props = {
   readOnly?: boolean
-  selectedEntityId: string | null
-  entities: MapEntity[]
-  layers: Layer[]
-  drawnGeometries: DrawnGeometry[]
   enrichedOverlay?: Record<string, unknown>
-  onUpdateEntity: (entityId: string, patch: Partial<MapEntity>) => void
-  onDeleteEntity: (entityId: string) => void
-  onDeleteGeometry: (geometryId: string) => void
 }
 
-export function EntityInspector({
-  readOnly = false,
-  selectedEntityId,
-  entities,
-  layers,
-  drawnGeometries,
-  enrichedOverlay = {},
-  onUpdateEntity,
-  onDeleteEntity,
-  onDeleteGeometry,
-}: Props) {
+export function EntityInspector({ readOnly = false, enrichedOverlay = {} }: Props) {
+  const { layers, updateEntity, deleteGeometry } = useProjectStore()
+  const assignableLayers = layers.filter((l) => l.osmData == null)
+
   const {
     entity,
     linkedGeometries,
@@ -112,14 +100,17 @@ export function EntityInspector({
     setNewSource,
     handleAddSource,
     handleRemoveSource,
-  } = useEntityInspector({
-    selectedEntityId,
-    entities,
-    layers,
-    drawnGeometries,
-    onUpdateEntity,
-    onDeleteGeometry,
-  })
+  } = useEntityInspector()
+
+  const [localName, setLocalName] = useState(entity?.name ?? "")
+  const [localMilitaryUnitId, setLocalMilitaryUnitId] = useState(entity?.militaryUnitId ?? "")
+  const [localNotes, setLocalNotes] = useState(entity?.notes ?? "")
+  const [localOsmRelationId, setLocalOsmRelationId] = useState(entity?.osmRelationId?.toString() ?? "")
+
+  function handleDeleteEntity(entityId: string): void {
+    if (!window.confirm("Delete this entity and all its linked geometries?")) return
+    useProjectStore.getState().deleteEntity(entityId)
+  }
 
   if (!entity) {
     return <div className="p-4">No selection</div>
@@ -243,17 +234,19 @@ export function EntityInspector({
         <Field>
           <FieldLabel>Name</FieldLabel>
           <Input
-            value={entity.name}
-            onChange={(e) => handleNameChange(e.target.value)}
+            value={localName}
+            onChange={(e) => setLocalName(e.target.value)}
+            onBlur={() => handleNameChange(localName)}
           />
         </Field>
         <Field>
           <FieldLabel>Military unit ID</FieldLabel>
           <Input
-            value={entity.militaryUnitId ?? ""}
-            onChange={(e) =>
-              onUpdateEntity(entity.id, {
-                militaryUnitId: e.target.value === "" ? null : e.target.value,
+            value={localMilitaryUnitId}
+            onChange={(e) => setLocalMilitaryUnitId(e.target.value)}
+            onBlur={() =>
+              updateEntity(entity.id, {
+                militaryUnitId: localMilitaryUnitId === "" ? null : localMilitaryUnitId,
               })
             }
           />
@@ -262,10 +255,11 @@ export function EntityInspector({
           <FieldLabel>Notes</FieldLabel>
           <Textarea
             placeholder="Free-form notes…"
-            value={entity.notes ?? ""}
-            onChange={(e) =>
-              onUpdateEntity(entity.id, {
-                notes: e.target.value === "" ? null : e.target.value,
+            value={localNotes}
+            onChange={(e) => setLocalNotes(e.target.value)}
+            onBlur={() =>
+              updateEntity(entity.id, {
+                notes: localNotes === "" ? null : localNotes,
               })
             }
           />
@@ -348,7 +342,7 @@ export function EntityInspector({
             <FieldLabel>Type</FieldLabel>
             <Select
               value={typeValue}
-              onValueChange={(v) => onUpdateEntity(entity.id, { type: v })}
+              onValueChange={(v) => updateEntity(entity.id, { type: v })}
             >
               <SelectTrigger className="h-8 text-xs">
                 <SelectValue placeholder="Type" />
@@ -374,7 +368,7 @@ export function EntityInspector({
             <Select
               value={affiliationValue}
               onValueChange={(v) =>
-                onUpdateEntity(entity.id, { affiliation: v as SymbolAffiliation })
+                updateEntity(entity.id, { affiliation: v as SymbolAffiliation })
               }
             >
               <SelectTrigger className="h-8 text-xs">
@@ -394,7 +388,7 @@ export function EntityInspector({
             <Select
               value={domainValue}
               onValueChange={(v) =>
-                onUpdateEntity(entity.id, { domain: v as SymbolDomain })
+                updateEntity(entity.id, { domain: v as SymbolDomain })
               }
             >
               <SelectTrigger className="h-8 text-xs">
@@ -413,12 +407,12 @@ export function EntityInspector({
         {!isEchelonLayerSelected && (
           <Field>
             <FieldLabel>Layer</FieldLabel>
-            <Select value={entity.layerId} onValueChange={(v) => onUpdateEntity(entity.id, { layerId: v })}>
+            <Select value={entity.layerId} onValueChange={(v) => updateEntity(entity.id, { layerId: v })}>
               <SelectTrigger className="h-8 text-xs">
                 <SelectValue placeholder="Select layer" />
               </SelectTrigger>
               <SelectContent>
-                {layers.map((layer) => (
+                {assignableLayers.map((layer) => (
                   <SelectItem key={layer.id} value={layer.id}>
                     {layer.name}
                   </SelectItem>
@@ -474,12 +468,12 @@ export function EntityInspector({
           <Input
             type="number"
             placeholder="None"
-            value={entity.osmRelationId ?? ""}
-            onChange={(e) => {
-              const raw = e.target.value
-              const n = raw === "" ? null : parseInt(raw, 10)
-              onUpdateEntity(entity.id, {
-                osmRelationId: raw === "" || Number.isNaN(n) ? null : n,
+            value={localOsmRelationId}
+            onChange={(e) => setLocalOsmRelationId(e.target.value)}
+            onBlur={() => {
+              const n = localOsmRelationId === "" ? null : parseInt(localOsmRelationId, 10)
+              updateEntity(entity.id, {
+                osmRelationId: localOsmRelationId === "" || Number.isNaN(n) ? null : n,
               })
             }}
           />
@@ -529,7 +523,7 @@ export function EntityInspector({
                       variant="ghost"
                       size="sm"
                       className="h-7 shrink-0 text-destructive hover:text-destructive"
-                      onClick={() => onDeleteGeometry(g.id)}
+                      onClick={() => deleteGeometry(g.id)}
                     >
                       Delete
                     </Button>
@@ -544,7 +538,7 @@ export function EntityInspector({
             variant="destructive"
             size="sm"
             className="w-full"
-            onClick={() => onDeleteEntity(entity.id)}
+            onClick={() => handleDeleteEntity(entity.id)}
           >
             Delete entity
           </Button>

@@ -1,21 +1,35 @@
 import type { Meta, StoryObj } from "@storybook/react"
-import type { DrawnGeometry, Layer, MapEntity } from "@/types/domain.types"
+import type { Layer, MapEntity } from "@/types/domain.types"
 import { EntityInspector } from "../../components/inspector/EntityInspector"
+import { useProjectStore } from "../../store/useProjectStore"
+import { useEffect } from "react"
 
 const meta: Meta<typeof EntityInspector> = {
   component: EntityInspector,
   title: "Inspector/EntityInspector",
   decorators: [
-    (Story) => (
-      <div className="h-full w-[320px] border">
-        <Story />
-      </div>
-    ),
+    (Story, context) => {
+      const StoreInit = () => {
+        useEffect(() => {
+          useProjectStore.setState({
+            entities: defaultEntities,
+            layers: defaultLayers,
+            drawnGeometries: defaultGeometries,
+            selectedEntityId: "entity-1",
+          })
+        }, [])
+        return null
+      }
+      return (
+        <div className="h-full w-[320px] border">
+          <StoreInit />
+          <Story {...context} />
+        </div>
+      )
+    },
   ],
 }
 export default meta
-
-const noop = () => {}
 
 const defaultLayers: Layer[] = [
   { id: "layer-1", name: "Units", visible: true, kind: "custom" },
@@ -39,12 +53,12 @@ const defaultEntities: MapEntity[] = [
   },
 ]
 
-const defaultGeometries: DrawnGeometry[] = [
+const defaultGeometries = [
   {
     id: "geom-1",
     layerId: "layer-1",
     entityId: "entity-1",
-    type: "point",
+    type: "point" as const,
     lat: 48.8566,
     lng: 2.3522,
   },
@@ -52,23 +66,14 @@ const defaultGeometries: DrawnGeometry[] = [
 
 type Story = StoryObj<typeof EntityInspector>
 
-
 export const Prefilled: Story = {
   args: {
     readOnly: false,
-    selectedEntityId: "entity-1",
-    entities: defaultEntities,
-    layers: defaultLayers,
-    drawnGeometries: defaultGeometries,
-    onUpdateEntity: noop,
-    onDeleteEntity: noop,
-    onDeleteGeometry: noop,
   },
 }
 
 export const PrefilledReadOnly: Story = {
   args: {
-    ...Prefilled.args,
     readOnly: true,
   },
 }

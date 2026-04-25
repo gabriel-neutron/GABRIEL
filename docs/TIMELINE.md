@@ -161,18 +161,18 @@ work. `LayersPanel` renders without any data props from `MainLayout`.
 
 ---
 
-## Phase 7 — EntityInspector Migration [  ]
+## Phase 7 — EntityInspector Migration [X]
 
 **Scope**: Migrate `EntityInspector` to read from the store and call store actions directly.
 **Dependencies**: Phase 4
 **Key file**: `src/components/inspector/EntityInspector.tsx`
 **Milestones**
-- [ ] `EntityInspector` reads `selectedEntityId, entities, layers, drawnGeometries` from store
-- [ ] `onUpdateEntity`, `onDeleteEntity`, `onDeleteGeometry` replaced with direct store calls
-- [ ] Props reduced to: `readOnly, enrichedOverlay` (overlay comes from `useEnrichment`, not store)
-- [ ] `OsmObjectInspector` verified: reads its own props from `selectedOsmObject` via store if
+- [X] `EntityInspector` reads `selectedEntityId, entities, layers, drawnGeometries` from store
+- [X] `onUpdateEntity`, `onDeleteEntity`, `onDeleteGeometry` replaced with direct store calls
+- [X] Props reduced to: `readOnly, enrichedOverlay` (overlay comes from `useEnrichment`, not store)
+- [X] `OsmObjectInspector` verified: reads its own props from `selectedOsmObject` via store if
   needed, or remains prop-driven (it has no mutation responsibilities)
-- [ ] `npm run build` passes, `npm test` passes
+- [X] `npm run build` passes, `npm test` passes
 **Acceptance Criteria**: Editing entity name/affiliation/echelon in the inspector updates the map
 symbol immediately. Deleting an entity removes it from the hierarchy panel and map.
 

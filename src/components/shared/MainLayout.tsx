@@ -83,12 +83,9 @@ export function MainLayout({
   const {
     layers,
     entities,
-    drawnGeometries,
     selectedEntityId,
     selectedOsmObject,
     addLayer,
-    updateEntity,
-    deleteGeometry,
     closeDetail,
   } = useProjectStore()
 
@@ -102,11 +99,6 @@ export function MainLayout({
       affected.forEach((id) => (visible ? next.delete(id) : next.add(id)))
       return next
     })
-  }
-
-  function handleDeleteEntity(entityId: string): void {
-    if (!window.confirm("Delete this entity and all its linked geometries?")) return
-    useProjectStore.getState().deleteEntity(entityId)
   }
 
   const handleCreateNewEntity = useCallback((geom: DrawnGeometry): void => {
@@ -127,7 +119,6 @@ export function MainLayout({
   }, [])
 
   const defaultLayerId = getDefaultEntityLayerId(layers)
-  const assignableLayers = layers.filter((l) => l.osmData == null)
 
   return (
     <>
@@ -219,15 +210,9 @@ export function MainLayout({
             />
           ) : (
             <EntityInspector
+              key={selectedEntityId ?? "none"}
               readOnly={readOnly}
-              selectedEntityId={selectedEntityId}
-              entities={entities}
-              layers={assignableLayers}
-              drawnGeometries={drawnGeometries}
               enrichedOverlay={enrichment.overlay}
-              onUpdateEntity={updateEntity}
-              onDeleteEntity={handleDeleteEntity}
-              onDeleteGeometry={deleteGeometry}
             />
           )
         }
