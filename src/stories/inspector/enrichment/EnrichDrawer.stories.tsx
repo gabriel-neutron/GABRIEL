@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react"
-import { EnrichDrawer } from "@/components/inspector/enrichment/EnrichDrawer"
+import { EnrichDrawer } from "@/components/enrichment/EnrichDrawer"
 import type { MapEntity } from "@/types/domain.types"
 import type { EnrichmentContext, EnrichmentProposal } from "@/types/enrichment.types"
 

@@ -1,7 +1,7 @@
 import { useState } from "react"
 import { MapView } from "@/components/map/MapView"
 import { EntityInspector } from "@/components/inspector/EntityInspector"
-import { EnrichDrawer } from "@/components/inspector/enrichment"
+import { EnrichDrawer } from "@/components/enrichment"
 import { OsmObjectInspector } from "@/components/inspector/OsmObjectInspector"
 import { ResearchDialog } from "@/components/shared/ResearchDialog"
 import { AppShell, type ProjectFileActions } from "@/components/shared/AppShell"
