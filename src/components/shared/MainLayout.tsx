@@ -35,6 +35,8 @@ type LayeredResearchControls = {
   setBatchSize: (n: number) => void
   richnessThreshold: number
   setRichnessThreshold: (n: number) => void
+  skipAnalyzedWithinDays: number
+  setSkipAnalyzedWithinDays: (n: number) => void
   hasProcessedEntities: boolean
   openDialog: () => void
   closeDialog: () => void
@@ -327,6 +329,8 @@ export function MainLayout({
           setBatchSize={layeredResearch.setBatchSize}
           richnessThreshold={layeredResearch.richnessThreshold}
           setRichnessThreshold={layeredResearch.setRichnessThreshold}
+          skipAnalyzedWithinDays={layeredResearch.skipAnalyzedWithinDays}
+          setSkipAnalyzedWithinDays={layeredResearch.setSkipAnalyzedWithinDays}
           hasProcessedEntities={layeredResearch.hasProcessedEntities}
           onRun={layeredResearch.onRun}
           onCancel={layeredResearch.onCancel}

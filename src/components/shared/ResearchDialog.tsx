@@ -21,6 +21,8 @@ type ResearchDialogProps = {
   setBatchSize: (n: number) => void
   richnessThreshold: number
   setRichnessThreshold: (n: number) => void
+  skipAnalyzedWithinDays: number
+  setSkipAnalyzedWithinDays: (n: number) => void
   hasProcessedEntities: boolean
   onRun: () => void
   onCancel: () => void
@@ -35,6 +37,22 @@ const RICHNESS_OPTIONS = [
   { label: "1+ sources", value: 2 },
   { label: "Has notes", value: 1 },
 ]
+const ANALYZED_WINDOW_OPTIONS = [
+  { label: "Never skip by date", value: 0 },
+  { label: "Last 24h", value: 1 },
+  { label: "Last 3 days", value: 3 },
+  { label: "Last 7 days", value: 7 },
+  { label: "Last 14 days", value: 14 },
+  { label: "Last 30 days", value: 30 },
+]
+
+function isAnalyzedRecently(entity: MapEntity, withinDays: number): boolean {
+  if (withinDays <= 0 || !entity.analyzedAt) return false
+  const analyzedMs = Date.parse(entity.analyzedAt)
+  if (!Number.isFinite(analyzedMs)) return false
+  const windowMs = withinDays * 24 * 60 * 60 * 1000
+  return Date.now() - analyzedMs <= windowMs
+}
 
 function StatusIcon({ status }: { status: EntityResearchStatus | undefined }) {
   switch (status) {
@@ -48,6 +66,8 @@ function StatusIcon({ status }: { status: EntityResearchStatus | undefined }) {
       return <span className="text-red-600 font-mono">!</span>
     case "skipped-rich":
       return <span className="text-amber-500 font-mono">—</span>
+    case "skipped-recent":
+      return <span className="text-sky-500 font-mono">⏱</span>
     case "skipped-abort":
       return <span className="text-muted-foreground font-mono">✗</span>
     case "pending":
@@ -63,6 +83,7 @@ function StatusLabel({ status }: { status: EntityResearchStatus | undefined }) {
     case "done-empty": return <span className="text-muted-foreground text-xs">no results</span>
     case "failed": return <span className="text-red-600 text-xs">failed</span>
     case "skipped-rich": return <span className="text-amber-500 text-xs">rich — skipped</span>
+    case "skipped-recent": return <span className="text-sky-600 text-xs">recent — skipped</span>
     case "skipped-abort": return <span className="text-muted-foreground text-xs">not reached</span>
     default: return <span className="text-muted-foreground text-xs">pending</span>
   }
@@ -95,6 +116,8 @@ export function ResearchDialog({
   setBatchSize,
   richnessThreshold,
   setRichnessThreshold,
+  skipAnalyzedWithinDays,
+  setSkipAnalyzedWithinDays,
   hasProcessedEntities,
   onRun,
   onCancel,
@@ -124,7 +147,11 @@ export function ResearchDialog({
   const isRunning = runStatus === "running"
   const totalTokens = totalUsage.inputTokens + totalUsage.outputTokens
   const progressPct = progress ? Math.round(((progress.done + 1) / progress.total) * 100) : 0
-  const eligibleEntities = entities.filter((entity) => !shouldSkipEntity(entity, richnessThreshold))
+  const eligibleEntities = entities.filter(
+    (entity) =>
+      !shouldSkipEntity(entity, richnessThreshold) &&
+      !isAnalyzedRecently(entity, skipAnalyzedWithinDays),
+  )
   const hasEligibleEntities = eligibleEntities.length > 0
 
   const startLabel = hasProcessedEntities
@@ -173,6 +200,18 @@ export function ResearchDialog({
                   className="rounded border bg-background px-2 py-0.5 text-sm"
                 >
                   {RICHNESS_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="flex items-center gap-2 text-sm">
+                <span className="text-muted-foreground">Skip analyzed</span>
+                <select
+                  value={skipAnalyzedWithinDays}
+                  onChange={(e) => setSkipAnalyzedWithinDays(Number(e.target.value))}
+                  className="rounded border bg-background px-2 py-0.5 text-sm"
+                >
+                  {ANALYZED_WINDOW_OPTIONS.map((opt) => (
                     <option key={opt.value} value={opt.value}>{opt.label}</option>
                   ))}
                 </select>
@@ -229,7 +268,7 @@ export function ResearchDialog({
               </p>
             ) : !hasEligibleEntities ? (
               <p className="px-3 py-6 text-center text-sm text-muted-foreground">
-                No entities match the current "Skip if" filter.
+                No entities match the current skip filters.
               </p>
             ) : (
               <table className="w-full">

@@ -15,6 +15,7 @@ export type EntityResearchStatus =
   | "done-empty"    // completed, no proposals found
   | "failed"        // attempted but failed
   | "skipped-rich"  // skipped — entity already has enough information
+  | "skipped-recent" // skipped — entity was analyzed recently
   | "skipped-abort" // skipped — run was stopped before this entity
 
 type LayeredResearchStatus = "idle" | "running" | "done" | "failed"
@@ -51,6 +52,7 @@ export function useLayeredResearch(
   const [dialogOpen, setDialogOpen] = useState(false)
   const [batchSize, setBatchSize] = useState(20)
   const [richnessThreshold, setRichnessThreshold] = useState(DEFAULT_RICHNESS_THRESHOLD)
+  const [skipAnalyzedWithinDays, setSkipAnalyzedWithinDays] = useState(0)
 
   const abortRef = useRef<AbortController | null>(null)
   /**
@@ -58,6 +60,21 @@ export function useLayeredResearch(
    * entities without re-running them.
    */
   const processedEntityIdsRef = useRef<Set<string>>(new Set())
+
+  const buildRecentAnalyzedEntityIds = useCallback((): Set<string> => {
+    if (skipAnalyzedWithinDays <= 0) return new Set()
+    const nowMs = Date.now()
+    const windowMs = skipAnalyzedWithinDays * 24 * 60 * 60 * 1000
+    return new Set(
+      entities
+        .filter((entity) => {
+          if (!entity.analyzedAt) return false
+          const analyzedMs = Date.parse(entity.analyzedAt)
+          return Number.isFinite(analyzedMs) && nowMs - analyzedMs <= windowMs
+        })
+        .map((entity) => entity.id),
+    )
+  }, [entities, skipAnalyzedWithinDays])
 
   const run = useCallback(
     async (sourceCache: Map<string, string>) => {
@@ -67,12 +84,23 @@ export function useLayeredResearch(
       // Build the BFS order upfront so the dialog can show the full entity list
       const bfsLayers = buildBfsLayers(entities)
       const orderedIds = bfsLayers.flat().map((e) => e.id)
+      const recentAnalyzedEntityIds = buildRecentAnalyzedEntityIds()
+      const combinedSkipEntityIds = new Set<string>([
+        ...processedEntityIdsRef.current,
+        ...recentAnalyzedEntityIds,
+      ])
 
       // Initialise statuses: already-processed keep their status, rest become pending
       setEntityStatuses((prev) => {
         const next: Record<string, EntityResearchStatus> = {}
         for (const id of orderedIds) {
-          next[id] = processedEntityIdsRef.current.has(id) ? (prev[id] ?? "done-empty") : "pending"
+          if (processedEntityIdsRef.current.has(id)) {
+            next[id] = prev[id] ?? "done-empty"
+          } else if (recentAnalyzedEntityIds.has(id)) {
+            next[id] = "skipped-recent"
+          } else {
+            next[id] = "pending"
+          }
         }
         return next
       })
@@ -88,7 +116,7 @@ export function useLayeredResearch(
         const result = await runLayeredResearch(entities, drawnGeometries, {
           sourceCache,
           maxEntities: batchSize,
-          skipEntityIds: processedEntityIdsRef.current,
+          skipEntityIds: combinedSkipEntityIds,
           richnessThreshold,
           signal: controller.signal,
 
@@ -153,7 +181,15 @@ export function useLayeredResearch(
         setProgress(null)
       }
     },
-    [entities, drawnGeometries, batchSize, richnessThreshold, onEntityAnalyzed],
+    [
+      entities,
+      drawnGeometries,
+      batchSize,
+      richnessThreshold,
+      skipAnalyzedWithinDays,
+      onEntityAnalyzed,
+      buildRecentAnalyzedEntityIds,
+    ],
   )
 
   const cancel = useCallback(() => {
@@ -197,6 +233,8 @@ export function useLayeredResearch(
     setBatchSize,
     richnessThreshold,
     setRichnessThreshold,
+    skipAnalyzedWithinDays,
+    setSkipAnalyzedWithinDays,
     // True when a previous batch has run (changes "Start" label to "Continue")
     hasProcessedEntities: processedEntityIdsRef.current.size > 0,
   }

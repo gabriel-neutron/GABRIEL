@@ -104,6 +104,9 @@ export function EnrichDrawer({
                 <h3 id="enrich-dialog-title" className="truncate text-base font-semibold tracking-tight sm:text-lg">
                   Enrich: {entity.name}
                 </h3>
+                <p className="text-xs text-muted-foreground">
+                  Last analyzed: {formatAnalyzedAt(entity.analyzedAt)}
+                </p>
               </div>
               <Button type="button" variant="ghost" onClick={onClose} className="h-8 px-2.5">
                 Close

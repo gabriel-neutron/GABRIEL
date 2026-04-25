@@ -486,6 +486,8 @@ export function EditPage({ onViewMode, onOpenAbout }: EditPageProps): React.Reac
         setBatchSize: layeredResearch.setBatchSize,
         richnessThreshold: layeredResearch.richnessThreshold,
         setRichnessThreshold: layeredResearch.setRichnessThreshold,
+        skipAnalyzedWithinDays: layeredResearch.skipAnalyzedWithinDays,
+        setSkipAnalyzedWithinDays: layeredResearch.setSkipAnalyzedWithinDays,
         hasProcessedEntities: layeredResearch.hasProcessedEntities,
         openDialog: layeredResearch.openDialog,
         closeDialog: layeredResearch.closeDialog,
