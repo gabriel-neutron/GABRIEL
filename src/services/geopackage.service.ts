@@ -8,6 +8,7 @@ import {
 } from "@ngageoint/geopackage"
 import { ECHELON_OPTIONS } from "@/types/symbol.types"
 import type { Layer, MapEntity, DrawnGeometry, PositionMode } from "@/types/domain.types"
+import { toLeafletCoord, toGeoJsonCoord } from "@/types/coordinates"
 
 setSqljsWasmLocateFile(
   (file) => `https://unpkg.com/@ngageoint/geopackage@4.2.6/dist/${file}`,
@@ -249,7 +250,7 @@ async function readGeometries(geoPackage: GeoPackage): Promise<GpkgGeometry[]> {
         layerId,
         entityId,
         type: "line",
-        positions: coords.map(([lng, lat]) => [lat, lng] as [number, number]),
+        positions: coords.map(([lng, lat]) => toLeafletCoord(lng, lat)),
       })
     } else if (type === "polygon" && feature.geometry.type === "Polygon") {
       const rings = feature.geometry.coordinates as [number, number][][]
@@ -258,7 +259,7 @@ async function readGeometries(geoPackage: GeoPackage): Promise<GpkgGeometry[]> {
         layerId,
         entityId,
         type: "polygon",
-        rings: rings.map((ring) => ring.map(([lng, lat]) => [lat, lng] as [number, number])),
+        rings: rings.map((ring) => ring.map(([lng, lat]) => toLeafletCoord(lng, lat))),
       })
     }
   }
@@ -401,12 +402,12 @@ export async function saveGeoPackage(
       } else if (g.type === "line") {
         geoJSONGeometry = {
           type: "LineString",
-          coordinates: g.positions.map(([lat, lng]) => [lng, lat]),
+          coordinates: g.positions.map(toGeoJsonCoord),
         }
       } else {
         geoJSONGeometry = {
           type: "Polygon",
-          coordinates: g.rings.map((ring) => ring.map(([lat, lng]) => [lng, lat])),
+          coordinates: g.rings.map((ring) => ring.map(toGeoJsonCoord)),
         }
       }
 

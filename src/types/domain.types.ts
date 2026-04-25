@@ -1,3 +1,5 @@
+import type { LatLng } from "@/types/coordinates"
+
 /**
  * Domain types for the application.
  * These types represent the core data structures used throughout the UI.
@@ -68,5 +70,5 @@ export type SelectedOsmObject =
  */
 export type DrawnGeometry =
   | { id: string; layerId: string; entityId: string | null; type: "point"; lat: number; lng: number }
-  | { id: string; layerId: string; entityId: string | null; type: "line"; positions: [number, number][] }
-  | { id: string; layerId: string; entityId: string | null; type: "polygon"; rings: [number, number][][] }
+  | { id: string; layerId: string; entityId: string | null; type: "line"; positions: LatLng[] }
+  | { id: string; layerId: string; entityId: string | null; type: "polygon"; rings: LatLng[][] }

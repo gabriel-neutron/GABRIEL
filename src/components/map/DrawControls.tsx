@@ -4,6 +4,7 @@ import "leaflet-draw"
 import type { Geometry } from "geojson"
 import { useMap } from "react-leaflet"
 import type { DrawnGeometry } from "@/types/domain.types"
+import { toLeafletCoord } from "@/types/coordinates"
 
 type DrawGeometryType = "point" | "line" | "polygon"
 
@@ -24,14 +25,12 @@ function geoJsonToDrawnGeometry(
     return { id, layerId, entityId: null, type: "point", lat, lng }
   }
   if (geometry.type === "LineString") {
-    const positions = geometry.coordinates.map(
-      ([lng, lat]) => [lat, lng] as [number, number],
-    )
+    const positions = geometry.coordinates.map(([lng, lat]) => toLeafletCoord(lng, lat))
     return { id, layerId, entityId: null, type: "line", positions }
   }
   if (geometry.type === "Polygon") {
     const rings = geometry.coordinates.map((ring) =>
-      ring.map(([lng, lat]) => [lat, lng] as [number, number]),
+      ring.map(([lng, lat]) => toLeafletCoord(lng, lat)),
     )
     return { id, layerId, entityId: null, type: "polygon", rings }
   }

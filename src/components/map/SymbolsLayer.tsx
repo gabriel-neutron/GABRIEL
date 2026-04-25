@@ -3,9 +3,10 @@ import L from "leaflet"
 import { Marker, Popup } from "react-leaflet"
 import { getRenderedSymbolForEntity } from "@/services/symbol.service"
 import { useProjectStore } from "@/store/useProjectStore"
+import type { LatLng } from "@/types/coordinates"
 
 type Props = {
-  positionMap: Map<string, [number, number]>
+  positionMap: Map<string, LatLng>
   visibleLayerIds: Set<string>
   hiddenEntityIds?: Set<string>
   onSelectEntity: (id: string | null) => void

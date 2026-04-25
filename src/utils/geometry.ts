@@ -1,4 +1,5 @@
 import type { DrawnGeometry, MapEntity } from "@/types/domain.types"
+import { type LatLng, asLatLng } from "@/types/coordinates"
 
 /**
  * Returns a representative point for symbol placement from the first geometry
@@ -7,19 +8,13 @@ import type { DrawnGeometry, MapEntity } from "@/types/domain.types"
 export function getEntityDisplayPosition(
   entityId: string,
   drawnGeometries: DrawnGeometry[],
-): [number, number] | null {
+): LatLng | null {
   const linked = drawnGeometries.filter((g) => g.entityId === entityId)
   const first = linked[0]
   if (!first) return null
-  if (first.type === "point") return [first.lat, first.lng]
-  if (first.type === "line" && first.positions[0]) {
-    const [lat, lng] = first.positions[0]
-    return [lat, lng]
-  }
-  if (first.type === "polygon" && first.rings[0]?.[0]) {
-    const [lat, lng] = first.rings[0][0]
-    return [lat, lng]
-  }
+  if (first.type === "point") return asLatLng(first.lat, first.lng)
+  if (first.type === "line" && first.positions[0]) return first.positions[0]
+  if (first.type === "polygon" && first.rings[0]?.[0]) return first.rings[0][0]
   return null
 }
 
@@ -38,7 +33,7 @@ const CHILD_SCALE = 0.35
 
 export interface PositionedEntity {
   entity: MapEntity
-  position: [number, number]
+  position: LatLng
 }
 
 /**
@@ -59,7 +54,7 @@ export function computeAllEntityPositions(
   entities: MapEntity[],
   drawnGeometries: DrawnGeometry[],
 ): PositionedEntity[] {
-  const positionById = new Map<string, [number, number]>()
+  const positionById = new Map<string, LatLng>()
   const depthById = new Map<string, number>()
 
   // Step 1: seed with entities that have their own geometry (depth 0)
@@ -114,10 +109,13 @@ export function computeAllEntityPositions(
 
       // Divide lng offset by cos(lat) for a circular ring, not an ellipse
       const cosLat = Math.cos((parentPos[0] * Math.PI) / 180)
-      positionById.set(entity.id, [
-        parentPos[0] + radius * Math.cos(angle),
-        parentPos[1] + (radius / cosLat) * Math.sin(angle),
-      ])
+      positionById.set(
+        entity.id,
+        asLatLng(
+          parentPos[0] + radius * Math.cos(angle),
+          parentPos[1] + (radius / cosLat) * Math.sin(angle),
+        ),
+      )
     }
 
     if (!progress) break // remaining entities have no resolvable parent

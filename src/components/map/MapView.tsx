@@ -251,7 +251,7 @@ export function MapView({
               return (
                 <Polyline
                   key={g.id}
-                  positions={g.positions.map(([lat, lng]) => [lat, lng] as [number, number])}
+                  positions={g.positions}
                 />
               )
             }
@@ -259,7 +259,7 @@ export function MapView({
               return (
                 <Polygon
                   key={g.id}
-                  positions={g.rings[0]?.map(([lat, lng]) => [lat, lng] as [number, number]) ?? []}
+                  positions={g.rings[0] ?? []}
                 />
               )
             }

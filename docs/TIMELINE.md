@@ -178,7 +178,7 @@ symbol immediately. Deleting an entity removes it from the hierarchy panel and m
 
 ---
 
-## Phase 8 — Coordinate Safety [  ]
+## Phase 8 — Coordinate Safety [X]
 
 **Scope**: Introduce branded `LatLng` / `LngLat` types. Enforce the coordinate contract with
 the TypeScript type system. Add a round-trip integration test for GeoPackage I/O.
@@ -190,17 +190,17 @@ the TypeScript type system. Add a round-trip integration test for GeoPackage I/O
 - `src/utils/geometry.ts`
 - `src/services/geopackage.service.test.ts` (new)
 **Milestones**
-- [ ] `src/types/coordinates.ts` created with `LatLng`, `LngLat`, `toLeafletCoord`,
+- [X] `src/types/coordinates.ts` created with `LatLng`, `LngLat`, `toLeafletCoord`,
   `toGeoJsonCoord`, `asLatLng`
-- [ ] `DrawnGeometry` line `positions` typed as `LatLng[]`; polygon `rings` as `LatLng[][]`
-- [ ] `geopackage.service.ts` `readGeometries`: wraps parsed coords in `toLeafletCoord`
-- [ ] `geopackage.service.ts` `saveGeoPackage`: wraps positions in `toGeoJsonCoord` before write
-- [ ] `geometry.ts` return types annotated with `LatLng`
-- [ ] No raw `[number, number]` coordinate literals outside `geopackage.service.ts` and
+- [X] `DrawnGeometry` line `positions` typed as `LatLng[]`; polygon `rings` as `LatLng[][]`
+- [X] `geopackage.service.ts` `readGeometries`: wraps parsed coords in `toLeafletCoord`
+- [X] `geopackage.service.ts` `saveGeoPackage`: wraps positions in `toGeoJsonCoord` before write
+- [X] `geometry.ts` return types annotated with `LatLng`
+- [X] No raw `[number, number]` coordinate literals outside `geopackage.service.ts` and
   `geometry.ts` — TypeScript enforces this
-- [ ] `geopackage.service.test.ts`: round-trip test for project with points, lines, and polygons;
+- [X] `geopackage.service.test.ts`: round-trip test for project with points, lines, and polygons;
   assert coordinates survive save → reload unchanged
-- [ ] `npm run build` passes, `npm test` passes
+- [X] `npm run build` passes, `npm test` passes
 **Acceptance Criteria**: Passing a raw `[number, number]` where `LatLng` is expected reports a
 TypeScript error. A line geometry's coordinates are identical before save and after reload.
 

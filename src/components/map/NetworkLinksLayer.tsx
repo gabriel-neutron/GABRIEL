@@ -2,6 +2,7 @@ import { useMemo } from "react"
 import { Polyline } from "react-leaflet"
 import { useProjectStore } from "@/store/useProjectStore"
 import type { MapEntity } from "@/types/domain.types"
+import type { LatLng } from "@/types/coordinates"
 
 const NETWORK_LINE_OPTIONS = {
   color: "#a855f7",
@@ -11,7 +12,7 @@ const NETWORK_LINE_OPTIONS = {
 }
 
 type Props = {
-  positionMap: Map<string, [number, number]>
+  positionMap: Map<string, LatLng>
 }
 
 const MAX_DEGREE = 3
@@ -58,7 +59,7 @@ export function NetworkLinksLayer({ positionMap }: Props): React.ReactElement | 
     if (!selected) return []
 
     const visibleIds = visibleNetworkIds(selectedEntityId, entities)
-    const result: Array<{ key: string; positions: [number, number][] }> = []
+    const result: Array<{ key: string; positions: LatLng[] }> = []
 
     for (const entity of entities) {
       if (!entity.parentId || !visibleIds.has(entity.parentId) || !visibleIds.has(entity.id)) continue
@@ -67,10 +68,7 @@ export function NetworkLinksLayer({ positionMap }: Props): React.ReactElement | 
       if (!fromPos || !toPos) continue
       result.push({
         key: `edge-${entity.parentId}-${entity.id}`,
-        positions: [
-          [fromPos[0], fromPos[1]],
-          [toPos[0], toPos[1]],
-        ],
+        positions: [fromPos, toPos],
       })
     }
 

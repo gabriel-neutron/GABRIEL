@@ -53,7 +53,7 @@ The hook `useEnrichment` (`src/hooks/useEnrichment.ts`) drives the single-entity
 
 ### Map rendering
 
-`react-leaflet` with `leaflet.markercluster`. Military symbols are rendered via `milsymbol` (NATO SIDC). `SymbolsLayer` and `NetworkLinksLayer` consume a `positionMap` (entityId → lat/lng) derived from `drawnGeometries`. OSM relation geometries are fetched lazily in `useMapProjectState` via `fetchRelationGeometry`.
+`react-leaflet` with `leaflet.markercluster`. Military symbols are rendered via `milsymbol` (NATO SIDC). `SymbolsLayer` and `NetworkLinksLayer` consume a `positionMap` (entityId → `LatLng`) derived from `drawnGeometries`. Coordinate order: internal app uses `LatLng` (`[lat, lng]`, `src/types/coordinates.ts`); GeoPackage storage uses `LngLat` (`[lng, lat]`). Conversion only in `geopackage.service.ts`. OSM relation geometries are fetched lazily via `useOsmRelationGeometries`.
 
 ### Terminology
 
