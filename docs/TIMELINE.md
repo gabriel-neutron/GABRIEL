@@ -206,7 +206,7 @@ TypeScript error. A line geometry's coordinates are identical before save and af
 
 ---
 
-## Phase 9 — Enrichment Consolidation [  ]
+## Phase 9 — Enrichment Consolidation [X]
 
 **Scope**: Eliminate the duplicated `toFeature` / `toContext` conversion functions. Create a
 single entity adapter module.
@@ -216,13 +216,13 @@ single entity adapter module.
 - `src/hooks/useEnrichment.ts`
 - `src/services/research/layered-research.service.ts`
 **Milestones**
-- [ ] `src/utils/enrichmentAdapters.ts` created with:
+- [X] `src/utils/enrichmentAdapters.ts` created with:
   `toEnrichmentFeature(entity, geometries): EnrichmentFeature`
   `toEnrichmentContext(entity, entities): EnrichmentContext`
-- [ ] Local copies in `useEnrichment.ts` removed; import from `enrichmentAdapters`
-- [ ] Local copies in `layered-research.service.ts` removed; import from `enrichmentAdapters`
-- [ ] Unit tests added for both functions in `src/utils/enrichmentAdapters.test.ts`
-- [ ] `npm run build` passes, `npm test` passes
+- [X] Local copies in `useEnrichment.ts` removed; import from `enrichmentAdapters`
+- [X] Local copies in `layered-research.service.ts` removed; import from `enrichmentAdapters`
+- [X] Unit tests added for both functions in `src/utils/enrichmentAdapters.test.ts`
+- [X] `npm run build` passes, `npm test` passes
 **Acceptance Criteria**: `grep -r "function toFeature\|function toContext" src/` returns 0 results.
 Single enrichment of an entity and batch research both produce identical GeoJSON feature shapes.
 

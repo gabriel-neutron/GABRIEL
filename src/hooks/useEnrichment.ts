@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useRef, useState } from "react"
 import { buildDefaultEnrichmentPrompt, DEFAULT_ENRICHMENT_OUTPUT_SCHEMA, ENRICHMENT_MAX_DEPTH_DEFAULT, runEnrichment } from "@/services/enrichment"
+import { toEnrichmentFeature, toEnrichmentContext } from "@/utils/enrichmentAdapters"
 import {
   acceptProposalToOverlay,
   clearFeatureEnrichmentState,
@@ -17,56 +18,8 @@ import {
   type EnrichmentUiState,
 } from "@/store/enrichment.store"
 import type { DrawnGeometry, MapEntity } from "@/types/domain.types"
-import type { EnrichmentContext, EnrichmentFeature, EnrichmentProposal, EnrichmentResponse } from "@/types/enrichment.types"
+import type { EnrichmentProposal, EnrichmentResponse } from "@/types/enrichment.types"
 
-function firstGeometryPoint(geometries: DrawnGeometry[]): [number, number] {
-  const point = geometries.find((geometry) => geometry.type === "point")
-  if (point) return [point.lng, point.lat]
-  return [0, 0]
-}
-
-function toFeature(entity: MapEntity, geometries: DrawnGeometry[]): EnrichmentFeature {
-  const [lng, lat] = firstGeometryPoint(geometries)
-  return {
-    type: "Feature",
-    id: entity.id,
-    geometry: {
-      type: "Point",
-      coordinates: [lng, lat],
-    },
-    properties: {
-      id: entity.id,
-      name: entity.name,
-      echelon: entity.echelon ?? null,
-      country: "RU",
-      parentId: entity.parentId,
-      natoSymbolCode: entity.natoSymbolCode ?? null,
-      status: "active",
-    },
-  }
-}
-
-function toContext(entity: MapEntity, entities: MapEntity[]): EnrichmentContext {
-  const parent = entity.parentId
-    ? entities.find((candidate) => candidate.id === entity.parentId) ?? null
-    : null
-  const children = entities.filter((candidate) => candidate.parentId === entity.id)
-  return {
-    parent: parent
-      ? {
-          id: parent.id,
-          name: parent.name,
-          echelon: parent.echelon ?? "unknown",
-          hq_location: undefined,
-        }
-      : null,
-    children: children.map((child) => ({
-      id: child.id,
-      name: child.name,
-      echelon: child.echelon ?? "unknown",
-    })),
-  }
-}
 
 export type UseEnrichmentArgs = {
   entities: MapEntity[]
@@ -94,20 +47,12 @@ export function useEnrichment({
     () => (selectedEntityId ? entities.find((entity) => entity.id === selectedEntityId) ?? null : null),
     [entities, selectedEntityId],
   )
-  const selectedGeometries = useMemo(
-    () =>
-      selectedEntity
-        ? drawnGeometries.filter((geometry) => geometry.entityId === selectedEntity.id)
-        : [],
-    [drawnGeometries, selectedEntity],
-  )
-
   const feature = useMemo(
-    () => (selectedEntity ? toFeature(selectedEntity, selectedGeometries) : null),
-    [selectedEntity, selectedGeometries],
+    () => (selectedEntity ? toEnrichmentFeature(selectedEntity, drawnGeometries) : null),
+    [selectedEntity, drawnGeometries],
   )
   const context = useMemo(
-    () => (selectedEntity ? toContext(selectedEntity, entities) : null),
+    () => (selectedEntity ? toEnrichmentContext(selectedEntity, entities) : null),
     [entities, selectedEntity],
   )
   const overlay = useMemo(
