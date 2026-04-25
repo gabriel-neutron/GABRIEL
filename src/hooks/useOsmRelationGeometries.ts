@@ -3,6 +3,10 @@ import { fetchRelationGeometry } from "@/services/overpass.service"
 import { useProjectStore } from "@/store/useProjectStore"
 import type { Layer } from "@/types/domain.types"
 
+export type UseOsmRelationGeometriesOptions = {
+  onOverpassUnavailable?: () => void
+}
+
 function relationFeatureCollectionFromLayers(
   relationId: number,
   layers: Layer[],
@@ -33,14 +37,16 @@ function relationFeatureCollectionFromLayers(
   return { type: "FeatureCollection", features }
 }
 
-export function useOsmRelationGeometries(): void {
+export function useOsmRelationGeometries(options?: UseOsmRelationGeometriesOptions): void {
   const entities = useProjectStore((s) => s.entities)
   const layers = useProjectStore((s) => s.layers)
   const selectedEntityId = useProjectStore((s) => s.selectedEntityId)
   const setEntityOsmGeometries = useProjectStore((s) => s.setEntityOsmGeometries)
 
+  const onOverpassUnavailableRef = useRef(options?.onOverpassUnavailable)
+  onOverpassUnavailableRef.current = options?.onOverpassUnavailable
+
   const relationGeometryCacheRef = useRef<Map<number, GeoJSON.FeatureCollection>>(new Map())
-  const overpassUnavailableRef = useRef(false)
 
   useEffect(
     function fetchOsmRelationGeometries() {
@@ -78,7 +84,7 @@ export function useOsmRelationGeometries(): void {
       void (async () => {
         for (const [relationId, entityIds] of relationToEntityIds.entries()) {
           if (cancelled) return
-          if (overpassUnavailableRef.current) continue
+          if (useProjectStore.getState().osmUnavailable) continue
 
           const cachedGeometry = relationGeometryCacheRef.current.get(relationId)
           if (cachedGeometry) {
@@ -112,7 +118,8 @@ export function useOsmRelationGeometries(): void {
             })
           } catch (error) {
             if (error instanceof Error && error.message.includes("Failed to fetch")) {
-              overpassUnavailableRef.current = true
+              useProjectStore.getState().setOsmUnavailable(true)
+              onOverpassUnavailableRef.current?.()
             }
           }
         }
@@ -120,6 +127,7 @@ export function useOsmRelationGeometries(): void {
 
       return () => {
         cancelled = true
+        useProjectStore.getState().setOsmUnavailable(false)
       }
     },
     [entities, layers, selectedEntityId, setEntityOsmGeometries],

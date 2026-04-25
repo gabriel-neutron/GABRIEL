@@ -2,10 +2,9 @@ import { useMemo, useRef } from "react"
 import L from "leaflet"
 import { Marker, Popup } from "react-leaflet"
 import { getRenderedSymbolForEntity } from "@/services/symbol.service"
-import type { MapEntity } from "@/types/domain.types"
+import { useProjectStore } from "@/store/useProjectStore"
 
 type Props = {
-  entities: MapEntity[]
   positionMap: Map<string, [number, number]>
   visibleLayerIds: Set<string>
   hiddenEntityIds?: Set<string>
@@ -30,12 +29,12 @@ function makeSymbolIcon(
 }
 
 export function SymbolsLayer({
-  entities,
   positionMap,
   visibleLayerIds,
   hiddenEntityIds,
   onSelectEntity,
-}: Props) {
+}: Props): React.ReactElement {
+  const entities = useProjectStore((s) => s.entities)
   const iconCache = useRef(new Map<string, L.DivIcon>())
 
   const visible = useMemo(() => {

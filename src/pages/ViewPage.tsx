@@ -4,7 +4,6 @@ import { MainLayout } from "@/components/shared/MainLayout"
 import type { ProjectFileActions } from "@/components/shared/AppShell"
 import { loadGeoPackage, applyGeoPackageResult } from "@/services/geopackage.service"
 import { useProjectStore } from "@/store/useProjectStore"
-import { useOsmRelationGeometries } from "@/hooks/useOsmRelationGeometries"
 import { useEnrichment } from "@/hooks/useEnrichment"
 
 export type ViewPageProps = {
@@ -23,8 +22,6 @@ export function ViewPage({ onEditMode, onOpenAbout }: ViewPageProps): React.Reac
   const [loadError, setLoadError] = useState<string | null>(null)
 
   const { entities, drawnGeometries, selectedEntityId } = useProjectStore()
-
-  useOsmRelationGeometries()
 
   const enrichment = useEnrichment({
     entities,

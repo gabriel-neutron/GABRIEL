@@ -8,12 +8,12 @@ import { GeometryActionMenu } from "./GeometryActionMenu"
 import { SymbolsLayer } from "./SymbolsLayer"
 import { NetworkLinksLayer } from "./NetworkLinksLayer"
 import { CenterOnSelection } from "./CenterOnSelection"
-import { MapBoundsReporter, type MapBounds } from "./MapBoundsReporter"
 import { useMapDrawing } from "./useMapDrawing"
 import { BASE_MAP_TILE_CONFIG } from "./mapTileConfig"
-import type { Layer, MapEntity, DrawnGeometry } from "@/types/domain.types"
+import type { DrawnGeometry } from "@/types/domain.types"
 import { computeAllEntityPositions } from "@/utils/geometry"
-import type { BaseMapId } from "@/components/shared/BaseMapSwitcher"
+import { useProjectStore } from "@/store/useProjectStore"
+import { useOsmRelationGeometries } from "@/hooks/useOsmRelationGeometries"
 
 function MapSizeSync() {
   const map = useMap()
@@ -77,43 +77,30 @@ function getOsmTypeAndId(
 
 type Props = {
   readOnly?: boolean
-  layers: Layer[]
-  entities: MapEntity[]
-  drawnGeometries: DrawnGeometry[]
-  entityOsmGeometries?: Record<string, GeoJSON.FeatureCollection>
   onCreateNewEntity: (geom: DrawnGeometry) => void
   onLinkGeometryToEntity: (geom: DrawnGeometry, entityId: string) => void
   defaultLayerId: string
-  selectedEntityId: string | null
-  onSelectEntity: (id: string | null) => void
-  onMapBoundsChange?: (bounds: MapBounds) => void
-  showNetworks?: boolean
-  baseMap?: BaseMapId
-  onSelectOsmObject?: (
-    type: "node" | "way" | "relation",
-    id: number,
-    cachedFeature?: GeoJSON.Feature & { id?: string }
-  ) => void
   hiddenEntityIds?: Set<string>
+  onOverpassUnavailable?: () => void
 }
 
 export function MapView({
   readOnly = false,
-  layers,
-  entities,
-  drawnGeometries,
-  entityOsmGeometries = {},
   onCreateNewEntity,
   onLinkGeometryToEntity,
   defaultLayerId,
-  selectedEntityId,
-  onSelectEntity,
-  onMapBoundsChange,
-  showNetworks = false,
-  baseMap = "osm",
-  onSelectOsmObject,
   hiddenEntityIds,
-}: Props) {
+  onOverpassUnavailable,
+}: Props): React.ReactElement {
+  const layers = useProjectStore((s) => s.layers)
+  const entities = useProjectStore((s) => s.entities)
+  const drawnGeometries = useProjectStore((s) => s.drawnGeometries)
+  const entityOsmGeometries = useProjectStore((s) => s.entityOsmGeometries)
+  const selectedEntityId = useProjectStore((s) => s.selectedEntityId)
+  const baseMap = useProjectStore((s) => s.baseMap)
+
+  useOsmRelationGeometries({ onOverpassUnavailable })
+
   const tileConfig = BASE_MAP_TILE_CONFIG[baseMap]
 
   const {
@@ -127,10 +114,15 @@ export function MapView({
     handleCancel,
   } = useMapDrawing({ onCreateNewEntity, onLinkGeometryToEntity })
 
+  const handleSelectEntity = useCallback((id: string | null) => {
+    useProjectStore.getState().setSelectedEntityId(id)
+    useProjectStore.getState().setSelectedOsmObject(null)
+  }, [])
+
   // Deselect entity when entering draw mode
   useEffect(() => {
-    if (mapTool !== "pan" && selectedEntityId !== null) onSelectEntity(null)
-  }, [mapTool, selectedEntityId, onSelectEntity])
+    if (mapTool !== "pan" && selectedEntityId !== null) handleSelectEntity(null)
+  }, [mapTool, selectedEntityId, handleSelectEntity])
 
   const visibleLayersInOrder = useMemo(() => layers.filter((l) => l.visible), [layers])
 
@@ -158,25 +150,26 @@ export function MapView({
   }, [entities, drawnGeometries])
 
   const getEntityPosition = useCallback(
-    (entity: MapEntity) => positionMap.get(entity.id) ?? null,
+    (entity: (typeof entities)[number]) => positionMap.get(entity.id) ?? null,
     [positionMap],
   )
 
-  // Stable refs so GeoJSON callbacks never capture stale closures
-  const onSelectOsmObjectRef = useRef(onSelectOsmObject)
+  // Stable ref so the GeoJSON click callback always reads current tool without being in deps
   const mapToolRef = useRef(mapTool)
-  onSelectOsmObjectRef.current = onSelectOsmObject
   mapToolRef.current = mapTool
 
-  function onEachOsmFeature(feature: GeoJSON.Feature & { id?: string }, layer: L.Layer) {
-    layer.on("click", () => {
-      if (mapToolRef.current !== "pan" || !onSelectOsmObjectRef.current) return
-      const parsed = getOsmTypeAndId(feature)
-      if (parsed) onSelectOsmObjectRef.current(parsed.type, parsed.id, feature)
-    })
-  }
-
-  const osmFeatureHandlers = onSelectOsmObject ? onEachOsmFeature : undefined
+  const onEachOsmFeature = useCallback(
+    function onEachOsmFeature(feature: GeoJSON.Feature & { id?: string }, layer: L.Layer) {
+      layer.on("click", () => {
+        if (mapToolRef.current !== "pan") return
+        const parsed = getOsmTypeAndId(feature)
+        if (!parsed) return
+        useProjectStore.getState().setSelectedOsmObject({ ...parsed, cachedFeature: feature })
+        useProjectStore.getState().setSelectedEntityId(null)
+      })
+    },
+    [],
+  )
 
   return (
     <div className="relative h-full w-full">
@@ -200,7 +193,6 @@ export function MapView({
           entities={entities}
           getEntityPosition={getEntityPosition}
         />
-        {onMapBoundsChange && <MapBoundsReporter onBoundsChange={onMapBoundsChange} />}
         {!readOnly && <MapToolSelector mapTool={mapTool} onMapToolChange={setMapTool} />}
         <MapSearch layers={layers} entityOsmGeometries={entityOsmGeometries} entities={entities} />
 
@@ -214,18 +206,12 @@ export function MapView({
         )}
 
         <SymbolsLayer
-          entities={entities}
           positionMap={positionMap}
           visibleLayerIds={visibleLayerIds}
           hiddenEntityIds={hiddenEntityIds}
-          onSelectEntity={onSelectEntity}
+          onSelectEntity={handleSelectEntity}
         />
-        <NetworkLinksLayer
-          entities={entities}
-          positionMap={positionMap}
-          selectedEntityId={selectedEntityId}
-          visible={showNetworks}
-        />
+        <NetworkLinksLayer positionMap={positionMap} />
 
         {visibleLayersInOrder.map((layer) =>
           layer.osmData ? (
@@ -233,7 +219,7 @@ export function MapView({
               key={layer.id}
               data={layer.osmData}
               pointToLayer={osmPointToLayer}
-              onEachFeature={osmFeatureHandlers}
+              onEachFeature={onEachOsmFeature}
             />
           ) : null
         )}
@@ -245,7 +231,7 @@ export function MapView({
               data={fc}
               pathOptions={linkedOsmStyle}
               pointToLayer={osmPointToLayer}
-              onEachFeature={osmFeatureHandlers}
+              onEachFeature={onEachOsmFeature}
             />
           ) : null
         )}

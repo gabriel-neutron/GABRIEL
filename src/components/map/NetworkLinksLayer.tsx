@@ -1,5 +1,6 @@
 import { useMemo } from "react"
 import { Polyline } from "react-leaflet"
+import { useProjectStore } from "@/store/useProjectStore"
 import type { MapEntity } from "@/types/domain.types"
 
 const NETWORK_LINE_OPTIONS = {
@@ -10,10 +11,7 @@ const NETWORK_LINE_OPTIONS = {
 }
 
 type Props = {
-  entities: MapEntity[]
   positionMap: Map<string, [number, number]>
-  selectedEntityId: string | null
-  visible: boolean
 }
 
 const MAX_DEGREE = 3
@@ -48,15 +46,13 @@ function visibleNetworkIds(
   return visible
 }
 
-export function NetworkLinksLayer({
-  entities,
-  positionMap,
-  selectedEntityId,
-  visible,
-}: Props) {
+export function NetworkLinksLayer({ positionMap }: Props): React.ReactElement | null {
+  const entities = useProjectStore((s) => s.entities)
+  const selectedEntityId = useProjectStore((s) => s.selectedEntityId)
+  const showNetworks = useProjectStore((s) => s.showNetworks)
 
   const links = useMemo(() => {
-    if (!visible || !selectedEntityId) return []
+    if (!showNetworks || !selectedEntityId) return []
 
     const selected = entities.find((e) => e.id === selectedEntityId)
     if (!selected) return []
@@ -79,7 +75,7 @@ export function NetworkLinksLayer({
     }
 
     return result
-  }, [visible, selectedEntityId, entities, positionMap])
+  }, [showNetworks, selectedEntityId, entities, positionMap])
 
   if (links.length === 0) return null
 

@@ -10,7 +10,6 @@ import {
 } from "@/services/geopackage.service"
 import { loadProject, saveProject, clearProject } from "@/services/projectStorage.service"
 import { useProjectStore } from "@/store/useProjectStore"
-import { useOsmRelationGeometries } from "@/hooks/useOsmRelationGeometries"
 import { useEnrichment } from "@/hooks/useEnrichment"
 import { useLayeredResearch } from "@/hooks/useLayeredResearch"
 
@@ -30,8 +29,6 @@ export function EditPage({ onViewMode, onOpenAbout }: EditPageProps): React.Reac
     setProject,
     resetProject,
   } = useProjectStore()
-
-  useOsmRelationGeometries()
 
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -288,6 +285,19 @@ export function EditPage({ onViewMode, onOpenAbout }: EditPageProps): React.Reac
         busy={busy}
         error={error}
         projectFileActions={projectFileActions}
+        onOverpassUnavailable={() =>
+          setToasts((prev) =>
+            [
+              ...prev,
+              {
+                id: `overpass-unavailable-${Date.now()}`,
+                title: "OSM endpoint unavailable",
+                description:
+                  "Overpass API could not be reached. OSM relation boundaries are unavailable.",
+              },
+            ].slice(-4),
+          )
+        }
         enrichment={{
           isDrawerOpen: enrichment.isDrawerOpen,
           selectedEntity: enrichment.selectedEntity,

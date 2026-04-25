@@ -113,26 +113,26 @@ Switching from view to edit mode and back works without errors.
 
 ---
 
-## Phase 5 — MapView + Map Layer Components [  ]
+## Phase 5 — MapView + Map Layer Components [X]
 
 **Scope**: Migrate `MapView`, `NetworkLinksLayer`, and `SymbolsLayer` to read from the store
 directly. Extract `useOsmRelationGeometries` to fix the overpass never-reset bug.
 **Dependencies**: Phase 4
 **Key files**: `src/components/map/MapView.tsx`, `NetworkLinksLayer.tsx`, `SymbolsLayer.tsx`
 **Milestones**
-- [ ] `src/hooks/useOsmRelationGeometries.ts` created — extracts the OSM relation fetch effect
+- [X] `src/hooks/useOsmRelationGeometries.ts` created — extracts the OSM relation fetch effect
   from `useMapProjectState`. On fetch failure: calls `store.setOsmUnavailable(true)` AND
   pushes a toast. On cleanup (`return () => {...}`): calls `store.setOsmUnavailable(false)`
   (fixes the silent never-reset bug).
-- [ ] `MapView` reads `layers, entities, drawnGeometries, entityOsmGeometries, selectedEntityId,
+- [X] `MapView` reads `layers, entities, drawnGeometries, entityOsmGeometries, selectedEntityId,
   showNetworks, baseMap` from store. Calls `useOsmRelationGeometries()` internally.
-- [ ] `MapView` props reduced to: `readOnly, onCreateNewEntity, onLinkGeometryToEntity,
+- [X] `MapView` props reduced to: `readOnly, onCreateNewEntity, onLinkGeometryToEntity,
   defaultLayerId, hiddenEntityIds` (behaviour config, not data)
-- [ ] `NetworkLinksLayer` reads `entities, selectedEntityId` from store. `useMemo` for BFS
+- [X] `NetworkLinksLayer` reads `entities, selectedEntityId` from store. `useMemo` for BFS
   verified intact.
-- [ ] `SymbolsLayer` reads `entities` from store (or receives via `positionMap` — keep the
+- [X] `SymbolsLayer` reads `entities` from store (or receives via `positionMap` — keep the
   current interface if the cache is local to the component).
-- [ ] `npm run build` passes, `npm test` passes
+- [X] `npm run build` passes, `npm test` passes
 **Acceptance Criteria**: Map renders correctly. Overpass failure shows a toast and resets on next
 page load. No BFS computation outside `useMemo`.
 

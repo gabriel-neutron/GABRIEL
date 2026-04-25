@@ -64,6 +64,7 @@ export type MainLayoutProps = {
   enrichment: EnrichmentControls
   layeredResearch?: LayeredResearchControls
   restoredFromSession?: boolean
+  onOverpassUnavailable?: () => void
 }
 
 export function MainLayout({
@@ -77,6 +78,7 @@ export function MainLayout({
   enrichment,
   layeredResearch,
   restoredFromSession = false,
+  onOverpassUnavailable,
 }: MainLayoutProps): React.ReactElement {
   const {
     layers,
@@ -86,7 +88,6 @@ export function MainLayout({
     selectedOsmObject,
     showNetworks,
     baseMap,
-    entityOsmGeometries,
     setLayerVisible,
     addLayer,
     addNewLayer,
@@ -142,15 +143,6 @@ export function MainLayout({
     s.setSelectedEntityId(entityId)
   }, [])
 
-  function handleSelectOsmObject(
-    type: "node" | "way" | "relation",
-    id: number,
-    cachedFeature?: GeoJSON.Feature & { id?: string },
-  ): void {
-    useProjectStore.getState().setSelectedOsmObject({ type, id, cachedFeature })
-    useProjectStore.getState().setSelectedEntityId(null)
-  }
-
   const handleSelectEntity = (id: string | null) => {
     useProjectStore.getState().setSelectedEntityId(id)
     useProjectStore.getState().setSelectedOsmObject(null)
@@ -169,19 +161,11 @@ export function MainLayout({
         mapSlot={
         <MapView
           readOnly={readOnly}
-          layers={layers}
-          entities={entities}
-          drawnGeometries={drawnGeometries}
-          entityOsmGeometries={entityOsmGeometries}
           onCreateNewEntity={handleCreateNewEntity}
           onLinkGeometryToEntity={handleLinkGeometryToEntity}
           defaultLayerId={defaultLayerId}
-          selectedEntityId={selectedEntityId}
-          onSelectEntity={handleSelectEntity}
-          onSelectOsmObject={handleSelectOsmObject}
-          showNetworks={showNetworks}
-          baseMap={baseMap}
           hiddenEntityIds={hiddenEntityIds}
+          onOverpassUnavailable={onOverpassUnavailable}
         />
       }
       treeSlot={
