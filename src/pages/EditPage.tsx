@@ -9,11 +9,13 @@ import {
   type GpkgLayer,
 } from "@/services/geopackage.service"
 import { loadProject, saveProject, clearProject } from "@/services/projectStorage.service"
-import { useMapProjectState } from "@/hooks/useMapProjectState"
+import { useProjectStore } from "@/store/useProjectStore"
+import { useOsmRelationGeometries } from "@/hooks/useOsmRelationGeometries"
 import { useEnrichment } from "@/hooks/useEnrichment"
 import { useLayeredResearch } from "@/hooks/useLayeredResearch"
-import type { Layer, MapEntity, DrawnGeometry } from "@/types/domain.types"
+import type { DrawnGeometry, MapEntity } from "@/types/domain.types"
 import { getDefaultEntityLayerId } from "@/utils/entityLayer"
+
 export type EditPageProps = {
   onViewMode?: () => void
   onOpenAbout?: () => void
@@ -33,62 +35,64 @@ function entityFromGeometry(geom: DrawnGeometry, defaultLayerId: string, parentI
 }
 
 export function EditPage({ onViewMode, onOpenAbout }: EditPageProps): React.ReactElement {
-  const p = useMapProjectState({ initialShowNetworks: true })
   const {
     layers,
-    setLayers,
     entities,
-    setEntities,
     drawnGeometries,
-    setDrawnGeometries,
     selectedEntityId,
-    setSelectedEntityId,
     selectedOsmObject,
-    setSelectedOsmObject,
     showNetworks,
-    setShowNetworks,
     baseMap,
-    setBaseMap,
     entityOsmGeometries,
+    sourceCache,
+    setSelectedEntityId,
+    setSelectedOsmObject,
+    closeDetail,
+    setShowNetworks,
+    setBaseMap,
     setLayerVisible,
-    handleCloseDetail: hookHandleCloseDetail,
-  } = p
+    addLayer,
+    addNewLayer,
+    renameLayer,
+    removeLayer,
+    moveLayer,
+    updateEntity,
+    deleteEntity,
+    deleteGeometry,
+    mergeSourceCache,
+    setProject,
+    resetProject,
+  } = useProjectStore()
+
+  useOsmRelationGeometries()
 
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [restoredFromSession, setRestoredFromSession] = useState(false)
-  const [sourceCache, setSourceCache] = useState<Map<string, string>>(() => new Map())
   const [toasts, setToasts] = useState<ToastItem[]>([])
+
   const handleDismissToast = useCallback((id: string) => {
     setToasts((prev) => prev.filter((item) => item.id !== id))
   }, [])
+
   const enrichment = useEnrichment({
     entities,
     drawnGeometries,
     selectedEntityId,
-    onApplyAccepted: handleUpdateEntity,
+    onApplyAccepted: updateEntity,
   })
+
   const layeredResearch = useLayeredResearch(entities, drawnGeometries, {
     onEntityAnalyzed: (entityId, analyzedAt) => {
-      setEntities((prev) =>
-        prev.map((entity) => (entity.id === entityId ? { ...entity, analyzedAt } : entity)),
-      )
+      updateEntity(entityId, { analyzedAt })
     },
   })
 
-  // When a batch run finishes, merge new URL→snippet pairs into sourceCache.
   useEffect(() => {
     if (layeredResearch.cacheAdditions.length === 0) return
-    setSourceCache((prev) => {
-      const next = new Map(prev)
-      for (const { url, content } of layeredResearch.cacheAdditions) {
-        next.set(url, content)
-      }
-      return next
-    })
-  }, [layeredResearch.cacheAdditions])
+    mergeSourceCache(layeredResearch.cacheAdditions)
+  }, [layeredResearch.cacheAdditions, mergeSourceCache])
 
-  // Show clear user-facing warnings when layered research hits endpoint/provider issues.
   useEffect(() => {
     if (layeredResearch.lastWarnings.length === 0) return
     setToasts((prev) => {
@@ -111,8 +115,6 @@ export function EditPage({ onViewMode, onOpenAbout }: EditPageProps): React.Reac
     })
   }, [layeredResearch.lastWarnings])
 
-  // Tracks whether the enrichment drawer was opened via a batch result so we
-  // can advance the review queue when it closes.
   const isBatchReviewRef = useRef(false)
 
   useEffect(function restoreSession() {
@@ -123,17 +125,19 @@ export function EditPage({ onViewMode, onOpenAbout }: EditPageProps): React.Reac
         .then((result) => {
           if (!mounted) return
           const next = applyGeoPackageResult(result, null)
-          setLayers(next.layers)
-          setEntities(next.entities)
-          setDrawnGeometries(next.drawnGeometries)
-          setSelectedEntityId(next.selectedEntityId)
-          setSourceCache(result.sourceCache)
+          setProject({
+            layers: next.layers,
+            entities: next.entities,
+            drawnGeometries: next.drawnGeometries,
+            selectedEntityId: next.selectedEntityId,
+            sourceCache: result.sourceCache,
+          })
           setRestoredFromSession(true)
         })
         .catch(() => {})
     })
     return () => { mounted = false }
-  }, [setLayers, setEntities, setDrawnGeometries, setSelectedEntityId])
+  }, [setProject])
 
   useEffect(
     function clearRestoredBanner() {
@@ -144,84 +148,35 @@ export function EditPage({ onViewMode, onOpenAbout }: EditPageProps): React.Reac
     [restoredFromSession],
   )
 
-  function addLayer(layer: Layer): void {
-    setLayers((prev) => [...prev, layer])
+  function handleDeleteEntity(entityId: string): void {
+    if (!window.confirm("Delete this entity and all its linked geometries?")) return
+    deleteEntity(entityId)
   }
 
-  function addNewLayer(): void {
-    const id = crypto.randomUUID()
-    const names = layers.filter((l) => l.kind === "custom" || l.osmData != null).map((l) => l.name)
-    let name = "New layer"
-    for (let n = 1; names.includes(name); n++) name = `New layer ${n}`
-    addLayer({ id, name, visible: true, kind: "custom" })
-  }
-
-  function renameLayer(layerId: string, name: string): void {
-    const trimmed = name.trim()
-    if (!trimmed) return
-    setLayers((prev) => prev.map((l) => (l.id === layerId ? { ...l, name: trimmed } : l)))
-  }
-
-  function removeLayer(id: string): void {
+  function handleRemoveLayer(id: string): void {
     const layer = layers.find((l) => l.id === id)
     if (layer?.kind === "echelon") return
     const isOsm = layer?.osmData != null
     if (!isOsm && !window.confirm("Remove this layer and all its entities and geometries?")) return
-    setLayers((prev) => prev.filter((l) => l.id !== id))
-    setEntities((prev) => prev.filter((e) => e.layerId !== id))
-    setDrawnGeometries((prev) => prev.filter((g) => g.layerId !== id))
-    const removedEntityIds = new Set(entities.filter((e) => e.layerId === id).map((e) => e.id))
-    setSelectedEntityId((prev) => (prev && removedEntityIds.has(prev) ? null : prev))
+    removeLayer(id)
   }
 
-  function moveLayer(layerId: string, direction: "up" | "down"): void {
-    setLayers((prev) => {
-      const i = prev.findIndex((l) => l.id === layerId)
-      if (i < 0) return prev
-      if (direction === "up" && i === 0) return prev
-      if (direction === "down" && i === prev.length - 1) return prev
-      const next = [...prev]
-      const j = direction === "up" ? i - 1 : i + 1
-      ;[next[i], next[j]] = [next[j], next[i]]
-      return next
-    })
-  }
+  const handleCreateNewEntity = useCallback((geom: DrawnGeometry): void => {
+    const s = useProjectStore.getState()
+    const defaultLayerId = getDefaultEntityLayerId(s.layers)
+    const entity = entityFromGeometry(geom, defaultLayerId, s.selectedEntityId)
+    s.addEntity(entity)
+    s.addGeometry({ ...geom, entityId: entity.id })
+    s.setSelectedOsmObject(null)
+    s.setSelectedEntityId(entity.id)
+  }, [])
 
-  const defaultLayerId = getDefaultEntityLayerId(layers)
-
-  function handleCreateNewEntity(geom: DrawnGeometry): void {
-    const entity = entityFromGeometry(geom, defaultLayerId, selectedEntityId)
-    setEntities((prev) => [...prev, entity])
-    setDrawnGeometries((prev) => [...prev, { ...geom, entityId: entity.id }])
-    setSelectedOsmObject(null)
-    setSelectedEntityId(entity.id)
-  }
-
-  function handleLinkGeometryToEntity(geom: DrawnGeometry, entityId: string): void {
-    setDrawnGeometries((prev) => [...prev, { ...geom, entityId }])
-    setSelectedOsmObject(null)
-    setSelectedEntityId(entityId)
-  }
-
-  function handleDeleteEntity(entityId: string): void {
-    if (!window.confirm("Delete this entity and all its linked geometries?")) return
-    setEntities((prev) => prev.filter((e) => e.id !== entityId))
-    setDrawnGeometries((prev) => prev.filter((g) => g.entityId !== entityId))
-    setSelectedEntityId((prev) => (prev === entityId ? null : prev))
-  }
-
-  function handleDeleteGeometry(geometryId: string): void {
-    setDrawnGeometries((prev) => prev.filter((g) => g.id !== geometryId))
-  }
-
-  function handleUpdateEntity(entityId: string, patch: Partial<MapEntity>): void {
-    setEntities((prev) => prev.map((e) => (e.id === entityId ? { ...e, ...patch } : e)))
-    if (patch.layerId !== undefined) {
-      setDrawnGeometries((prev) =>
-        prev.map((g) => (g.entityId === entityId ? { ...g, layerId: patch.layerId! } : g)),
-      )
-    }
-  }
+  const handleLinkGeometryToEntity = useCallback((geom: DrawnGeometry, entityId: string): void => {
+    const s = useProjectStore.getState()
+    s.addGeometry({ ...geom, entityId })
+    s.setSelectedOsmObject(null)
+    s.setSelectedEntityId(entityId)
+  }, [])
 
   function handleSelectOsmObject(
     type: "node" | "way" | "relation",
@@ -255,10 +210,7 @@ export function EditPage({ onViewMode, onOpenAbout }: EditPageProps): React.Reac
   }, [])
 
   const handleNewProject = useCallback(async (): Promise<void> => {
-    setLayers(() => getDefaultEchelonLayers())
-    setEntities(() => [])
-    setDrawnGeometries(() => [])
-    setSelectedEntityId(null)
+    resetProject()
     setError(null)
     setRestoredFromSession(false)
     clearProject().catch(() => {})
@@ -281,7 +233,7 @@ export function EditPage({ onViewMode, onOpenAbout }: EditPageProps): React.Reac
     } finally {
       setBusy(false)
     }
-  }, [setLayers, setEntities, setDrawnGeometries, setSelectedEntityId, writeGeoPackageToFile])
+  }, [resetProject, writeGeoPackageToFile])
 
   const handleOpenProject = useCallback(async (file: File): Promise<void> => {
     setBusy(true)
@@ -290,11 +242,13 @@ export function EditPage({ onViewMode, onOpenAbout }: EditPageProps): React.Reac
       const buffer = await file.arrayBuffer()
       const result = await loadGeoPackage(buffer)
       const next = applyGeoPackageResult(result, null)
-      setLayers(next.layers)
-      setEntities(next.entities)
-      setDrawnGeometries(next.drawnGeometries)
-      setSelectedEntityId(next.selectedEntityId)
-      setSourceCache(result.sourceCache)
+      useProjectStore.getState().setProject({
+        layers: next.layers,
+        entities: next.entities,
+        drawnGeometries: next.drawnGeometries,
+        selectedEntityId: next.selectedEntityId,
+        sourceCache: result.sourceCache,
+      })
       await saveProject(buffer, { fileName: file.name })
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load GeoPackage")
@@ -302,9 +256,10 @@ export function EditPage({ onViewMode, onOpenAbout }: EditPageProps): React.Reac
     } finally {
       setBusy(false)
     }
-  }, [setLayers, setEntities, setDrawnGeometries, setSelectedEntityId])
+  }, [])
 
   const handleSaveProject = useCallback(async (): Promise<void> => {
+    const { layers, entities, drawnGeometries, sourceCache } = useProjectStore.getState()
     const nonOsmLayerIds = new Set(layers.filter((l) => l.osmData == null).map((l) => l.id))
     const persistedEntities = entities
       .filter((e) => nonOsmLayerIds.has(e.layerId))
@@ -337,10 +292,8 @@ export function EditPage({ onViewMode, onOpenAbout }: EditPageProps): React.Reac
     } finally {
       setBusy(false)
     }
-  }, [layers, entities, drawnGeometries, writeGeoPackageToFile])
+  }, [writeGeoPackageToFile])
 
-  // Opens the next entity in the batch review queue and loads its pre-computed
-  // result into the enrichment drawer.
   const handleReviewNext = useCallback(() => {
     const entityId = layeredResearch.nextInQueue
     if (!entityId) return
@@ -351,8 +304,6 @@ export function EditPage({ onViewMode, onOpenAbout }: EditPageProps): React.Reac
     enrichment.loadBatchResult(result)
   }, [layeredResearch, enrichment, setSelectedEntityId])
 
-  // Wraps the normal closeDrawer so the review queue advances after the user
-  // manually closes the drawer while in batch-review mode.
   const handleCloseEnrichmentDrawer = useCallback(() => {
     const outcome = enrichment.closeDrawer()
     if (outcome.closed && isBatchReviewRef.current) {
@@ -361,23 +312,15 @@ export function EditPage({ onViewMode, onOpenAbout }: EditPageProps): React.Reac
     }
   }, [enrichment, layeredResearch])
 
-  // Keep a stable ref to the latest enrichment object so the auto-advance
-  // effect can read current methods without them being in the dep array
-  // (which would cause the effect to re-fire on every state change).
   const enrichmentRef = useRef(enrichment)
   enrichmentRef.current = enrichment
 
-  // Auto-advance: when every proposal for the current entity has been
-  // accepted or rejected, immediately apply the accepted patches, pop the
-  // queue, and load the next entity — without requiring the user to close
-  // and reopen the drawer.
   useEffect(() => {
     if (!enrichment.allProposalsResolved || !isBatchReviewRef.current) return
 
     const enrich = enrichmentRef.current
     enrich.advanceBatchReview()
 
-    // Peek at the entity that will become the new head after we advance
     const nextEntityId = layeredResearch.reviewQueue[1] ?? null
     layeredResearch.advanceQueue()
 
@@ -387,12 +330,10 @@ export function EditPage({ onViewMode, onOpenAbout }: EditPageProps): React.Reac
         setSelectedEntityId(nextEntityId)
         enrich.loadBatchResult(result)
       } else {
-        // Result missing (shouldn't happen) — end batch review
         isBatchReviewRef.current = false
         enrich.forceCloseDrawer()
       }
     } else {
-      // Queue exhausted — close the drawer and exit batch mode
       isBatchReviewRef.current = false
       enrich.forceCloseDrawer()
     }
@@ -430,7 +371,7 @@ export function EditPage({ onViewMode, onOpenAbout }: EditPageProps): React.Reac
         entityOsmGeometries={entityOsmGeometries}
         restoredFromSession={restoredFromSession}
         setLayerVisible={setLayerVisible}
-        removeLayer={removeLayer}
+        removeLayer={handleRemoveLayer}
         renameLayer={renameLayer}
         addNewLayer={addNewLayer}
         handleDeleteEntity={handleDeleteEntity}
@@ -438,62 +379,62 @@ export function EditPage({ onViewMode, onOpenAbout }: EditPageProps): React.Reac
         addLayer={addLayer}
         handleCreateNewEntity={handleCreateNewEntity}
         handleLinkGeometryToEntity={handleLinkGeometryToEntity}
-        handleUpdateEntity={handleUpdateEntity}
-        handleDeleteGeometry={handleDeleteGeometry}
+        handleUpdateEntity={updateEntity}
+        handleDeleteGeometry={deleteGeometry}
         handleSelectOsmObject={handleSelectOsmObject}
-        handleCloseDetail={hookHandleCloseDetail}
+        handleCloseDetail={closeDetail}
         busy={busy}
         error={error}
         projectFileActions={projectFileActions}
         enrichment={{
-        isDrawerOpen: enrichment.isDrawerOpen,
-        selectedEntity: enrichment.selectedEntity,
-        context: enrichment.context,
-        overlay: enrichment.overlay,
-        prompt: enrichment.draftPrompt,
-        status: enrichment.state.run.status,
-        queryTrace: enrichment.state.run.queryTrace,
-        depthUsed: enrichment.state.run.depthUsed,
-        unresolvedFields: enrichment.state.run.unresolvedFields,
-        notes: enrichment.state.run.notes,
-        proposals: enrichment.state.run.proposals,
-        decisions:
-          enrichment.selectedEntityId == null
-            ? {}
-            : enrichment.state.decisions[enrichment.selectedEntityId] ?? {},
-        errorMessage: enrichment.state.run.error?.details ?? null,
-        closeNotice: enrichment.closeNotice,
-        setPrompt: enrichment.setDraftPrompt,
-        openDrawer: enrichment.openDrawer,
-        closeDrawer: handleCloseEnrichmentDrawer,
-        run: enrichment.run,
-        accept: enrichment.accept,
-        reject: enrichment.reject,
-        ignore: enrichment.ignore,
-        clearOverlayForSelected: enrichment.clearOverlayForSelected,
-      }}
+          isDrawerOpen: enrichment.isDrawerOpen,
+          selectedEntity: enrichment.selectedEntity,
+          context: enrichment.context,
+          overlay: enrichment.overlay,
+          prompt: enrichment.draftPrompt,
+          status: enrichment.state.run.status,
+          queryTrace: enrichment.state.run.queryTrace,
+          depthUsed: enrichment.state.run.depthUsed,
+          unresolvedFields: enrichment.state.run.unresolvedFields,
+          notes: enrichment.state.run.notes,
+          proposals: enrichment.state.run.proposals,
+          decisions:
+            enrichment.selectedEntityId == null
+              ? {}
+              : enrichment.state.decisions[enrichment.selectedEntityId] ?? {},
+          errorMessage: enrichment.state.run.error?.details ?? null,
+          closeNotice: enrichment.closeNotice,
+          setPrompt: enrichment.setDraftPrompt,
+          openDrawer: enrichment.openDrawer,
+          closeDrawer: handleCloseEnrichmentDrawer,
+          run: enrichment.run,
+          accept: enrichment.accept,
+          reject: enrichment.reject,
+          ignore: enrichment.ignore,
+          clearOverlayForSelected: enrichment.clearOverlayForSelected,
+        }}
         layeredResearch={{
-        status: layeredResearch.status,
-        progress: layeredResearch.progress,
-        reviewQueueLength: layeredResearch.reviewQueue.length,
-        hasNextInQueue: layeredResearch.nextInQueue !== null,
-        entityStatuses: layeredResearch.entityStatuses,
-        totalUsage: layeredResearch.totalUsage,
-        cacheAdditions: layeredResearch.cacheAdditions,
-        lastStats: layeredResearch.lastStats,
-        dialogOpen: layeredResearch.dialogOpen,
-        batchSize: layeredResearch.batchSize,
-        setBatchSize: layeredResearch.setBatchSize,
-        richnessThreshold: layeredResearch.richnessThreshold,
-        setRichnessThreshold: layeredResearch.setRichnessThreshold,
-        skipAnalyzedWithinDays: layeredResearch.skipAnalyzedWithinDays,
-        setSkipAnalyzedWithinDays: layeredResearch.setSkipAnalyzedWithinDays,
-        hasProcessedEntities: layeredResearch.hasProcessedEntities,
-        openDialog: layeredResearch.openDialog,
-        closeDialog: layeredResearch.closeDialog,
-        onRun: () => layeredResearch.run(sourceCache),
-        onCancel: layeredResearch.cancel,
-        onReviewNext: handleReviewNext,
+          status: layeredResearch.status,
+          progress: layeredResearch.progress,
+          reviewQueueLength: layeredResearch.reviewQueue.length,
+          hasNextInQueue: layeredResearch.nextInQueue !== null,
+          entityStatuses: layeredResearch.entityStatuses,
+          totalUsage: layeredResearch.totalUsage,
+          cacheAdditions: layeredResearch.cacheAdditions,
+          lastStats: layeredResearch.lastStats,
+          dialogOpen: layeredResearch.dialogOpen,
+          batchSize: layeredResearch.batchSize,
+          setBatchSize: layeredResearch.setBatchSize,
+          richnessThreshold: layeredResearch.richnessThreshold,
+          setRichnessThreshold: layeredResearch.setRichnessThreshold,
+          skipAnalyzedWithinDays: layeredResearch.skipAnalyzedWithinDays,
+          setSkipAnalyzedWithinDays: layeredResearch.setSkipAnalyzedWithinDays,
+          hasProcessedEntities: layeredResearch.hasProcessedEntities,
+          openDialog: layeredResearch.openDialog,
+          closeDialog: layeredResearch.closeDialog,
+          onRun: () => layeredResearch.run(sourceCache),
+          onCancel: layeredResearch.cancel,
+          onReviewNext: handleReviewNext,
         }}
       />
       <ToastStack

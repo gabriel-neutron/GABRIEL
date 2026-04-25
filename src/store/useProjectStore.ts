@@ -30,7 +30,7 @@ function initialState(): ProjectState {
     sourceCache: new Map(),
     selectedEntityId: null,
     selectedOsmObject: null,
-    showNetworks: false,
+    showNetworks: true,
     baseMap: "osm",
     entityOsmGeometries: {},
     osmUnavailable: false,

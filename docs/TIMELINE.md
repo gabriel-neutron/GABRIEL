@@ -37,23 +37,23 @@ The existing app is completely unchanged in behaviour.
 
 ---
 
-## Phase 2 — EditPage Migration [  ]
+## Phase 2 — EditPage Migration [X]
 
 **Scope**: Migrate `EditPage` from `useMapProjectState` to `useProjectStore`. EditPage becomes an
 I/O orchestrator (~180 lines) with no state management responsibilities.
 **Dependencies**: Phase 1
 **Key file**: `src/pages/EditPage.tsx` (505 → ~180 lines)
 **Milestones**
-- [ ] `useMapProjectState` import removed from `EditPage`
-- [ ] All `setState` calls replaced with store action calls (e.g. `store.addNewLayer()`,
+- [X] `useMapProjectState` import removed from `EditPage`
+- [X] All `setState` calls replaced with store action calls (e.g. `store.addNewLayer()`,
   `store.updateEntity(id, patch)`, `store.deleteEntity(id)`)
-- [ ] `handleCreateNewEntity` and `handleLinkGeometryToEntity` remain as `useCallback` wrappers
+- [X] `handleCreateNewEntity` and `handleLinkGeometryToEntity` remain as `useCallback` wrappers
   (they call two store actions: `addEntity` + `addGeometry`)
-- [ ] Session restore effect calls `store.setProject(result)` after `loadGeoPackage`
-- [ ] `handleSaveProject` reads state via `useProjectStore.getState()` (not reactive)
-- [ ] `sourceCache` moved into the store; `mergeSourceCache` used for batch research additions
-- [ ] `MainLayout` still receives all current props (prop reduction is Phase 4)
-- [ ] `npm run build` passes, `npm test` passes
+- [X] Session restore effect calls `store.setProject(result)` after `loadGeoPackage`
+- [X] `handleSaveProject` reads state via `useProjectStore.getState()` (not reactive)
+- [X] `sourceCache` moved into the store; `mergeSourceCache` used for batch research additions
+- [X] `MainLayout` still receives all current props (prop reduction is Phase 4)
+- [X] `npm run build` passes, `npm test` passes
 **Acceptance Criteria**: Open a `.gpkg` file → entities appear on map. Draw a geometry → entity
 created, survives IndexedDB restore. No observable behaviour change.
 
