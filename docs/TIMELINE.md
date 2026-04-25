@@ -59,19 +59,19 @@ created, survives IndexedDB restore. No observable behaviour change.
 
 ---
 
-## Phase 3 — ViewPage Migration [  ]
+## Phase 3 — ViewPage Migration [X]
 
 **Scope**: Migrate `ViewPage` to use `useProjectStore`. Remove `useMapProjectState` and all
 `READ_ONLY_HANDLERS` stubs.
 **Dependencies**: Phase 2
 **Key file**: `src/pages/ViewPage.tsx`
 **Milestones**
-- [ ] `useMapProjectState` import removed from `ViewPage`
-- [ ] After `applyGeoPackageResult`, call `useProjectStore.getState().setProject(result)`
-- [ ] `READ_ONLY_HANDLERS` object deleted
-- [ ] `READ_ONLY_FILE_ACTIONS` kept (AppShell still renders file buttons, disabled in readOnly mode)
-- [ ] `useMapProjectState.ts` deleted (no remaining callers)
-- [ ] `npm run build` passes, `npm test` passes
+- [X] `useMapProjectState` import removed from `ViewPage`
+- [X] After `applyGeoPackageResult`, call `useProjectStore.getState().setProject(result)`
+- [X] `READ_ONLY_HANDLERS` object deleted
+- [X] `READ_ONLY_FILE_ACTIONS` kept (AppShell still renders file buttons, disabled in readOnly mode)
+- [X] `useMapProjectState.ts` deleted (no remaining callers)
+- [X] `npm run build` passes, `npm test` passes
 **Acceptance Criteria**: View mode loads `public/project.gpkg` and renders entities correctly.
 Switching from view to edit mode and back works without errors.
 

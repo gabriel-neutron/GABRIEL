@@ -3,28 +3,14 @@ import { Loader2 } from "lucide-react"
 import { MainLayout } from "@/components/shared/MainLayout"
 import type { ProjectFileActions } from "@/components/shared/AppShell"
 import { loadGeoPackage, applyGeoPackageResult } from "@/services/geopackage.service"
-import { useMapProjectState } from "@/hooks/useMapProjectState"
+import { useProjectStore } from "@/store/useProjectStore"
+import { useOsmRelationGeometries } from "@/hooks/useOsmRelationGeometries"
 import { useEnrichment } from "@/hooks/useEnrichment"
-import type { Layer, MapEntity, DrawnGeometry } from "@/types/domain.types"
 
 export type ViewPageProps = {
   onEditMode?: () => void
   onOpenAbout?: () => void
 }
-
-const READ_ONLY_HANDLERS = {
-  removeLayer: (_id: string) => {},
-  renameLayer: (_layerId: string, _name: string) => {},
-  addNewLayer: () => {},
-  handleDeleteEntity: (_entityId: string) => {},
-  moveLayer: (_layerId: string, _dir: "up" | "down") => {},
-  addLayer: (_layer: Layer) => {},
-  handleCreateNewEntity: (_geom: DrawnGeometry) => {},
-  handleLinkGeometryToEntity: (_geom: DrawnGeometry, _entityId: string) => {},
-  handleUpdateEntity: (_entityId: string, _patch: Partial<MapEntity>) => {},
-  handleDeleteGeometry: (_geometryId: string) => {},
-  handleSelectOsmObject: (_type: "node" | "way" | "relation", _id: number, _f?: GeoJSON.Feature & { id?: string }) => {},
-} as const
 
 const READ_ONLY_FILE_ACTIONS: ProjectFileActions = {
   onNewProject: () => {},
@@ -36,13 +22,30 @@ export function ViewPage({ onEditMode, onOpenAbout }: ViewPageProps): React.Reac
   const [projectLoading, setProjectLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
 
-  const p = useMapProjectState({ initialShowNetworks: false })
-  const { setLayers, setEntities, setDrawnGeometries, setSelectedEntityId } = p
+  const {
+    entities,
+    drawnGeometries,
+    selectedEntityId,
+    selectedOsmObject,
+    showNetworks,
+    baseMap,
+    entityOsmGeometries,
+    layers,
+    setSelectedEntityId,
+    setSelectedOsmObject,
+    closeDetail,
+    setShowNetworks,
+    setBaseMap,
+    setLayerVisible,
+  } = useProjectStore()
+
+  useOsmRelationGeometries()
+
   const enrichment = useEnrichment({
-    entities: p.entities,
-    drawnGeometries: p.drawnGeometries,
-    selectedEntityId: p.selectedEntityId,
-    onApplyAccepted: READ_ONLY_HANDLERS.handleUpdateEntity,
+    entities,
+    drawnGeometries,
+    selectedEntityId,
+    onApplyAccepted: () => {},
   })
 
   useEffect(function loadDemoProject() {
@@ -58,10 +61,13 @@ export function ViewPage({ onEditMode, onOpenAbout }: ViewPageProps): React.Reac
       .then((result) => {
         if (!mounted) return
         const next = applyGeoPackageResult(result, null)
-        setLayers(next.layers)
-        setEntities(next.entities)
-        setDrawnGeometries(next.drawnGeometries)
-        setSelectedEntityId(next.selectedEntityId)
+        useProjectStore.getState().setProject({
+          layers: next.layers,
+          entities: next.entities,
+          drawnGeometries: next.drawnGeometries,
+          selectedEntityId: next.selectedEntityId,
+          sourceCache: result.sourceCache,
+        })
         setLoadError(null)
       })
       .catch((e) => {
@@ -76,7 +82,7 @@ export function ViewPage({ onEditMode, onOpenAbout }: ViewPageProps): React.Reac
       mounted = false
       controller.abort()
     }
-  }, [setLayers, setEntities, setDrawnGeometries, setSelectedEntityId])
+  }, [])
 
   if (loadError !== null) {
     return (
@@ -100,31 +106,31 @@ export function ViewPage({ onEditMode, onOpenAbout }: ViewPageProps): React.Reac
       readOnly
       onOpenAbout={onOpenAbout}
       onSwitchToEdit={onEditMode}
-      layers={p.layers}
-      entities={p.entities}
-      drawnGeometries={p.drawnGeometries}
-      selectedEntityId={p.selectedEntityId}
-      setSelectedEntityId={p.setSelectedEntityId}
-      selectedOsmObject={p.selectedOsmObject}
-      setSelectedOsmObject={p.setSelectedOsmObject}
-      showNetworks={p.showNetworks}
-      setShowNetworks={p.setShowNetworks}
-      baseMap={p.baseMap}
-      setBaseMap={p.setBaseMap}
-      entityOsmGeometries={p.entityOsmGeometries}
-      setLayerVisible={p.setLayerVisible}
-      removeLayer={READ_ONLY_HANDLERS.removeLayer}
-      renameLayer={READ_ONLY_HANDLERS.renameLayer}
-      addNewLayer={READ_ONLY_HANDLERS.addNewLayer}
-      handleDeleteEntity={READ_ONLY_HANDLERS.handleDeleteEntity}
-      moveLayer={READ_ONLY_HANDLERS.moveLayer}
-      addLayer={READ_ONLY_HANDLERS.addLayer}
-      handleCreateNewEntity={READ_ONLY_HANDLERS.handleCreateNewEntity}
-      handleLinkGeometryToEntity={READ_ONLY_HANDLERS.handleLinkGeometryToEntity}
-      handleUpdateEntity={READ_ONLY_HANDLERS.handleUpdateEntity}
-      handleDeleteGeometry={READ_ONLY_HANDLERS.handleDeleteGeometry}
-      handleSelectOsmObject={READ_ONLY_HANDLERS.handleSelectOsmObject}
-      handleCloseDetail={p.handleCloseDetail}
+      layers={layers}
+      entities={entities}
+      drawnGeometries={drawnGeometries}
+      selectedEntityId={selectedEntityId}
+      setSelectedEntityId={setSelectedEntityId}
+      selectedOsmObject={selectedOsmObject}
+      setSelectedOsmObject={setSelectedOsmObject}
+      showNetworks={showNetworks}
+      setShowNetworks={setShowNetworks}
+      baseMap={baseMap}
+      setBaseMap={setBaseMap}
+      entityOsmGeometries={entityOsmGeometries}
+      setLayerVisible={setLayerVisible}
+      removeLayer={() => {}}
+      renameLayer={() => {}}
+      addNewLayer={() => {}}
+      handleDeleteEntity={() => {}}
+      moveLayer={() => {}}
+      addLayer={() => {}}
+      handleCreateNewEntity={() => {}}
+      handleLinkGeometryToEntity={() => {}}
+      handleUpdateEntity={() => {}}
+      handleDeleteGeometry={() => {}}
+      handleSelectOsmObject={() => {}}
+      handleCloseDetail={closeDetail}
       busy={false}
       error={null}
       projectFileActions={READ_ONLY_FILE_ACTIONS}
