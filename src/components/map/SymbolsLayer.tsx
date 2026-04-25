@@ -25,6 +25,7 @@ function makeSymbolIcon(
     html: `<div class="nato-symbol-wrap" style="width:${width}px;height:${height}px;position:relative;${opacityStyle}">${svg}</div>`,
     iconSize: [width, height],
     iconAnchor: [anchor.x, anchor.y],
+    popupAnchor: [0, -anchor.y],
   })
 }
 

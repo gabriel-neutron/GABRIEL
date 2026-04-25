@@ -1,5 +1,4 @@
 import { useEffect, useRef } from "react"
-import L from "leaflet"
 import { useMap } from "react-leaflet"
 import type { MapEntity } from "@/types/domain.types"
 
@@ -12,35 +11,36 @@ type Props = {
 export function CenterOnSelection({ selectedEntityId, entities, getEntityPosition }: Props) {
   const map = useMap()
   const lastSelectedIdRef = useRef<string | null>(null)
+  const centerTargetRef = useRef<[number, number] | null>(null)
+  const selectionTimeRef = useRef<number>(0)
+
   useEffect(() => {
     if (!selectedEntityId) {
       lastSelectedIdRef.current = null
+      centerTargetRef.current = null
       return
     }
+    if (lastSelectedIdRef.current === selectedEntityId) return
     const entity = entities.find((e) => e.id === selectedEntityId)
     if (!entity) return
-
     const position = getEntityPosition(entity)
     if (!position) return
-
-    const [lat, lng] = position
-    const selectionChanged = lastSelectedIdRef.current !== selectedEntityId
     lastSelectedIdRef.current = selectedEntityId
-
-    if (!selectionChanged) return
-
-    map.flyTo([lat, lng], map.getZoom(), { duration: 0.3 })
-    const id = setTimeout(() => {
-      map.eachLayer((layer) => {
-        if (!(layer instanceof L.Marker)) return
-        const pos = layer.getLatLng()
-        if (Math.abs(pos.lat - lat) < 0.0001 && Math.abs(pos.lng - lng) < 0.0001) {
-          layer.openPopup()
-        }
-      })
-    }, 350)
-    return () => clearTimeout(id)
+    centerTargetRef.current = position
+    selectionTimeRef.current = Date.now()
+    map.setView(position, map.getZoom(), { animate: false })
   }, [selectedEntityId, entities, getEntityPosition, map])
+
+  useEffect(() => {
+    function handleResize() {
+      const pos = centerTargetRef.current
+      if (!pos) return
+      if (Date.now() - selectionTimeRef.current > 300) return
+      map.setView(pos, map.getZoom(), { animate: false })
+    }
+    map.on("resize", handleResize)
+    return () => { map.off("resize", handleResize) }
+  }, [map])
 
   return null
 }

@@ -13,52 +13,19 @@ import { useProjectStore } from "@/store/useProjectStore"
 import { useOsmRelationGeometries } from "@/hooks/useOsmRelationGeometries"
 import { useEnrichment } from "@/hooks/useEnrichment"
 import { useLayeredResearch } from "@/hooks/useLayeredResearch"
-import type { DrawnGeometry, MapEntity } from "@/types/domain.types"
-import { getDefaultEntityLayerId } from "@/utils/entityLayer"
 
 export type EditPageProps = {
   onViewMode?: () => void
   onOpenAbout?: () => void
 }
 
-function entityFromGeometry(geom: DrawnGeometry, defaultLayerId: string, parentId: string | null): MapEntity {
-  const id = crypto.randomUUID()
-  const layerId = geom.layerId ?? defaultLayerId
-  return {
-    id,
-    name: "New entity",
-    layerId,
-    parentId,
-    affiliation: "Hostile",
-    isExactPosition: false,
-  }
-}
-
 export function EditPage({ onViewMode, onOpenAbout }: EditPageProps): React.ReactElement {
   const {
-    layers,
     entities,
     drawnGeometries,
     selectedEntityId,
-    selectedOsmObject,
-    showNetworks,
-    baseMap,
-    entityOsmGeometries,
     sourceCache,
-    setSelectedEntityId,
-    setSelectedOsmObject,
-    closeDetail,
-    setShowNetworks,
-    setBaseMap,
-    setLayerVisible,
-    addLayer,
-    addNewLayer,
-    renameLayer,
-    removeLayer,
-    moveLayer,
     updateEntity,
-    deleteEntity,
-    deleteGeometry,
     mergeSourceCache,
     setProject,
     resetProject,
@@ -147,45 +114,6 @@ export function EditPage({ onViewMode, onOpenAbout }: EditPageProps): React.Reac
     },
     [restoredFromSession],
   )
-
-  function handleDeleteEntity(entityId: string): void {
-    if (!window.confirm("Delete this entity and all its linked geometries?")) return
-    deleteEntity(entityId)
-  }
-
-  function handleRemoveLayer(id: string): void {
-    const layer = layers.find((l) => l.id === id)
-    if (layer?.kind === "echelon") return
-    const isOsm = layer?.osmData != null
-    if (!isOsm && !window.confirm("Remove this layer and all its entities and geometries?")) return
-    removeLayer(id)
-  }
-
-  const handleCreateNewEntity = useCallback((geom: DrawnGeometry): void => {
-    const s = useProjectStore.getState()
-    const defaultLayerId = getDefaultEntityLayerId(s.layers)
-    const entity = entityFromGeometry(geom, defaultLayerId, s.selectedEntityId)
-    s.addEntity(entity)
-    s.addGeometry({ ...geom, entityId: entity.id })
-    s.setSelectedOsmObject(null)
-    s.setSelectedEntityId(entity.id)
-  }, [])
-
-  const handleLinkGeometryToEntity = useCallback((geom: DrawnGeometry, entityId: string): void => {
-    const s = useProjectStore.getState()
-    s.addGeometry({ ...geom, entityId })
-    s.setSelectedOsmObject(null)
-    s.setSelectedEntityId(entityId)
-  }, [])
-
-  function handleSelectOsmObject(
-    type: "node" | "way" | "relation",
-    id: number,
-    cachedFeature?: GeoJSON.Feature & { id?: string },
-  ): void {
-    setSelectedOsmObject({ type, id, cachedFeature })
-    setSelectedEntityId(null)
-  }
 
   const writeGeoPackageToFile = useCallback(async (bytes: Uint8Array): Promise<void> => {
     const showSave = (window as Window & { showSaveFilePicker?: (opts?: unknown) => Promise<FileSystemFileHandle> })
@@ -299,10 +227,10 @@ export function EditPage({ onViewMode, onOpenAbout }: EditPageProps): React.Reac
     if (!entityId) return
     const result = layeredResearch.getResult(entityId)
     if (!result) return
-    setSelectedEntityId(entityId)
+    useProjectStore.getState().setSelectedEntityId(entityId)
     isBatchReviewRef.current = true
     enrichment.loadBatchResult(result)
-  }, [layeredResearch, enrichment, setSelectedEntityId])
+  }, [layeredResearch, enrichment])
 
   const handleCloseEnrichmentDrawer = useCallback(() => {
     const outcome = enrichment.closeDrawer()
@@ -327,7 +255,7 @@ export function EditPage({ onViewMode, onOpenAbout }: EditPageProps): React.Reac
     if (nextEntityId) {
       const result = layeredResearch.getResult(nextEntityId)
       if (result) {
-        setSelectedEntityId(nextEntityId)
+        useProjectStore.getState().setSelectedEntityId(nextEntityId)
         enrich.loadBatchResult(result)
       } else {
         isBatchReviewRef.current = false
@@ -342,7 +270,6 @@ export function EditPage({ onViewMode, onOpenAbout }: EditPageProps): React.Reac
     layeredResearch.reviewQueue,
     layeredResearch.advanceQueue,
     layeredResearch.getResult,
-    setSelectedEntityId,
   ])
 
   const projectFileActions = {
@@ -357,32 +284,7 @@ export function EditPage({ onViewMode, onOpenAbout }: EditPageProps): React.Reac
         readOnly={false}
         onOpenAbout={onOpenAbout}
         onSwitchToView={onViewMode}
-        layers={layers}
-        entities={entities}
-        drawnGeometries={drawnGeometries}
-        selectedEntityId={selectedEntityId}
-        setSelectedEntityId={setSelectedEntityId}
-        selectedOsmObject={selectedOsmObject}
-        setSelectedOsmObject={setSelectedOsmObject}
-        showNetworks={showNetworks}
-        setShowNetworks={setShowNetworks}
-        baseMap={baseMap}
-        setBaseMap={setBaseMap}
-        entityOsmGeometries={entityOsmGeometries}
         restoredFromSession={restoredFromSession}
-        setLayerVisible={setLayerVisible}
-        removeLayer={handleRemoveLayer}
-        renameLayer={renameLayer}
-        addNewLayer={addNewLayer}
-        handleDeleteEntity={handleDeleteEntity}
-        moveLayer={moveLayer}
-        addLayer={addLayer}
-        handleCreateNewEntity={handleCreateNewEntity}
-        handleLinkGeometryToEntity={handleLinkGeometryToEntity}
-        handleUpdateEntity={updateEntity}
-        handleDeleteGeometry={deleteGeometry}
-        handleSelectOsmObject={handleSelectOsmObject}
-        handleCloseDetail={closeDetail}
         busy={busy}
         error={error}
         projectFileActions={projectFileActions}

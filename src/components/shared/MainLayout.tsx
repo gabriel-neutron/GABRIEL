@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useCallback } from "react"
 import { MapView } from "@/components/map/MapView"
 import { EntityInspector } from "@/components/inspector/EntityInspector"
 import { EnrichDrawer } from "@/components/enrichment"
@@ -10,39 +10,32 @@ import { HierarchyPanel } from "@/components/shared/HierarchyPanel"
 import { ShowNetworksToggle } from "@/components/shared/ShowNetworksToggle"
 import { TreeView } from "@/components/tree/TreeView"
 import { OsmQueryMenu } from "@/components/shared/OsmQueryMenu"
-import { BaseMapSwitcher, type BaseMapId } from "@/components/shared/BaseMapSwitcher"
+import { BaseMapSwitcher } from "@/components/shared/BaseMapSwitcher"
 import { ModeToggle } from "@/components/shared/ModeToggle"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import type { Layer, MapEntity, DrawnGeometry } from "@/types/domain.types"
+import type { MapEntity, DrawnGeometry } from "@/types/domain.types"
 import { getDefaultEntityLayerId } from "@/utils/entityLayer"
-import type { SelectedOsmObject } from "@/types/domain.types"
-import type { EnrichmentContext, EnrichmentProposal } from "@/types/enrichment.types"
-import type { EntityResearchStatus } from "@/hooks/useLayeredResearch"
-import type { LayeredResearchResult } from "@/services/research/layered-research.service"
+import type { EnrichmentControls, LayeredResearchControls } from "@/types/layout.types"
+import { useProjectStore } from "@/store/useProjectStore"
 
-type LayeredResearchControls = {
-  status: "idle" | "running" | "done" | "failed"
-  progress: { entityId: string; name: string; layer: number; done: number; total: number } | null
-  reviewQueueLength: number
-  hasNextInQueue: boolean
-  entityStatuses: Record<string, EntityResearchStatus>
-  totalUsage: { inputTokens: number; outputTokens: number }
-  cacheAdditions: Array<{ url: string; content: string }>
-  lastStats: LayeredResearchResult["stats"] | null
-  dialogOpen: boolean
-  batchSize: number
-  setBatchSize: (n: number) => void
-  richnessThreshold: number
-  setRichnessThreshold: (n: number) => void
-  skipAnalyzedWithinDays: number
-  setSkipAnalyzedWithinDays: (n: number) => void
-  hasProcessedEntities: boolean
-  openDialog: () => void
-  closeDialog: () => void
-  onRun: () => void
-  onCancel: () => void
-  onReviewNext: () => void
+export type { EnrichmentControls, LayeredResearchControls }
+
+function entityFromGeometry(
+  geom: DrawnGeometry,
+  defaultLayerId: string,
+  parentId: string | null,
+): MapEntity {
+  const id = crypto.randomUUID()
+  const layerId = geom.layerId ?? defaultLayerId
+  return {
+    id,
+    name: "New entity",
+    layerId,
+    parentId,
+    affiliation: "Hostile",
+    isExactPosition: false,
+  }
 }
 
 function collectDescendants(entities: MapEntity[], rootId: string): string[] {
@@ -65,60 +58,12 @@ export type MainLayoutProps = {
   onOpenAbout?: () => void
   onSwitchToEdit?: () => void
   onSwitchToView?: () => void
-  layers: Layer[]
-  entities: MapEntity[]
-  drawnGeometries: DrawnGeometry[]
-  selectedEntityId: string | null
-  setSelectedEntityId: (id: string | null) => void
-  selectedOsmObject: SelectedOsmObject
-  setSelectedOsmObject: (v: SelectedOsmObject) => void
-  showNetworks: boolean
-  setShowNetworks: (v: boolean) => void
-  baseMap: BaseMapId
-  setBaseMap: (v: BaseMapId) => void
-  entityOsmGeometries: Record<string, GeoJSON.FeatureCollection>
-  restoredFromSession?: boolean
-  setLayerVisible: (id: string, visible: boolean) => void
-  removeLayer: (id: string) => void
-  renameLayer: (layerId: string, name: string) => void
-  addNewLayer: () => void
-  handleDeleteEntity: (entityId: string) => void
-  moveLayer: (layerId: string, direction: "up" | "down") => void
-  addLayer: (layer: Layer) => void
-  handleCreateNewEntity: (geom: DrawnGeometry) => void
-  handleLinkGeometryToEntity: (geom: DrawnGeometry, entityId: string) => void
-  handleUpdateEntity: (entityId: string, patch: Partial<MapEntity>) => void
-  handleDeleteGeometry: (geometryId: string) => void
-  handleSelectOsmObject: (type: "node" | "way" | "relation", id: number, cachedFeature?: GeoJSON.Feature & { id?: string }) => void
-  handleCloseDetail: () => void
+  projectFileActions: ProjectFileActions
   busy: boolean
   error: string | null
-  projectFileActions: ProjectFileActions
-  enrichment: {
-    isDrawerOpen: boolean
-    selectedEntity: MapEntity | null
-    context: EnrichmentContext | null
-    overlay: Record<string, unknown>
-    prompt: string
-    status: "idle" | "running" | "success" | "partial" | "failed"
-    queryTrace: string[]
-    depthUsed: number
-    unresolvedFields: string[]
-    notes: string
-    proposals: EnrichmentProposal[]
-    decisions: Record<string, "accepted" | "rejected" | "pending">
-    errorMessage: string | null
-    closeNotice: string | null
-    setPrompt: (value: string) => void
-    openDrawer: () => void
-    closeDrawer: () => void
-    run: () => void
-    accept: (proposal: EnrichmentProposal) => void
-    reject: (proposal: EnrichmentProposal) => void
-    ignore: (proposal: EnrichmentProposal) => void
-    clearOverlayForSelected: () => void
-  }
+  enrichment: EnrichmentControls
   layeredResearch?: LayeredResearchControls
+  restoredFromSession?: boolean
 }
 
 export function MainLayout({
@@ -126,38 +71,34 @@ export function MainLayout({
   onOpenAbout,
   onSwitchToEdit,
   onSwitchToView,
-  layers,
-  entities,
-  drawnGeometries,
-  selectedEntityId,
-  setSelectedEntityId,
-  selectedOsmObject,
-  setSelectedOsmObject,
-  showNetworks,
-  setShowNetworks,
-  baseMap,
-  setBaseMap,
-  entityOsmGeometries,
-  restoredFromSession = false,
-  setLayerVisible,
-  removeLayer,
-  renameLayer,
-  addNewLayer,
-  handleDeleteEntity,
-  moveLayer,
-  addLayer,
-  handleCreateNewEntity,
-  handleLinkGeometryToEntity,
-  handleUpdateEntity,
-  handleDeleteGeometry,
-  handleSelectOsmObject,
-  handleCloseDetail,
+  projectFileActions,
   busy,
   error,
-  projectFileActions,
   enrichment,
   layeredResearch,
-}: MainLayoutProps) {
+  restoredFromSession = false,
+}: MainLayoutProps): React.ReactElement {
+  const {
+    layers,
+    entities,
+    drawnGeometries,
+    selectedEntityId,
+    selectedOsmObject,
+    showNetworks,
+    baseMap,
+    entityOsmGeometries,
+    setLayerVisible,
+    addLayer,
+    addNewLayer,
+    renameLayer,
+    moveLayer,
+    updateEntity,
+    deleteGeometry,
+    closeDetail,
+    setShowNetworks,
+    setBaseMap,
+  } = useProjectStore()
+
   const [leftMode, setLeftMode] = useState<"layers" | "hierarchy">("layers")
   const [hiddenEntityIds, setHiddenEntityIds] = useState<Set<string>>(new Set())
 
@@ -170,13 +111,53 @@ export function MainLayout({
     })
   }
 
-  const defaultLayerId = getDefaultEntityLayerId(layers)
-  const assignableLayers = layers.filter((l) => l.osmData == null)
+  function handleDeleteEntity(entityId: string): void {
+    if (!window.confirm("Delete this entity and all its linked geometries?")) return
+    useProjectStore.getState().deleteEntity(entityId)
+  }
+
+  function handleRemoveLayer(id: string): void {
+    const s = useProjectStore.getState()
+    const layer = s.layers.find((l) => l.id === id)
+    if (layer?.kind === "echelon") return
+    const isOsm = layer?.osmData != null
+    if (!isOsm && !window.confirm("Remove this layer and all its entities and geometries?")) return
+    s.removeLayer(id)
+  }
+
+  const handleCreateNewEntity = useCallback((geom: DrawnGeometry): void => {
+    const s = useProjectStore.getState()
+    const defaultLayerId = getDefaultEntityLayerId(s.layers)
+    const entity = entityFromGeometry(geom, defaultLayerId, s.selectedEntityId)
+    s.addEntity(entity)
+    s.addGeometry({ ...geom, entityId: entity.id })
+    s.setSelectedOsmObject(null)
+    s.setSelectedEntityId(entity.id)
+  }, [])
+
+  const handleLinkGeometryToEntity = useCallback((geom: DrawnGeometry, entityId: string): void => {
+    const s = useProjectStore.getState()
+    s.addGeometry({ ...geom, entityId })
+    s.setSelectedOsmObject(null)
+    s.setSelectedEntityId(entityId)
+  }, [])
+
+  function handleSelectOsmObject(
+    type: "node" | "way" | "relation",
+    id: number,
+    cachedFeature?: GeoJSON.Feature & { id?: string },
+  ): void {
+    useProjectStore.getState().setSelectedOsmObject({ type, id, cachedFeature })
+    useProjectStore.getState().setSelectedEntityId(null)
+  }
 
   const handleSelectEntity = (id: string | null) => {
-    setSelectedEntityId(id)
-    setSelectedOsmObject(null)
+    useProjectStore.getState().setSelectedEntityId(id)
+    useProjectStore.getState().setSelectedOsmObject(null)
   }
+
+  const defaultLayerId = getDefaultEntityLayerId(layers)
+  const assignableLayers = layers.filter((l) => l.osmData == null)
 
   return (
     <>
@@ -229,7 +210,7 @@ export function MainLayout({
                 selectedEntityId={selectedEntityId}
                 onSelectEntity={handleSelectEntity}
                 onToggleVisible={setLayerVisible}
-                onRemoveLayer={removeLayer}
+                onRemoveLayer={handleRemoveLayer}
                 onRenameLayer={renameLayer}
                 onAddLayer={addNewLayer}
                 onRemoveEntity={handleDeleteEntity}
@@ -275,7 +256,7 @@ export function MainLayout({
       }
       selectedEntityId={selectedEntityId}
       selectedOsmObject={selectedOsmObject}
-      onCloseDetail={handleCloseDetail}
+      onCloseDetail={closeDetail}
       detailHeaderActions={
         !readOnly && selectedEntityId !== null && selectedOsmObject === null ? (
           <Button
@@ -303,9 +284,9 @@ export function MainLayout({
               layers={assignableLayers}
               drawnGeometries={drawnGeometries}
               enrichedOverlay={enrichment.overlay}
-              onUpdateEntity={handleUpdateEntity}
+              onUpdateEntity={updateEntity}
               onDeleteEntity={handleDeleteEntity}
-              onDeleteGeometry={handleDeleteGeometry}
+              onDeleteGeometry={deleteGeometry}
             />
           )
         }

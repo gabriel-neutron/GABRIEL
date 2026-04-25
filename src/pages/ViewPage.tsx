@@ -22,22 +22,7 @@ export function ViewPage({ onEditMode, onOpenAbout }: ViewPageProps): React.Reac
   const [projectLoading, setProjectLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
 
-  const {
-    entities,
-    drawnGeometries,
-    selectedEntityId,
-    selectedOsmObject,
-    showNetworks,
-    baseMap,
-    entityOsmGeometries,
-    layers,
-    setSelectedEntityId,
-    setSelectedOsmObject,
-    closeDetail,
-    setShowNetworks,
-    setBaseMap,
-    setLayerVisible,
-  } = useProjectStore()
+  const { entities, drawnGeometries, selectedEntityId } = useProjectStore()
 
   useOsmRelationGeometries()
 
@@ -106,31 +91,6 @@ export function ViewPage({ onEditMode, onOpenAbout }: ViewPageProps): React.Reac
       readOnly
       onOpenAbout={onOpenAbout}
       onSwitchToEdit={onEditMode}
-      layers={layers}
-      entities={entities}
-      drawnGeometries={drawnGeometries}
-      selectedEntityId={selectedEntityId}
-      setSelectedEntityId={setSelectedEntityId}
-      selectedOsmObject={selectedOsmObject}
-      setSelectedOsmObject={setSelectedOsmObject}
-      showNetworks={showNetworks}
-      setShowNetworks={setShowNetworks}
-      baseMap={baseMap}
-      setBaseMap={setBaseMap}
-      entityOsmGeometries={entityOsmGeometries}
-      setLayerVisible={setLayerVisible}
-      removeLayer={() => {}}
-      renameLayer={() => {}}
-      addNewLayer={() => {}}
-      handleDeleteEntity={() => {}}
-      moveLayer={() => {}}
-      addLayer={() => {}}
-      handleCreateNewEntity={() => {}}
-      handleLinkGeometryToEntity={() => {}}
-      handleUpdateEntity={() => {}}
-      handleDeleteGeometry={() => {}}
-      handleSelectOsmObject={() => {}}
-      handleCloseDetail={closeDetail}
       busy={false}
       error={null}
       projectFileActions={READ_ONLY_FILE_ACTIONS}

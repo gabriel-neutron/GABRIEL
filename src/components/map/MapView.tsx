@@ -1,6 +1,6 @@
 import { useMemo, useEffect, useRef, useCallback } from "react"
 import L from "leaflet"
-import { MapContainer, TileLayer, Marker, Popup, Polyline, Polygon, GeoJSON } from "react-leaflet"
+import { MapContainer, TileLayer, Marker, Popup, Polyline, Polygon, GeoJSON, useMap } from "react-leaflet"
 import { MapToolSelector } from "./MapToolSelector"
 import { MapSearch } from "./MapSearch"
 import { DrawControls } from "./DrawControls"
@@ -14,6 +14,20 @@ import { BASE_MAP_TILE_CONFIG } from "./mapTileConfig"
 import type { Layer, MapEntity, DrawnGeometry } from "@/types/domain.types"
 import { computeAllEntityPositions } from "@/utils/geometry"
 import type { BaseMapId } from "@/components/shared/BaseMapSwitcher"
+
+function MapSizeSync() {
+  const map = useMap()
+  useEffect(() => {
+    const container = map.getContainer()
+    const observer = new ResizeObserver(() => {
+      map.stop()
+      map.invalidateSize({ animate: false })
+    })
+    observer.observe(container)
+    return () => observer.disconnect()
+  }, [map])
+  return null
+}
 
 const markerIcon = L.divIcon({
   className: "map-entity-marker",
@@ -180,6 +194,7 @@ export function MapView({
         zoom={5}
         zoomControl
       >
+        <MapSizeSync />
         <CenterOnSelection
           selectedEntityId={selectedEntityId}
           entities={entities}

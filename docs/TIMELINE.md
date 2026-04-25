@@ -77,7 +77,7 @@ Switching from view to edit mode and back works without errors.
 
 ---
 
-## Phase 4 — MainLayout Prop Reduction [  ]
+## Phase 4 — MainLayout Prop Reduction [X]
 
 **Scope**: Shrink `MainLayoutProps` from 30+ members to ≤ 10. Remove all data props; keep only
 `readOnly`, mode switch callbacks, I/O actions, and the two hook output objects.
@@ -98,16 +98,16 @@ Switching from view to edit mode and back works without errors.
 }
 ```
 **Milestones**
-- [ ] All data props (`layers, entities, drawnGeometries, selectedEntityId,` etc.) removed from
+- [X] All data props (`layers, entities, drawnGeometries, selectedEntityId,` etc.) removed from
   `MainLayoutProps`
-- [ ] All handler props (`handleDeleteEntity, handleUpdateEntity,` etc.) removed
-- [ ] `hiddenEntityIds` + `handleToggleEntityVisible` stay as local `useState` in `MainLayout`
+- [X] All handler props (`handleDeleteEntity, handleUpdateEntity,` etc.) removed
+- [X] `hiddenEntityIds` + `handleToggleEntityVisible` stay as local `useState` in `MainLayout`
   (view-only, not persisted)
-- [ ] Children that previously read data from props are temporarily given `useProjectStore` calls
+- [X] Children that previously read data from props are temporarily given `useProjectStore` calls
   inline (individual component migrations follow in Phase 5–7)
-- [ ] `EditPage` JSX call to `MainLayout` updated to match reduced props
-- [ ] `ViewPage` JSX call to `MainLayout` updated
-- [ ] `npm run build` passes, `npm test` passes
+- [X] `EditPage` JSX call to `MainLayout` updated to match reduced props
+- [X] `ViewPage` JSX call to `MainLayout` updated
+- [X] `npm run build` passes, `npm test` passes
 **Acceptance Criteria**: `MainLayoutProps` has ≤ 10 members. Removing a data prop from the
 `MainLayout` call in `EditPage` produces no TypeScript error in children.
 
