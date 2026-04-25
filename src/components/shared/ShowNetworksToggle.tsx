@@ -1,19 +1,17 @@
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
+import { useProjectStore } from "@/store/useProjectStore"
 
-type Props = {
-  checked: boolean
-  onCheckedChange: (checked: boolean) => void
-}
-
-export function ShowNetworksToggle({ checked, onCheckedChange }: Props) {
+export function ShowNetworksToggle() {
+  const showNetworks = useProjectStore((s) => s.showNetworks)
+  const setShowNetworks = useProjectStore((s) => s.setShowNetworks)
   return (
     <div className="flex items-center gap-2">
       <Switch
         id="show-networks"
         size="sm"
-        checked={checked}
-        onCheckedChange={onCheckedChange}
+        checked={showNetworks}
+        onCheckedChange={setShowNetworks}
       />
       <Label htmlFor="show-networks" className="text-sm cursor-pointer select-none">
         Show Networks

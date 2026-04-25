@@ -5,6 +5,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { useProjectStore } from "@/store/useProjectStore"
 
 export const BASE_MAP_IDS = ["osm", "satellite", "hybrid", "topo"] as const
 export type BaseMapId = (typeof BASE_MAP_IDS)[number]
@@ -16,14 +17,11 @@ const LABELS: Record<BaseMapId, string> = {
   topo: "Topographic",
 }
 
-type Props = {
-  value: BaseMapId
-  onValueChange: (value: BaseMapId) => void
-}
-
-export function BaseMapSwitcher({ value, onValueChange }: Props) {
+export function BaseMapSwitcher() {
+  const baseMap = useProjectStore((s) => s.baseMap)
+  const setBaseMap = useProjectStore((s) => s.setBaseMap)
   return (
-    <Select value={value} onValueChange={(v) => onValueChange(v as BaseMapId)}>
+    <Select value={baseMap} onValueChange={(v) => setBaseMap(v as BaseMapId)}>
       <SelectTrigger size="sm" className="w-[160px]" title="Map background">
         <SelectValue placeholder="Map" />
       </SelectTrigger>

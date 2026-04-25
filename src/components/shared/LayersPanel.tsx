@@ -1,20 +1,10 @@
 import { useState, useEffect, useRef } from "react"
 import { Eye, EyeOff } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import type { Layer, MapEntity } from "@/types/domain.types"
+import { useProjectStore } from "@/store/useProjectStore"
 
 type Props = {
   readOnly?: boolean
-  layers: Layer[]
-  entities: MapEntity[]
-  selectedEntityId: string | null
-  onSelectEntity: (id: string) => void
-  onToggleVisible: (layerId: string, visible: boolean) => void
-  onRemoveLayer: (layerId: string) => void
-  onRenameLayer: (layerId: string, name: string) => void
-  onAddLayer: () => void
-  onRemoveEntity: (entityId: string) => void
-  onMoveLayer: (layerId: string, direction: "up" | "down") => void
 }
 
 function getLayerTitle(isOsmLayer: boolean, expanded: boolean, readOnly: boolean): string | undefined {
@@ -24,20 +14,11 @@ function getLayerTitle(isOsmLayer: boolean, expanded: boolean, readOnly: boolean
   return "Expand. Right-click to rename or delete."
 }
 
-export function LayersPanel({
-  readOnly = false,
-  layers,
-  entities,
-  selectedEntityId,
-  onSelectEntity,
-  onToggleVisible,
-  onRemoveLayer,
-  onRenameLayer,
-  onAddLayer,
-  onRemoveEntity,
-  onMoveLayer,
-}: Props) {
-  /** Layer list expand/collapse is session-only; omitted key means collapsed. */
+export function LayersPanel({ readOnly = false }: Props) {
+  const layers = useProjectStore((s) => s.layers)
+  const entities = useProjectStore((s) => s.entities)
+  const selectedEntityId = useProjectStore((s) => s.selectedEntityId)
+
   const [expandedByLayerId, setExpandedByLayerId] = useState<Record<string, boolean>>({})
   const [contextMenu, setContextMenu] = useState<{ layerId: string; x: number; y: number } | null>(null)
   const menuRef = useRef<HTMLDivElement>(null)
@@ -51,6 +32,20 @@ export function LayersPanel({
       const cur = prev[layerId] === true
       return { ...prev, [layerId]: !cur }
     })
+  }
+
+  function handleRemoveLayer(id: string): void {
+    const s = useProjectStore.getState()
+    const layer = s.layers.find((l) => l.id === id)
+    if (layer?.kind === "echelon") return
+    const isOsm = layer?.osmData != null
+    if (!isOsm && !window.confirm("Remove this layer and all its entities and geometries?")) return
+    s.removeLayer(id)
+  }
+
+  function handleDeleteEntity(entityId: string): void {
+    if (!window.confirm("Delete this entity and all its linked geometries?")) return
+    useProjectStore.getState().deleteEntity(entityId)
   }
 
   useEffect(() => {
@@ -93,7 +88,12 @@ export function LayersPanel({
       <div className="flex shrink-0 items-center justify-between gap-2 border-b border-border px-4 py-3">
         <h2 className="text-sm font-semibold">Layers</h2>
         {!readOnly && (
-          <Button type="button" variant="outline" size="xs" onClick={onAddLayer}>
+          <Button
+            type="button"
+            variant="outline"
+            size="xs"
+            onClick={() => useProjectStore.getState().addNewLayer()}
+          >
             Add layer
           </Button>
         )}
@@ -153,7 +153,7 @@ export function LayersPanel({
                         size="icon-xs"
                         className="h-6 w-6"
                         disabled={!canMoveUp}
-                        onClick={() => onMoveLayer(layer.id, "up")}
+                        onClick={() => useProjectStore.getState().moveLayer(layer.id, "up")}
                         title="Move layer up (draw order)"
                       >
                         ↑
@@ -164,7 +164,7 @@ export function LayersPanel({
                         size="icon-xs"
                         className="h-6 w-6"
                         disabled={!canMoveDown}
-                        onClick={() => onMoveLayer(layer.id, "down")}
+                        onClick={() => useProjectStore.getState().moveLayer(layer.id, "down")}
                         title="Move layer down (draw order)"
                       >
                         ↓
@@ -176,7 +176,7 @@ export function LayersPanel({
                     variant="ghost"
                     size="icon-xs"
                     className="h-5 w-5 shrink-0 text-muted-foreground"
-                    onClick={() => onToggleVisible(layer.id, !layer.visible)}
+                    onClick={() => useProjectStore.getState().setLayerVisible(layer.id, !layer.visible)}
                     title={layer.visible ? "Hide" : "Show"}
                   >
                     {layer.visible ? (
@@ -194,7 +194,11 @@ export function LayersPanel({
                       <div key={entity.id} className="flex items-center gap-1">
                         <button
                           type="button"
-                          onClick={() => onSelectEntity(entity.id)}
+                          onClick={() => {
+                            const s = useProjectStore.getState()
+                            s.setSelectedEntityId(entity.id)
+                            s.setSelectedOsmObject(null)
+                          }}
                           className={`min-w-0 flex-1 truncate rounded px-2 py-1 text-left text-xs transition-colors hover:bg-muted ${
                             selectedEntityId === entity.id ? "bg-primary/15 text-primary" : ""
                           }`}
@@ -209,7 +213,7 @@ export function LayersPanel({
                             className="h-5 w-5 shrink-0 text-muted-foreground hover:bg-destructive/15 hover:text-destructive"
                             onClick={(e) => {
                               e.stopPropagation()
-                              onRemoveEntity(entity.id)
+                              handleDeleteEntity(entity.id)
                             }}
                             title="Remove entity"
                           >
@@ -239,7 +243,7 @@ export function LayersPanel({
               onClick={() => {
                 if (!contextLayer) return
                 const name = window.prompt("Layer name", contextLayer.name)
-                if (name != null) onRenameLayer(contextMenu.layerId, name)
+                if (name != null) useProjectStore.getState().renameLayer(contextMenu.layerId, name)
                 setContextMenu(null)
               }}
             >
@@ -251,7 +255,7 @@ export function LayersPanel({
               type="button"
               className="w-full px-3 py-1.5 text-left text-sm text-destructive hover:bg-destructive/10"
               onClick={() => {
-                onRemoveLayer(contextMenu.layerId)
+                handleRemoveLayer(contextMenu.layerId)
                 setContextMenu(null)
               }}
             >

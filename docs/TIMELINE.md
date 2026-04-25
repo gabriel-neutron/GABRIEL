@@ -138,7 +138,7 @@ page load. No BFS computation outside `useMemo`.
 
 ---
 
-## Phase 6 — Panels Migration [  ]
+## Phase 6 — Panels Migration [X]
 
 **Scope**: Migrate `LayersPanel`, `HierarchyPanel`, `TreeView`, `ShowNetworksToggle`, and
 `BaseMapSwitcher` to read from/write to the store directly.
@@ -146,16 +146,16 @@ page load. No BFS computation outside `useMemo`.
 **Key files**: `src/components/shared/LayersPanel.tsx`, `HierarchyPanel.tsx`,
 `src/components/tree/TreeView.tsx`, `ShowNetworksToggle.tsx`, `BaseMapSwitcher.tsx`
 **Milestones**
-- [ ] `LayersPanel` reads `layers, entities, selectedEntityId` from store; calls store actions
+- [X] `LayersPanel` reads `layers, entities, selectedEntityId` from store; calls store actions
   directly (`setLayerVisible, removeLayer, renameLayer, addNewLayer, moveLayer`). Props reduced
   to: `readOnly`.
-- [ ] `HierarchyPanel` reads `entities, selectedEntityId` from store. Props: `hiddenEntityIds,
+- [X] `HierarchyPanel` reads `entities, selectedEntityId` from store. Props: `hiddenEntityIds,
   onToggleEntityVisible` (passed from MainLayout local state).
-- [ ] `TreeView` reads `entities, selectedEntityId` from store; calls
+- [X] `TreeView` reads `entities, selectedEntityId` from store; calls
   `store.setSelectedEntityId`. Props removed entirely.
-- [ ] `ShowNetworksToggle` reads/writes `showNetworks` directly. No props.
-- [ ] `BaseMapSwitcher` reads/writes `baseMap` directly. No props.
-- [ ] `npm run build` passes, `npm test` passes
+- [X] `ShowNetworksToggle` reads/writes `showNetworks` directly. No props.
+- [X] `BaseMapSwitcher` reads/writes `baseMap` directly. No props.
+- [X] `npm run build` passes, `npm test` passes
 **Acceptance Criteria**: Layer visibility toggle, entity selection in tree, and base map switch all
 work. `LayersPanel` renders without any data props from `MainLayout`.
 

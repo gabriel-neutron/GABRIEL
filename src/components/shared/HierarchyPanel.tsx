@@ -2,12 +2,11 @@ import { useState } from "react"
 import { Eye, EyeOff } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import type { MapEntity } from "@/types/domain.types"
+import { useProjectStore } from "@/store/useProjectStore"
+import { useShallow } from "zustand/shallow"
 
 type Props = {
-  entities: MapEntity[]
-  selectedEntityId: string | null
   hiddenEntityIds: Set<string>
-  onSelectEntity: (id: string) => void
   onToggleEntityVisible: (entityId: string, visible: boolean) => void
 }
 
@@ -18,7 +17,6 @@ type NodeProps = {
   selectedEntityId: string | null
   hiddenEntityIds: Set<string>
   expandedIds: Set<string>
-  onSelectEntity: (id: string) => void
   onToggleEntityVisible: (entityId: string, visible: boolean) => void
   onToggleExpanded: (id: string) => void
 }
@@ -53,7 +51,6 @@ function EntityNode({
   selectedEntityId,
   hiddenEntityIds,
   expandedIds,
-  onSelectEntity,
   onToggleEntityVisible,
   onToggleExpanded,
 }: NodeProps) {
@@ -68,13 +65,18 @@ function EntityNode({
   const effectivelyHidden = isHidden || ancestorHidden
   const isSelected = selectedEntityId === entity.id
 
+  function handleSelectEntity() {
+    const s = useProjectStore.getState()
+    s.setSelectedEntityId(entity.id)
+    s.setSelectedOsmObject(null)
+  }
+
   return (
     <div>
       <div
         className="flex items-center gap-1 rounded px-2 py-0.5"
         style={{ paddingLeft: `${8 + depth * 16}px` }}
       >
-        {/* Expand/collapse toggle */}
         <button
           type="button"
           className="flex h-5 w-5 shrink-0 items-center justify-center text-muted-foreground"
@@ -85,10 +87,9 @@ function EntityNode({
           {hasKids ? (expanded ? "▾" : "▸") : ""}
         </button>
 
-        {/* Entity name */}
         <button
           type="button"
-          onClick={() => onSelectEntity(entity.id)}
+          onClick={handleSelectEntity}
           className={`min-w-0 flex-1 truncate rounded px-1 py-0.5 text-left text-xs transition-colors hover:bg-muted ${
             isSelected ? "bg-primary/15 font-medium text-primary" : ""
           } ${effectivelyHidden ? "opacity-40" : ""}`}
@@ -97,7 +98,6 @@ function EntityNode({
           {entity.name}
         </button>
 
-        {/* Visibility toggle */}
         <Button
           type="button"
           variant="ghost"
@@ -126,7 +126,6 @@ function EntityNode({
               selectedEntityId={selectedEntityId}
               hiddenEntityIds={hiddenEntityIds}
               expandedIds={expandedIds}
-              onSelectEntity={onSelectEntity}
               onToggleEntityVisible={onToggleEntityVisible}
               onToggleExpanded={onToggleExpanded}
             />
@@ -137,13 +136,10 @@ function EntityNode({
   )
 }
 
-export function HierarchyPanel({
-  entities,
-  selectedEntityId,
-  hiddenEntityIds,
-  onSelectEntity,
-  onToggleEntityVisible,
-}: Props) {
+export function HierarchyPanel({ hiddenEntityIds, onToggleEntityVisible }: Props) {
+  const { entities, selectedEntityId } = useProjectStore(
+    useShallow((s) => ({ entities: s.entities, selectedEntityId: s.selectedEntityId }))
+  )
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
   const anyVisible = entities.some(
     (e) => !hiddenEntityIds.has(e.id) && !isAncestorHidden(e, entities, hiddenEntityIds),
@@ -160,6 +156,7 @@ export function HierarchyPanel({
       return next
     })
   }
+
   function handleToggleAllVisibility() {
     const visible = !anyVisible
     for (const entity of entities) onToggleEntityVisible(entity.id, visible)
@@ -194,7 +191,6 @@ export function HierarchyPanel({
                 selectedEntityId={selectedEntityId}
                 hiddenEntityIds={hiddenEntityIds}
                 expandedIds={expandedIds}
-                onSelectEntity={onSelectEntity}
                 onToggleEntityVisible={onToggleEntityVisible}
                 onToggleExpanded={handleToggleExpanded}
               />

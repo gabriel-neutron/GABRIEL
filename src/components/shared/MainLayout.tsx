@@ -86,18 +86,10 @@ export function MainLayout({
     drawnGeometries,
     selectedEntityId,
     selectedOsmObject,
-    showNetworks,
-    baseMap,
-    setLayerVisible,
     addLayer,
-    addNewLayer,
-    renameLayer,
-    moveLayer,
     updateEntity,
     deleteGeometry,
     closeDetail,
-    setShowNetworks,
-    setBaseMap,
   } = useProjectStore()
 
   const [leftMode, setLeftMode] = useState<"layers" | "hierarchy">("layers")
@@ -117,15 +109,6 @@ export function MainLayout({
     useProjectStore.getState().deleteEntity(entityId)
   }
 
-  function handleRemoveLayer(id: string): void {
-    const s = useProjectStore.getState()
-    const layer = s.layers.find((l) => l.id === id)
-    if (layer?.kind === "echelon") return
-    const isOsm = layer?.osmData != null
-    if (!isOsm && !window.confirm("Remove this layer and all its entities and geometries?")) return
-    s.removeLayer(id)
-  }
-
   const handleCreateNewEntity = useCallback((geom: DrawnGeometry): void => {
     const s = useProjectStore.getState()
     const defaultLayerId = getDefaultEntityLayerId(s.layers)
@@ -142,11 +125,6 @@ export function MainLayout({
     s.setSelectedOsmObject(null)
     s.setSelectedEntityId(entityId)
   }, [])
-
-  const handleSelectEntity = (id: string | null) => {
-    useProjectStore.getState().setSelectedEntityId(id)
-    useProjectStore.getState().setSelectedOsmObject(null)
-  }
 
   const defaultLayerId = getDefaultEntityLayerId(layers)
   const assignableLayers = layers.filter((l) => l.osmData == null)
@@ -168,13 +146,7 @@ export function MainLayout({
           onOverpassUnavailable={onOverpassUnavailable}
         />
       }
-      treeSlot={
-        <TreeView
-          entities={entities}
-          selectedEntityId={selectedEntityId}
-          onSelectEntity={handleSelectEntity}
-        />
-      }
+      treeSlot={<TreeView />}
       leftSlot={
         <div className="flex h-full flex-col">
           <div className="shrink-0 border-b border-border px-3 py-2">
@@ -187,25 +159,10 @@ export function MainLayout({
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
             {leftMode === "layers" ? (
-              <LayersPanel
-                readOnly={readOnly}
-                layers={layers}
-                entities={entities}
-                selectedEntityId={selectedEntityId}
-                onSelectEntity={handleSelectEntity}
-                onToggleVisible={setLayerVisible}
-                onRemoveLayer={handleRemoveLayer}
-                onRenameLayer={renameLayer}
-                onAddLayer={addNewLayer}
-                onRemoveEntity={handleDeleteEntity}
-                onMoveLayer={moveLayer}
-              />
+              <LayersPanel readOnly={readOnly} />
             ) : (
               <HierarchyPanel
-                entities={entities}
-                selectedEntityId={selectedEntityId}
                 hiddenEntityIds={hiddenEntityIds}
-                onSelectEntity={handleSelectEntity}
                 onToggleEntityVisible={handleToggleEntityVisible}
               />
             )}
@@ -217,8 +174,8 @@ export function MainLayout({
           {!readOnly && restoredFromSession && (
             <span className="text-muted-foreground text-xs">Project restored from last session</span>
           )}
-          <ShowNetworksToggle checked={showNetworks} onCheckedChange={setShowNetworks} />
-          <BaseMapSwitcher value={baseMap} onValueChange={setBaseMap} />
+          <ShowNetworksToggle />
+          <BaseMapSwitcher />
           {!readOnly && <OsmQueryMenu layers={layers} onAddLayer={addLayer} />}
           {!readOnly && layeredResearch && (
             <Button

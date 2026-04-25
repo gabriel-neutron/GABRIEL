@@ -2,21 +2,19 @@ import { useCallback, useMemo } from "react"
 import ReactFlow, { Background, type Edge, type Node, Position } from "reactflow"
 import type { MapEntity } from "@/types/domain.types"
 import { MilitarySymbolNode } from "./MilitarySymbolNode"
+import { useProjectStore } from "@/store/useProjectStore"
+import { useShallow } from "zustand/shallow"
 
 const nodeTypes = { militarySymbol: MilitarySymbolNode }
 
-// Horizontal spacing between sibling units (same level)
 const H_SPACING = 110
-// Vertical spacing between hierarchical levels
 const V_SPACING = 130
 
-type Props = {
-  entities: MapEntity[]
-  selectedEntityId: string | null
-  onSelectEntity: (id: string | null) => void
-}
+export function TreeView() {
+  const { entities, selectedEntityId } = useProjectStore(
+    useShallow((s) => ({ entities: s.entities, selectedEntityId: s.selectedEntityId }))
+  )
 
-export function TreeView({ entities, selectedEntityId, onSelectEntity }: Props) {
   const { nodes, edges } = useMemo(() => {
     const nodeMap = new Map<string, Node>()
     const edgeList: Edge[] = []
@@ -112,16 +110,17 @@ export function TreeView({ entities, selectedEntityId, onSelectEntity }: Props) 
     }))
   }, [nodes, selectedEntityId])
 
-  const handleNodeClick = useCallback(
-    (_: React.MouseEvent, node: Node) => {
-      onSelectEntity(node.id)
-    },
-    [onSelectEntity]
-  )
+  const handleNodeClick = useCallback((_: React.MouseEvent, node: Node) => {
+    const s = useProjectStore.getState()
+    s.setSelectedEntityId(node.id)
+    s.setSelectedOsmObject(null)
+  }, [])
 
   const handlePaneClick = useCallback(() => {
-    onSelectEntity(null)
-  }, [onSelectEntity])
+    const s = useProjectStore.getState()
+    s.setSelectedEntityId(null)
+    s.setSelectedOsmObject(null)
+  }, [])
 
   return (
     <div className="h-full w-full">
