@@ -1,16 +1,10 @@
 import { useState, useEffect, useRef } from "react"
 import { getDefaultEchelonLayers } from "@/services/geopackage.service"
 import { fetchRelationGeometry } from "@/services/overpass.service"
-import type { Layer, MapEntity, DrawnGeometry } from "@/types/domain.types"
+import type { Layer, MapEntity, DrawnGeometry, SelectedOsmObject } from "@/types/domain.types"
 import type { BaseMapId } from "@/components/shared/BaseMapSwitcher"
 
-export type SelectedOsmObject =
-  | {
-      type: "node" | "way" | "relation"
-      id: number
-      cachedFeature?: GeoJSON.Feature & { id?: string }
-    }
-  | null
+export type { SelectedOsmObject }
 
 type Options = { initialShowNetworks: boolean }
 

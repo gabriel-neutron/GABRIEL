@@ -15,23 +15,23 @@
 
 ---
 
-## Phase 1 — Zustand Store Creation [  ]
+## Phase 1 — Zustand Store Creation [X]
 
-**Scope**: Install Zustand. Create `src/store/projectStore.ts` with the full state + actions
+**Scope**: Install Zustand. Create `src/store/useProjectStore.ts` with the full state + actions
 interface. No component migration yet — the store exists alongside the current `useMapProjectState`.
 **Dependencies**: Phase 0
 **Milestones**
-- [ ] `zustand` added to `package.json` dependencies (`npm install zustand`)
-- [ ] `src/store/projectStore.ts` created with state shape:
+- [X] `zustand` added to `package.json` dependencies (`npm install zustand`)
+- [X] `src/store/useProjectStore.ts` created with state shape:
   `layers, entities, drawnGeometries, sourceCache, selectedEntityId, selectedOsmObject,
   showNetworks, baseMap, entityOsmGeometries, osmUnavailable, lastSavedAt`
-- [ ] Actions implemented: `setProject, resetProject, addLayer, addNewLayer, renameLayer,
+- [X] Actions implemented: `setProject, resetProject, addLayer, addNewLayer, renameLayer,
   removeLayer, moveLayer, setLayerVisible, addEntity, updateEntity, deleteEntity, addGeometry,
   deleteGeometry, setSelectedEntityId, setSelectedOsmObject, closeDetail, setShowNetworks,
   setBaseMap, setEntityOsmGeometries, setOsmUnavailable, mergeSourceCache, setLastSavedAt`
-- [ ] `devtools` middleware applied (enabled only in `import.meta.env.DEV`)
-- [ ] Store is exported as `useProjectStore`
-- [ ] `npm run build` passes, `npm test` passes (store is unused but must not break the build)
+- [X] `devtools` middleware applied (enabled only in `import.meta.env.DEV`)
+- [X] Store is exported as `useProjectStore`
+- [X] `npm run build` passes, `npm test` passes (store is unused but must not break the build)
 **Acceptance Criteria**: `useProjectStore` can be imported and returns the expected shape.
 The existing app is completely unchanged in behaviour.
 

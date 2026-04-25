@@ -1,5 +1,4 @@
 import { OpenAIModelAdapter } from "./openai.adapter"
-import { OverpassAdapter } from "./overpass.adapter"
 import { TavilyAdapter } from "./tavily.adapter"
 import { CachedContentAdapter } from "./cached-content.adapter"
 import type { AiModelAdapter, RetrievalAdapter } from "./provider.types"

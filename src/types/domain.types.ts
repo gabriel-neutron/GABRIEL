@@ -57,6 +57,11 @@ export type MapEntity = {
 
 export type PositionMode = "own" | "parent" | "none"
 
+/** An OSM node, way, or relation selected on the map for inspection. */
+export type SelectedOsmObject =
+  | { type: "node" | "way" | "relation"; id: number; cachedFeature?: GeoJSON.Feature & { id?: string } }
+  | null
+
 /**
  * User-drawn map geometry stored in GeoPackage `geometries` (point, line, or polygon).
  * Linked to a layer; optionally linked to a unit entity via `entityId`.
