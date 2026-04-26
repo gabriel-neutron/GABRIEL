@@ -259,6 +259,7 @@ export function getSymbolForUnit(input: SymbolServiceInput): SymbolServiceOutput
 
 export interface RenderedSymbol {
   svg: string
+  pngDataUri: string
   anchor: { x: number; y: number }
   width: number
   height: number
@@ -290,11 +291,14 @@ export function renderSymbol(sidc: string, options: SymbolServiceOutput["options
   })
 
   const svg = symbol.asSVG()
+  const canvas = symbol.asCanvas(2)
+  const pngDataUri = canvas.toDataURL("image/png")
   const anchor = symbol.getAnchor()
   const size = symbol.getSize()
 
   const result: RenderedSymbol = {
     svg,
+    pngDataUri,
     anchor: { x: anchor.x, y: anchor.y },
     width: size.width,
     height: size.height,

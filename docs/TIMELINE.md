@@ -228,23 +228,23 @@ Single enrichment of an entity and batch research both produce identical GeoJSON
 
 ---
 
-## Phase 10 — Performance Verification [  ]
+## Phase 10 — Performance Verification [X]
 
 **Scope**: Audit and verify all memoisation invariants at 1 000+ entity scale. Add a Storybook
 story for performance testing.
 **Dependencies**: Phase 9
 **Key files**: `src/components/map/NetworkLinksLayer.tsx`,
 `src/components/map/MapView.tsx`,
-`src/stories/NetworkLinksLayer.stories.tsx` (new or update)
+`src/stories/map/NetworkLinksLayer.stories.tsx` (new)
 **Milestones**
-- [ ] `NetworkLinksLayer.stories.tsx` story with 500 synthetic entities + 1 selected entity
+- [X] `NetworkLinksLayer.stories.tsx` story with 500 synthetic entities + 1 selected entity
   confirms BFS is not recalculated on unrelated state changes (verified via React DevTools
   Profiler or console.count)
-- [ ] `computeAllEntityPositions` `useMemo` dependency array confirmed correct after Zustand
+- [X] `computeAllEntityPositions` `useMemo` dependency array confirmed correct after Zustand
   migration — uses `shallow` selector if needed to return stable references
-- [ ] Zustand selectors in `MapView`, `LayersPanel`, `NetworkLinksLayer` audited for unnecessary
+- [X] Zustand selectors in `MapView`, `LayersPanel`, `NetworkLinksLayer` audited for unnecessary
   object references (use `shallow` where selecting multiple fields)
-- [ ] `npm run build` passes, `npm test` passes
+- [X] `npm run build` passes, `npm test` passes
 **Acceptance Criteria**: Adding a toast or changing base map does not trigger a BFS recompute in
 `NetworkLinksLayer`. `SymbolsLayer` re-render count on selection change is ≤ 2 in Profiler.
 

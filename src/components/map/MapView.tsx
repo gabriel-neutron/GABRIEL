@@ -1,4 +1,4 @@
-import { useMemo, useEffect, useRef, useCallback } from "react"
+import { useMemo, useEffect, useRef, useCallback, useState } from "react"
 import L from "leaflet"
 import { MapContainer, TileLayer, Marker, Popup, Polyline, Polygon, GeoJSON, useMap } from "react-leaflet"
 import { MapToolSelector } from "./MapToolSelector"
@@ -12,6 +12,7 @@ import { useMapDrawing } from "./useMapDrawing"
 import { BASE_MAP_TILE_CONFIG } from "./mapTileConfig"
 import type { DrawnGeometry } from "@/types/domain.types"
 import { computeAllEntityPositions } from "@/utils/geometry"
+import { MapBoundsReporter, type MapBounds } from "./MapBoundsReporter"
 import { useProjectStore } from "@/store/useProjectStore"
 import { useOsmRelationGeometries } from "@/hooks/useOsmRelationGeometries"
 
@@ -114,6 +115,8 @@ export function MapView({
     handleCancel,
   } = useMapDrawing({ onCreateNewEntity, onLinkGeometryToEntity })
 
+  const [mapBounds, setMapBounds] = useState<MapBounds | null>(null)
+
   const handleSelectEntity = useCallback((id: string | null) => {
     useProjectStore.getState().setSelectedEntityId(id)
     useProjectStore.getState().setSelectedOsmObject(null)
@@ -188,6 +191,7 @@ export function MapView({
         zoomControl
       >
         <MapSizeSync />
+        <MapBoundsReporter onBoundsChange={setMapBounds} />
         <CenterOnSelection
           selectedEntityId={selectedEntityId}
           entities={entities}
@@ -210,6 +214,7 @@ export function MapView({
           visibleLayerIds={visibleLayerIds}
           hiddenEntityIds={hiddenEntityIds}
           onSelectEntity={handleSelectEntity}
+          mapBounds={mapBounds}
         />
         <NetworkLinksLayer positionMap={positionMap} />
 
