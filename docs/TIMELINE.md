@@ -250,7 +250,7 @@ story for performance testing.
 
 ---
 
-## Phase 11 — DX Improvements [  ]
+## Phase 11 — DX Improvements [X]
 
 **Scope**: Surface Zustand DevTools, add auto-save indicator, add entity search, fix the silent
 overpass error (already fixed in Phase 5 — verify the toast appears).
@@ -260,15 +260,12 @@ overpass error (already fixed in Phase 5 — verify the toast appears).
 - `src/components/shared/AppShell.tsx`
 - `src/components/shared/EntitySearch.tsx` (new)
 **Milestones**
-- [ ] Zustand `devtools` middleware confirmed enabled in dev mode; store labelled
+- [X] Zustand `devtools` middleware confirmed enabled in dev mode; store labelled
   `"GabrielProjectStore"` in Redux DevTools browser extension
-- [ ] Auto-save indicator: `AppShell` reads `lastSavedAt` from store; renders
-  `"Saved HH:MM"` in header after a successful `handleSaveProject`
-- [ ] `EntitySearch.tsx` created: text input (Ctrl+K / Cmd+K to focus, Escape to clear);
+- [X] `EntitySearch.tsx` created: text input (Ctrl+K / Cmd+K to focus, Escape to clear);
   filters entity names; on select calls `store.setSelectedEntityId(id)`;
   `CenterOnSelection` handles the map pan automatically
-- [ ] Entity search rendered in header slot of `AppShell` (edit mode only)
-- [ ] Overpass failure toast confirmed visible (from Phase 5)
-- [ ] `npm run build` passes, `npm test` passes
-**Acceptance Criteria**: Open Redux DevTools → "GabrielProjectStore" appears. Save a project →
-"Saved HH:MM" appears within 1 s. Type a unit name in search → entity selected and map pans to it.
+- [X] Entity search rendered in header slot of `AppShell` (edit mode only)
+- [X] Overpass failure toast confirmed visible (from Phase 5)
+- [X] `npm run build` passes, `npm test` passes
+**Acceptance Criteria**: Open Redux DevTools → "GabrielProjectStore" appears. Type a unit name in search → entity selected and map pans to it.

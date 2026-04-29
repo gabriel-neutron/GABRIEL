@@ -2,7 +2,6 @@ import { useMemo, useEffect, useRef, useCallback, useState } from "react"
 import L from "leaflet"
 import { MapContainer, TileLayer, Marker, Popup, Polyline, Polygon, GeoJSON, useMap } from "react-leaflet"
 import { MapToolSelector } from "./MapToolSelector"
-import { MapSearch } from "./MapSearch"
 import { DrawControls } from "./DrawControls"
 import { GeometryActionMenu } from "./GeometryActionMenu"
 import { SymbolsLayer } from "./SymbolsLayer"
@@ -15,6 +14,17 @@ import { computeAllEntityPositions } from "@/utils/geometry"
 import { MapBoundsReporter, type MapBounds } from "./MapBoundsReporter"
 import { useProjectStore } from "@/store/useProjectStore"
 import { useOsmRelationGeometries } from "@/hooks/useOsmRelationGeometries"
+
+type FlyToFn = (lat: number, lng: number, zoom?: number) => void
+
+function MapInstanceBridge({ flyToRef }: { flyToRef: React.RefObject<FlyToFn | null> }) {
+  const map = useMap()
+  useEffect(() => {
+    flyToRef.current = (lat, lng, zoom = 14) => map.flyTo([lat, lng], zoom, { duration: 0.4 })
+    return () => { flyToRef.current = null }
+  }, [map, flyToRef])
+  return null
+}
 
 function MapSizeSync() {
   const map = useMap()
@@ -83,6 +93,7 @@ type Props = {
   defaultLayerId: string
   hiddenEntityIds?: Set<string>
   onOverpassUnavailable?: () => void
+  flyToRef?: React.RefObject<FlyToFn | null>
 }
 
 export function MapView({
@@ -92,6 +103,7 @@ export function MapView({
   defaultLayerId,
   hiddenEntityIds,
   onOverpassUnavailable,
+  flyToRef,
 }: Props): React.ReactElement {
   const layers = useProjectStore((s) => s.layers)
   const entities = useProjectStore((s) => s.entities)
@@ -197,8 +209,8 @@ export function MapView({
           entities={entities}
           getEntityPosition={getEntityPosition}
         />
+        {flyToRef && <MapInstanceBridge flyToRef={flyToRef} />}
         {!readOnly && <MapToolSelector mapTool={mapTool} onMapToolChange={setMapTool} />}
-        <MapSearch layers={layers} entityOsmGeometries={entityOsmGeometries} entities={entities} />
 
         <TileLayer url={tileConfig.url} attribution={tileConfig.attribution} />
         {tileConfig.overlay && (

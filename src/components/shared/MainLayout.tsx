@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react"
+import { useState, useCallback, useRef } from "react"
 import { MapView } from "@/components/map/MapView"
 import { EntityInspector } from "@/components/inspector/EntityInspector"
 import { EnrichDrawer } from "@/components/enrichment"
@@ -12,8 +12,10 @@ import { TreeView } from "@/components/tree/TreeView"
 import { OsmQueryMenu } from "@/components/shared/OsmQueryMenu"
 import { BaseMapSwitcher } from "@/components/shared/BaseMapSwitcher"
 import { ModeToggle } from "@/components/shared/ModeToggle"
+import { UnifiedSearch, type FlyToFn } from "@/components/shared/UnifiedSearch"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { FlaskConical } from "lucide-react"
 import type { MapEntity, DrawnGeometry } from "@/types/domain.types"
 import { getDefaultEntityLayerId } from "@/utils/entityLayer"
 import type { EnrichmentControls, LayeredResearchControls } from "@/types/layout.types"
@@ -89,6 +91,8 @@ export function MainLayout({
     closeDetail,
   } = useProjectStore()
 
+  const flyToRef = useRef<FlyToFn | null>(null)
+
   const [leftMode, setLeftMode] = useState<"layers" | "hierarchy">("layers")
   const [hiddenEntityIds, setHiddenEntityIds] = useState<Set<string>>(new Set())
 
@@ -135,6 +139,7 @@ export function MainLayout({
           defaultLayerId={defaultLayerId}
           hiddenEntityIds={hiddenEntityIds}
           onOverpassUnavailable={onOverpassUnavailable}
+          flyToRef={flyToRef}
         />
       }
       treeSlot={<TreeView />}
@@ -160,32 +165,46 @@ export function MainLayout({
           </div>
         </div>
       }
-      headerSlot={
-        <>
+      headerPrimarySlot={
+        <div className="flex min-w-0 items-center gap-2">
+          {!readOnly && (
+            <div className="w-full max-w-[340px]">
+              <UnifiedSearch flyToRef={flyToRef} />
+            </div>
+          )}
           {!readOnly && restoredFromSession && (
             <span className="text-muted-foreground text-xs">Project restored from last session</span>
           )}
-          <ShowNetworksToggle />
+        </div>
+      }
+      headerSecondarySlot={
+        <div className="flex flex-wrap items-center gap-2">
           <BaseMapSwitcher />
-          {!readOnly && <OsmQueryMenu layers={layers} onAddLayer={addLayer} />}
+          <ShowNetworksToggle />
           {!readOnly && layeredResearch && (
             <Button
               type="button"
-              size="sm"
+              size="icon"
               variant={layeredResearch.status === "running" ? "secondary" : "outline"}
               onClick={layeredResearch.openDialog}
-              title="Research all entities layer by layer"
+              title={
+                layeredResearch.status === "running"
+                  ? "Research all entities (running)"
+                  : layeredResearch.reviewQueueLength > 0
+                    ? `Review research queue (${layeredResearch.reviewQueueLength})`
+                    : "Research all entities"
+              }
             >
-              {layeredResearch.status === "running"
-                ? "Researching…"
-                : layeredResearch.reviewQueueLength > 0
-                  ? `Review (${layeredResearch.reviewQueueLength})`
-                  : "Research all"}
+              <FlaskConical className="h-4 w-4" />
+              <span className="sr-only">
+                {layeredResearch.status === "running" ? "Researching entities" : "Research all entities"}
+              </span>
             </Button>
           )}
           <ModeToggle />
-        </>
+        </div>
       }
+      headerMenuSlot={!readOnly ? <OsmQueryMenu layers={layers} onAddLayer={addLayer} /> : null}
       selectedEntityId={selectedEntityId}
       selectedOsmObject={selectedOsmObject}
       onCloseDetail={closeDetail}
