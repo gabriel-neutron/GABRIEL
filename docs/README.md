@@ -14,6 +14,7 @@
 | `CONSTRAINTS.md` | Code style, naming, architecture patterns, error handling, performance | Active |
 | `ARCHITECTURE.md` | Component tree, data flows, coordinate contract, enrichment pipeline | Active |
 | `TIMELINE.md` | Refactoring phases 0–11, milestones, acceptance criteria | Active |
+| `TELEGRAM_OSINT_PRD.md` | PRD for Telegram scrapper and graph module
 
 ---
 

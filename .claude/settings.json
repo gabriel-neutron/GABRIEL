@@ -7,6 +7,10 @@
           {
             "type": "command",
             "command": "python3 .claude/hooks/docs_protection.py"
+          },
+          {
+            "type": "command",
+            "command": "python3 .claude/hooks/ui_protection.py"
           }
         ]
       }
