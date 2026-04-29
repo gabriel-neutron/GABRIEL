@@ -26,10 +26,10 @@ If milestones are missing, ask the user whether to fix them now or skip them.
 
 ## Step 3 — Code Quality Review
 
-Read `docs/CONVENTIONS.md` and review all code created or modified in this phase.
+Read `docs/CONSTRAINTS.md` and review all code created or modified in this phase.
 
 Check:
-- [ ] **File structure** — matches conventions in CONVENTIONS.md
+- [ ] **File structure** — matches conventions in CONSTRAINTS.md
 - [ ] **Naming** — files, variables, functions follow conventions
 - [ ] **Architecture** — follows prescribed patterns (not inventing new ones)
 - [ ] **Error handling** — errors are caught and handled as specified
@@ -64,7 +64,7 @@ Report any unhandled edge cases. Ask the user which ones to fix now vs. defer.
 
 Run all applicable checks:
 1. **Build**: Does the project build without errors?
-2. **Lint**: Any linting issues? (include Rust clippy with zero warnings)
+2. **Lint**: Any linting issues?
 3. **Type check**: Any type errors? (if applicable)
 4. **Tests**: Do all tests pass?
 
@@ -85,7 +85,9 @@ If anything changed during this phase that affects the docs:
 - Update `docs/TIMELINE.md` — mark the phase as complete (add ✅)
 - Update `docs/README.md` — if new docs were added
 - Update `CLAUDE.md` — if project context changed
-- Update `docs/CONVENTIONS.md` — if new patterns were established
+- Update `docs/CONSTRAINTS.md` — if new patterns were established
+
+`docs/TELEGRAM_OSINT_PRD.md` is out of scope for generic phase review unless the phase explicitly targets Telegram OSINT work.
 
 Show doc changes to the user for approval.
 

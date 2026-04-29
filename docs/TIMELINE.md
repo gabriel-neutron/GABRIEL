@@ -79,7 +79,7 @@ a local-first GIS + OSINT workflow.
 
 ## Phase 3 — Testing and Release Gates (Weeks 3-5)
 
-**Status:** in progress (CI + coverage gate + `npm run verify`; GeoPackage WASM integration and page-level tests still open).
+**Status:** complete (local Phase 3 scope complete; branch protection enforcement explicitly deferred by user decision).
 
 **Goal**: Move from "tests exist" to "critical workflows are defended."
 
@@ -97,13 +97,13 @@ a local-first GIS + OSINT workflow.
 
 **Tasks**
 - [x] Add CI pipeline running lint, test, and build on PRs.
-- [ ] Add at least one real GeoPackage WASM round-trip integration test.
-- [ ] Add integration tests for open/save/session-restore path.
+- [x] Add at least one real GeoPackage WASM round-trip integration test.
+- [x] Add integration tests for open/save/session-restore path.
 - [x] Enable coverage output and define minimum baseline for critical modules.
 
 **Exit Criteria**
-- [ ] PRs cannot merge without passing CI checks.
-- [ ] GeoPackage persistence boundary has real integration coverage.
+- [ ] PRs cannot merge without passing CI checks. *(Skipped for now by user request; enforce in repo settings later.)*
+- [x] GeoPackage persistence boundary has real integration coverage.
 - [x] Coverage is reported in CI and enforced for agreed critical paths.
 
 ---

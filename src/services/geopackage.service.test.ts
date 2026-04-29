@@ -1,13 +1,94 @@
-import { describe, expect, it } from "vitest"
+import { readdirSync, rmSync } from "node:fs"
+import { describe, expect, it, afterEach } from "vitest"
 import { toLeafletCoord, toGeoJsonCoord, asLatLng } from "@/types/coordinates"
+import type { MapEntity } from "@/types/domain.types"
+import { loadGeoPackage, saveGeoPackage, type GpkgLayer } from "./geopackage.service"
 import type { GpkgGeometry } from "./geopackage.service"
 
-// These tests verify the coordinate contract introduced in Phase 8:
-// internal [lat, lng] ↔ GeoJSON [lng, lat] round-trips losslessly.
-// The GeoPackage service uses toLeafletCoord on read and toGeoJsonCoord on write;
-// testing those functions directly avoids WASM initialization in a Node.js test runner.
+// Coordinate contract: internal [lat, lng] ↔ storage [lng, lat].
 
 describe("coordinate round-trip", () => {
+  afterEach(() => {
+    for (const file of readdirSync(process.cwd())) {
+      if (file.startsWith("gabriel-") && file.endsWith(".gpkg")) {
+        rmSync(file, { force: true })
+      }
+    }
+  })
+
+  it(
+    "saveGeoPackage -> loadGeoPackage round-trips entities, geometries, and source cache",
+    async () => {
+      const layers: GpkgLayer[] = [
+        { id: "division", name: "Division", visible: true, kind: "echelon" },
+        { id: "custom-1", name: "Custom Layer", visible: true, kind: "custom" },
+      ]
+      const entities: MapEntity[] = [
+        {
+          id: "e-1",
+          name: "1st Test Division",
+          layerId: "division",
+          parentId: null,
+          type: "infantry",
+          notes: "HQ test note",
+          sources: "https://example.org/source-a",
+          positionMode: "own",
+          isExactPosition: true,
+        },
+      ]
+      const geometries: GpkgGeometry[] = [
+        { id: "p-1", layerId: "division", entityId: "e-1", type: "point", lat: 48.5, lng: 134.7 },
+        {
+          id: "l-1",
+          layerId: "custom-1",
+          entityId: null,
+          type: "line",
+          positions: [asLatLng(48.5, 134.7), asLatLng(49.0, 135.2)],
+        },
+      ]
+      const sourceCache = new Map<string, string>([
+        ["https://example.org/source-a", "cached snippet A"],
+        ["https://example.org/source-b", "cached snippet B"],
+      ])
+
+      const bytes = await saveGeoPackage(layers, entities, geometries, sourceCache)
+      const persistedBuffer = Uint8Array.from(bytes).buffer
+      const loaded = await loadGeoPackage(persistedBuffer)
+
+      expect(loaded.layers).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ id: "division", name: "Division", kind: "echelon", visible: true }),
+          expect.objectContaining({ id: "custom-1", name: "Custom Layer", kind: "custom", visible: true }),
+        ]),
+      )
+      expect(loaded.entities).toHaveLength(1)
+      expect(loaded.entities[0]).toEqual(
+        expect.objectContaining({
+          id: "e-1",
+          name: "1st Test Division",
+          layerId: "division",
+          notes: "HQ test note",
+          sources: "https://example.org/source-a",
+          positionMode: "own",
+          isExactPosition: true,
+        }),
+      )
+      expect(loaded.geometries).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ id: "p-1", type: "point", lat: 48.5, lng: 134.7 }),
+          expect.objectContaining({
+            id: "l-1",
+            type: "line",
+            positions: [asLatLng(48.5, 134.7), asLatLng(49.0, 135.2)],
+          }),
+        ]),
+      )
+      expect(loaded.sourceCache.get("https://example.org/source-a")).toBe("cached snippet A")
+      expect(loaded.sourceCache.get("https://example.org/source-b")).toBe("cached snippet B")
+    },
+    30_000,
+  )
+
   it("toLeafletCoord and toGeoJsonCoord are inverses", () => {
     const lat = 48.5
     const lng = 134.7

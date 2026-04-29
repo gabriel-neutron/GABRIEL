@@ -18,18 +18,18 @@ Before anything else:
 
 ## Step 2 — Read All Context
 
-Read and align with ALL of these documents:
+Use `docs/README.md` as the canonical docs index and planning scope.
+
+Read and align with this default planning set:
 - `CLAUDE.md`
 - `docs/README.md`
 - `docs/PRD.md`
 - `docs/TIMELINE.md`
-- `docs/CONVENTIONS.md`
+- `docs/CONSTRAINTS.md`
 - `docs/TECH_STACK.md`
 - `docs/ARCHITECTURE.md`
-- `docs/HARDWARE.md`
-- `docs/SIGNALS.md`
-- `docs/DSP.md`
-- `docs/PERF.md`
+
+Do **not** include `docs/TELEGRAM_OSINT_PRD.md` unless the phase explicitly targets Telegram OSINT.
 
 ## Step 3 — Identify the Next Phase
 
@@ -62,7 +62,7 @@ If there are questions or missing requirements, **ask the user before proceeding
 
 ### Estimated Approach
 - Which files will be created or modified?
-- What patterns from `CONVENTIONS.md` apply?
+- What patterns from `CONSTRAINTS.md` apply?
 - Any risks or edge cases to watch for?
 
 ## Step 5 — Get Confirmation
@@ -95,7 +95,7 @@ Tell the user: "Phase development is complete. Please test, then run `/phase-rev
 
 - **Always plan before coding** — never jump straight into implementation
 - **Ask clarification questions** before building if anything is unclear
-- **Follow CONVENTIONS.md** — every file, name, and pattern must comply
+- **Follow CONSTRAINTS.md** — every file, name, and pattern must comply
 - **Do not skip milestones** — work through them in order
 - **Do not modify docs** unless a change is explicitly needed and user-approved
 - **Report check/test results** — never silently skip failing tests

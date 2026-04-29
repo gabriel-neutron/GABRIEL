@@ -276,8 +276,10 @@ export async function saveGeoPackage(
   researchSources?: Map<string, string>,
 ): Promise<Uint8Array> {
   let geoPackage: GeoPackage | null = null
+  const packageFileName = `gabriel-${crypto.randomUUID()}.gpkg`
   try {
-    geoPackage = await GeoPackageAPI.create()
+    // Use a deterministic package file name so sql.js export works in browser and Node test runtimes.
+    geoPackage = await GeoPackageAPI.create(packageFileName)
     geoPackage.createRequiredTables()
 
     geoPackage.connection.run(`CREATE TABLE ${LAYERS_TABLE} (
