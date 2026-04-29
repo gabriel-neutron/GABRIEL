@@ -15,6 +15,7 @@ export function buildDefaultEnrichmentPrompt(
     `Find verified headquarters and garrison information for ${name} (${echelon}, ${country}).`,
     `Context: parent=${parentName}; known children=${children}. Focus only on HQ/garrison evidence and existing entity fields.`,
     "Prioritize evidence from 2023 onward and include both English and Russian sources.",
+    "Evidence contract: each accepted claim needs at least one cited URL from retrieval; flag contradictions (conflict) or old-only evidence (stale) rather than guessing; allow evolution only when timelines clearly explain change.",
   ]
 
   if (poolHintUrls && poolHintUrls.length > 0) {

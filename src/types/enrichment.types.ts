@@ -51,11 +51,21 @@ export type EnrichmentRequest = {
   maxDepth: number
 }
 
+/** Why a field could not be proposed as an auditable value (AI-assigned; see enrichment prompt). */
+export type UnresolvedReason = "conflict" | "stale" | "no-evidence" | "other"
+
+export type EnrichmentConflictCandidate = {
+  value: unknown
+  sources: EnrichmentSource[]
+}
+
 export type EnrichmentSource = {
   url: string
   title: string
   snippet: string
   domainType: SourceDomainType
+  /** ISO date from retrieval (e.g. Tavily published_date) when available. */
+  publishedAt?: string
 }
 
 export type EnrichmentProposal = {
@@ -72,6 +82,10 @@ export type EnrichmentResponse = {
   depthUsed: number
   proposals: EnrichmentProposal[]
   unresolvedFields: string[]
+  /** One reason per unresolved field (required when unresolvedFields is non-empty). */
+  unresolvedReasons: Record<string, UnresolvedReason>
+  /** Present when unresolvedReasons[field] is conflict — competing values with sources. */
+  conflicts?: Record<string, EnrichmentConflictCandidate[]>
   notes: string
   queryTrace: string[]
   processingTimeMs: number
@@ -93,6 +107,7 @@ export type ProviderSearchResult = {
   url: string
   title: string
   snippet: string
+  publishedAt?: string
 }
 
 export type RetrievalChunk = {
@@ -102,6 +117,7 @@ export type RetrievalChunk = {
   snippet: string
   domainType: SourceDomainType
   authorityWeight: number
+  publishedAt?: string
 }
 
 export type RetrievalDiagnostics = {

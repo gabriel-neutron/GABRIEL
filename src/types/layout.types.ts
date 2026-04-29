@@ -1,5 +1,10 @@
 import type { MapEntity } from "@/types/domain.types"
-import type { EnrichmentContext, EnrichmentProposal } from "@/types/enrichment.types"
+import type {
+  EnrichmentConflictCandidate,
+  EnrichmentContext,
+  EnrichmentProposal,
+  UnresolvedReason,
+} from "@/types/enrichment.types"
 import type { EntityResearchStatus } from "@/hooks/useLayeredResearch"
 import type { LayeredResearchResult } from "@/services/research/layered-research.service"
 
@@ -13,6 +18,8 @@ export type EnrichmentControls = {
   queryTrace: string[]
   depthUsed: number
   unresolvedFields: string[]
+  unresolvedReasons: Record<string, UnresolvedReason>
+  conflicts?: Record<string, EnrichmentConflictCandidate[]>
   notes: string
   proposals: EnrichmentProposal[]
   decisions: Record<string, "accepted" | "rejected" | "pending">

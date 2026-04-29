@@ -1,8 +1,10 @@
 import type {
+  EnrichmentConflictCandidate,
   EnrichmentError,
   EnrichmentProposal,
   EnrichmentResponse,
   EnrichmentRunStatus,
+  UnresolvedReason,
 } from "@/types/enrichment.types"
 
 export type ProposalDecision = "accepted" | "rejected" | "pending"
@@ -17,6 +19,8 @@ export type EnrichmentRunState = {
   processingTimeMs: number
   proposals: EnrichmentProposal[]
   unresolvedFields: string[]
+  unresolvedReasons: Record<string, UnresolvedReason>
+  conflicts?: Record<string, EnrichmentConflictCandidate[]>
   notes: string
   error: EnrichmentError | null
   startedAtMs: number | null
@@ -42,6 +46,7 @@ export const INITIAL_ENRICHMENT_RUN: EnrichmentRunState = {
   processingTimeMs: 0,
   proposals: [],
   unresolvedFields: [],
+  unresolvedReasons: {},
   notes: "",
   error: null,
   startedAtMs: null,
@@ -101,6 +106,8 @@ export function completeEnrichmentRun(
       processingTimeMs: response.processingTimeMs,
       proposals: response.proposals,
       unresolvedFields: response.unresolvedFields,
+      unresolvedReasons: response.unresolvedReasons,
+      conflicts: response.conflicts,
       notes: response.notes,
       error: null,
       finishedAtMs: Date.now(),

@@ -309,6 +309,8 @@ export function EditPage({ onViewMode, onOpenAbout }: EditPageProps): React.Reac
           queryTrace: enrichment.state.run.queryTrace,
           depthUsed: enrichment.state.run.depthUsed,
           unresolvedFields: enrichment.state.run.unresolvedFields,
+          unresolvedReasons: enrichment.state.run.unresolvedReasons,
+          conflicts: enrichment.state.run.conflicts,
           notes: enrichment.state.run.notes,
           proposals: enrichment.state.run.proposals,
           decisions:

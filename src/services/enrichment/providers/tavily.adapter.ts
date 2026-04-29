@@ -40,6 +40,7 @@ export class TavilyAdapter implements RetrievalAdapter {
         url?: string
         title?: string
         content?: string
+        published_date?: string
       }>
     }
 
@@ -49,6 +50,10 @@ export class TavilyAdapter implements RetrievalAdapter {
         url: item.url ?? "",
         title: item.title ?? item.url ?? "Untitled source",
         snippet: item.content ?? "",
+        publishedAt:
+          typeof item.published_date === "string" && item.published_date.trim().length > 0
+            ? item.published_date.trim()
+            : undefined,
       }))
   }
 }

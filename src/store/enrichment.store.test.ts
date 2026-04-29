@@ -56,6 +56,7 @@ describe("enrichment store", () => {
       depthUsed: 2,
       proposals: [],
       unresolvedFields: ["commander"],
+      unresolvedReasons: { commander: "no-evidence" },
       notes: "No reliable source",
       queryTrace: ["query a"],
       processingTimeMs: 1000,
@@ -63,6 +64,7 @@ describe("enrichment store", () => {
     const completed = completeEnrichmentRun(started, response)
     expect(completed.run.status).toBe("partial")
     expect(completed.run.unresolvedFields).toEqual(["commander"])
+    expect(completed.run.unresolvedReasons).toEqual({ commander: "no-evidence" })
   })
 
   it("detects unresolved pending proposals for feature", () => {
@@ -84,7 +86,7 @@ describe("enrichment store", () => {
             {
               url: "https://example.com",
               title: "Example",
-              snippet: "Example",
+              snippet: "Example snippet with enough characters.",
               domainType: "web",
             },
           ],
@@ -92,6 +94,7 @@ describe("enrichment store", () => {
         },
       ],
       unresolvedFields: [],
+      unresolvedReasons: {},
       notes: "",
       queryTrace: [],
       processingTimeMs: 100,

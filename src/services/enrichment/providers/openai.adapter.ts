@@ -131,11 +131,15 @@ export class OpenAIModelAdapter implements AiModelAdapter {
       "If evidence is found but its relevance to garrison is uncertain, include the source URL and append a brief note rather than discarding it.",
       "Prioritize sources in this order: (1) official Russian military/government (mil.ru, kremlin.ru, .gov.ru, CSTO), (2) OSINT reports/news (Bellingcat, RFE/RL, ISW, Meduza, BBC), (3) social media (Telegram, VK), (4) Wikipedia.",
       "If Wikipedia is the only available source for a claim, note it but also report any primary source it cites. Never use Wikipedia as the sole citation.",
-      "Return only the required fields; do not add extra keys.",
+      "Citation: every non-null field value you output must be directly supported by at least one chunk URL (same URL may appear in chunk list).",
+      "Contradictions: if sources disagree on a field, output null for that field unless a clear timeline shows the situation evolved (newer evidence supersedes older). Otherwise set unresolvedReasons[field] to conflict and fill conflicts[field] with an array of {value, sources:[{url,title,snippet,domainType?,publishedAt?}]} — each candidate needs at least one source with snippet >= 20 chars.",
+      "Staleness: evidence with publishedAt older than 365 days is stale unless a fresher chunk corroborates it OR the fact is unlikely to change (e.g. permanent installation address). If you cannot meet that bar, output null and set unresolvedReasons[field] to stale.",
+      "Always include top-level unresolvedReasons: object. For each field in outputSchemaFields that you set to null or cannot support with chunk URLs, set unresolvedReasons[field] to one of: conflict, stale, no-evidence, other. Omit keys for fields where you output a supported non-null value.",
+      "When unresolvedReasons[field] is conflict, conflicts[field] is required (non-empty array as above).",
       "If evidence is missing for a field, set the field to null.",
       "Never output placeholders such as \"no source\", \"source not found\", \"unknown\", \"n/a\", \"none\", or similar text.",
       "For the `sources` field, return newline-delimited `https://...` URLs only, or null when there is no supported URL evidence.",
-      `Required fields: ${JSON.stringify(input.outputSchemaFields)}`,
+      `Schema fields (values): ${JSON.stringify(input.outputSchemaFields)}.`,
     ].join("\n")
 
     return this.callOpenAI(

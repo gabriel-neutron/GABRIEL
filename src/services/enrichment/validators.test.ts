@@ -3,9 +3,13 @@ import { DEFAULT_ENRICHMENT_OUTPUT_SCHEMA } from "./schema.fixtures"
 import {
   getAuthorityWeight,
   getDomainTypeFromUrl,
+  MIN_SOURCES_PER_PROPOSAL,
   validateEnrichmentRequest,
+  validateEnrichmentResponse,
+  validateProposal,
   validateSource,
 } from "./validators"
+import type { EnrichmentProposal, EnrichmentResponse } from "@/types/enrichment.types"
 import type { EnrichmentRequest } from "@/types/enrichment.types"
 
 function makeRequest(): EnrichmentRequest {
@@ -58,6 +62,94 @@ describe("validateSource", () => {
       domainType: "web",
     })
     expect(errors.length).toBeGreaterThan(0)
+  })
+
+  it("rejects non-parseable publishedAt", () => {
+    const errors = validateSource({
+      url: "https://example.com/article",
+      title: "Example",
+      snippet: "This snippet is long enough for validation rules.",
+      domainType: "web",
+      publishedAt: "not-a-date",
+    })
+    expect(errors.some((e) => e.includes("publishedAt"))).toBe(true)
+  })
+})
+
+const validSource = {
+  url: "https://example.com/evidence",
+  title: "Evidence",
+  snippet: "This snippet is long enough for validation rules.",
+  domainType: "web" as const,
+}
+
+function baseResponse(overrides: Partial<EnrichmentResponse>): EnrichmentResponse {
+  return {
+    status: "success",
+    featureId: "f1",
+    depthUsed: 1,
+    proposals: [],
+    unresolvedFields: [],
+    unresolvedReasons: {},
+    notes: "",
+    queryTrace: [],
+    processingTimeMs: 1,
+    ...overrides,
+  }
+}
+
+describe("validateProposal", () => {
+  it(`requires at least ${MIN_SOURCES_PER_PROPOSAL} source(s)`, () => {
+    const proposal: EnrichmentProposal = {
+      field: "notes",
+      currentValue: null,
+      proposedValue: "Proposed text here.",
+      reasoning: "Backed by retrieval.",
+      sources: [],
+    }
+    expect(validateProposal(proposal).some((e) => e.includes("at least"))).toBe(true)
+  })
+})
+
+describe("validateEnrichmentResponse", () => {
+  it("accepts response with unresolved reasons per field", () => {
+    const errors = validateEnrichmentResponse(
+      baseResponse({
+        status: "partial",
+        unresolvedFields: ["militaryUnitId"],
+        unresolvedReasons: { militaryUnitId: "stale" },
+      }),
+    )
+    expect(errors).toEqual([])
+  })
+
+  it("rejects conflict reason without conflict candidates", () => {
+    const errors = validateEnrichmentResponse(
+      baseResponse({
+        status: "partial",
+        unresolvedFields: ["militaryUnitId"],
+        unresolvedReasons: { militaryUnitId: "conflict" },
+      }),
+    )
+    expect(errors.some((e) => e.includes("conflicts[militaryUnitId]"))).toBe(true)
+  })
+
+  it("accepts conflict reason with valid candidate sources", () => {
+    const longSnippet = "Candidate evidence text is long enough for validation rules."
+    const errors = validateEnrichmentResponse(
+      baseResponse({
+        status: "partial",
+        unresolvedFields: ["militaryUnitId"],
+        unresolvedReasons: { militaryUnitId: "conflict" },
+        conflicts: {
+          militaryUnitId: [
+            { value: "A", sources: [{ ...validSource, snippet: longSnippet }] },
+            { value: "B", sources: [{ ...validSource, url: "https://other.example/doc", snippet: longSnippet }] },
+          ],
+        },
+      }),
+    )
+    expect(errors).toEqual([])
   })
 })
 

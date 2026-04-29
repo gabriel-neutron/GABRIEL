@@ -57,6 +57,7 @@ describe("runLayeredResearch", () => {
         depthUsed: 1,
         proposals: [],
         unresolvedFields: [],
+        unresolvedReasons: {},
         notes: "",
         queryTrace: [],
         processingTimeMs: 12,

@@ -1,4 +1,5 @@
 import type {
+  EnrichmentConflictCandidate,
   EnrichmentError,
   EnrichmentOutputSchema,
   EnrichmentProposal,
@@ -8,6 +9,7 @@ import type {
   EnrichmentUsage,
   ProviderSearchResult,
   RetrievalChunk,
+  UnresolvedReason,
 } from "@/types/enrichment.types"
 import { createDefaultProviderBundle, type ProviderBundle } from "./providers"
 import { getAuthorityWeight, getDomainTypeFromUrl, validateEnrichmentRequest, validateEnrichmentResponse, validateSource } from "./validators"
@@ -36,6 +38,69 @@ export type RunEnrichmentResult = {
 const CONFIDENCE_THRESHOLD = 0.5
 const REQUEST_TIMEOUT_MS = 8000
 const ALLOWED_ENRICHMENT_FIELDS = new Set(["notes", "sources", "militaryUnitId", "osmRelationId"])
+
+const UNRESOLVED_REASON_VALUES = new Set<UnresolvedReason>(["conflict", "stale", "no-evidence", "other"])
+
+function isUnresolvedReason(value: unknown): value is UnresolvedReason {
+  return typeof value === "string" && UNRESOLVED_REASON_VALUES.has(value as UnresolvedReason)
+}
+
+function unresolvedReasonsForFields(
+  fields: string[],
+  aiReasons: Record<string, UnresolvedReason>,
+): Record<string, UnresolvedReason> {
+  const out: Record<string, UnresolvedReason> = {}
+  for (const field of fields) {
+    const fromAi = aiReasons[field]
+    out[field] = fromAi ?? "no-evidence"
+  }
+  return out
+}
+
+function parseAiUnresolvedReasons(raw: unknown): Record<string, UnresolvedReason> {
+  if (raw === null || typeof raw !== "object" || Array.isArray(raw)) return {}
+  const out: Record<string, UnresolvedReason> = {}
+  for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
+    if (isUnresolvedReason(value)) out[key] = value
+  }
+  return out
+}
+
+function parseConflictSource(raw: Record<string, unknown>): EnrichmentSource | null {
+  const url = typeof raw.url === "string" ? raw.url.trim() : ""
+  const title = typeof raw.title === "string" ? raw.title.trim() : ""
+  const snippet = typeof raw.snippet === "string" ? raw.snippet.trim() : ""
+  const domainType = getDomainTypeFromUrl(url)
+  const publishedAt =
+    typeof raw.publishedAt === "string" && raw.publishedAt.trim().length > 0 ? raw.publishedAt.trim() : undefined
+  const source: EnrichmentSource = { url, title, snippet, domainType, ...(publishedAt != null ? { publishedAt } : {}) }
+  if (validateSource(source).length > 0) return null
+  return source
+}
+
+function parseAiConflicts(raw: unknown): Record<string, EnrichmentConflictCandidate[]> | undefined {
+  if (raw === null || typeof raw !== "object" || Array.isArray(raw)) return undefined
+  const out: Record<string, EnrichmentConflictCandidate[]> = {}
+  for (const [field, list] of Object.entries(raw as Record<string, unknown>)) {
+    if (!Array.isArray(list)) continue
+    const candidates: EnrichmentConflictCandidate[] = []
+    for (const item of list) {
+      if (item === null || typeof item !== "object" || Array.isArray(item)) continue
+      const row = item as Record<string, unknown>
+      const sourcesRaw = row.sources
+      if (!Array.isArray(sourcesRaw)) continue
+      const sources: EnrichmentSource[] = []
+      for (const s of sourcesRaw) {
+        if (s === null || typeof s !== "object" || Array.isArray(s)) continue
+        const parsed = parseConflictSource(s as Record<string, unknown>)
+        if (parsed) sources.push(parsed)
+      }
+      candidates.push({ value: row.value ?? null, sources })
+    }
+    if (candidates.length > 0) out[field] = candidates
+  }
+  return Object.keys(out).length > 0 ? out : undefined
+}
 
 function estimateTokens(value: string): number {
   return Math.ceil(value.length / 4)
@@ -140,7 +205,7 @@ function sanitizeSynthesisObject(
 
 function normalizeProviderResult(query: string, result: ProviderSearchResult): RetrievalChunk {
   const domainType = getDomainTypeFromUrl(result.url)
-  return {
+  const chunk: RetrievalChunk = {
     query,
     url: result.url,
     title: result.title,
@@ -148,6 +213,10 @@ function normalizeProviderResult(query: string, result: ProviderSearchResult): R
     domainType,
     authorityWeight: getAuthorityWeight(domainType),
   }
+  if (result.publishedAt != null && result.publishedAt.trim().length > 0) {
+    chunk.publishedAt = result.publishedAt.trim()
+  }
+  return chunk
 }
 
 function scoreChunkForField(chunk: RetrievalChunk, field: string): number {
@@ -203,12 +272,18 @@ async function retrieveParallel(
 
 function fieldSourcesFromChunks(field: string, chunks: RetrievalChunk[]): EnrichmentSource[] {
   const matching = chunks.filter((chunk) => scoreChunkForField(chunk, field) > 0)
-  const mapped = matching.map((chunk) => ({
-    url: chunk.url,
-    title: chunk.title,
-    snippet: chunk.snippet,
-    domainType: chunk.domainType,
-  }))
+  const mapped = matching.map((chunk) => {
+    const base: EnrichmentSource = {
+      url: chunk.url,
+      title: chunk.title,
+      snippet: chunk.snippet,
+      domainType: chunk.domainType,
+    }
+    if (chunk.publishedAt != null && chunk.publishedAt.trim().length > 0) {
+      return { ...base, publishedAt: chunk.publishedAt.trim() }
+    }
+    return base
+  })
   return mapped.filter((source) => validateSource(source).length === 0)
 }
 
@@ -230,6 +305,9 @@ async function synthesizeWithSingleModel(
       url: chunk.url,
       title: chunk.title,
       snippet: chunk.snippet,
+      ...(chunk.publishedAt != null && chunk.publishedAt.trim().length > 0
+        ? { publishedAt: chunk.publishedAt.trim() }
+        : {}),
     })),
   }
 
@@ -255,6 +333,7 @@ function buildResponse(
   queryTrace: string[],
   chunks: RetrievalChunk[],
   synthesisObject: Record<string, unknown>,
+  rawSynthesis: Record<string, unknown>,
   notes: string[],
   startedAtMs: number,
 ): EnrichmentResponse {
@@ -285,12 +364,33 @@ function buildResponse(
   const status: EnrichmentResponse["status"] =
     proposals.length === 0 ? "failed" : unresolvedFields.length > 0 ? "partial" : "success"
 
+  const aiReasons = parseAiUnresolvedReasons(rawSynthesis.unresolvedReasons)
+  let unresolvedReasons = unresolvedReasonsForFields(unresolvedFields, aiReasons)
+  let conflicts = parseAiConflicts(rawSynthesis.conflicts)
+
+  for (const field of unresolvedFields) {
+    if (unresolvedReasons[field] === "conflict" && (!conflicts?.[field] || conflicts[field].length === 0)) {
+      unresolvedReasons = { ...unresolvedReasons, [field]: "no-evidence" }
+    }
+  }
+  if (conflicts) {
+    const pruned: Record<string, EnrichmentConflictCandidate[]> = {}
+    for (const field of unresolvedFields) {
+      if (unresolvedReasons[field] !== "conflict") continue
+      const list = conflicts[field]
+      if (list != null && list.length > 0) pruned[field] = list
+    }
+    conflicts = Object.keys(pruned).length > 0 ? pruned : undefined
+  }
+
   return {
     status,
     featureId: String(request.feature.id ?? request.feature.properties?.id ?? "unknown-feature"),
     depthUsed,
     proposals,
     unresolvedFields,
+    unresolvedReasons,
+    ...(conflicts != null ? { conflicts } : {}),
     notes: notes.join(" | "),
     queryTrace,
     processingTimeMs: Date.now() - startedAtMs,
@@ -387,6 +487,7 @@ export async function runEnrichment(
       depthUsed,
       proposals: [],
       unresolvedFields: fields,
+      unresolvedReasons: unresolvedReasonsForFields(fields, {}),
       notes:
         notes.length > 0
           ? `stop=${stopReason} | ${notes.join(" | ")}`
@@ -412,6 +513,7 @@ export async function runEnrichment(
     queryTrace,
     allChunks,
     sanitizeSynthesisObject(synthesisObject, fields),
+    synthesisObject,
     notes,
     startedAtMs,
   )

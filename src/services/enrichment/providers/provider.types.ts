@@ -22,6 +22,7 @@ export type SynthesisInput = {
     url: string
     title: string
     snippet: string
+    publishedAt?: string
   }>
 }
 

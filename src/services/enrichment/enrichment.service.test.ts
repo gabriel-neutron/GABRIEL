@@ -66,6 +66,7 @@ describe("runEnrichment", () => {
     expect(result.response.featureId).toBe("feature-1")
     expect(result.response.proposals.length).toBeGreaterThan(0)
     expect(result.response.notes).toContain("stop=")
+    expect(result.response.unresolvedReasons).toBeDefined()
   })
 
   it("rejects invalid request input", async () => {
@@ -247,6 +248,111 @@ describe("runEnrichment", () => {
     expect(result.response.unresolvedFields).toEqual(
       expect.arrayContaining(["notes", "sources"]),
     )
+    expect(result.response.unresolvedReasons.notes).toBe("no-evidence")
+    expect(result.response.unresolvedReasons.sources).toBe("no-evidence")
+  })
+
+  it("downgrades conflict to no-evidence when conflict candidates are missing", async () => {
+    const snippet =
+      "Research notes indicate the brigade HQ and garrison are documented in Khabarovsk Krai in 2023 reporting."
+    const providers: ProviderBundle = {
+      model: {
+        async generateQueries() {
+          return ["64th Separate Motor Rifle Brigade HQ garrison notes 2023"]
+        },
+        async synthesize() {
+          return {
+            notes: "HQ reported in Khabarovsk Krai with permanent garrison activity in 2023.",
+            sources: "https://en.wikipedia.org/wiki/64th_Separate_Motor_Rifle_Brigade",
+            militaryUnitId: "64123",
+            osmRelationId: null,
+            unresolvedReasons: { militaryUnitId: "conflict" },
+          }
+        },
+      },
+      retrieval: [
+        {
+          name: "mock",
+          async search() {
+            return [
+              {
+                url: "https://en.wikipedia.org/wiki/64th_Separate_Motor_Rifle_Brigade",
+                title: "Wikipedia",
+                snippet,
+              },
+            ]
+          },
+        },
+      ],
+    }
+
+    const result = await runEnrichment(makeRequest(), { providers })
+    expect(result.response.unresolvedFields).toContain("militaryUnitId")
+    expect(result.response.unresolvedReasons.militaryUnitId).toBe("no-evidence")
+  })
+
+  it("keeps conflict reason when structured candidates are returned", async () => {
+    const snippet =
+      "Research notes indicate the brigade HQ and garrison are documented in Khabarovsk Krai in 2023 reporting."
+    const candSnippet = "Open reporting consistently ties the unit identifier to this ORBAT listing."
+    const providers: ProviderBundle = {
+      model: {
+        async generateQueries() {
+          return ["64th Separate Motor Rifle Brigade HQ garrison notes 2023"]
+        },
+        async synthesize() {
+          return {
+            notes: "HQ reported in Khabarovsk Krai with permanent garrison activity in 2023.",
+            sources: "https://en.wikipedia.org/wiki/64th_Separate_Motor_Rifle_Brigade",
+            militaryUnitId: null,
+            osmRelationId: null,
+            unresolvedReasons: { militaryUnitId: "conflict" },
+            conflicts: {
+              militaryUnitId: [
+                {
+                  value: "64123",
+                  sources: [
+                    {
+                      url: "https://en.wikipedia.org/wiki/64th_Separate_Motor_Rifle_Brigade",
+                      title: "Wikipedia",
+                      snippet: candSnippet,
+                    },
+                  ],
+                },
+                {
+                  value: "64124",
+                  sources: [
+                    {
+                      url: "https://example.mil.ru/unit/64th",
+                      title: "Official mirror",
+                      snippet: candSnippet,
+                    },
+                  ],
+                },
+              ],
+            },
+          }
+        },
+      },
+      retrieval: [
+        {
+          name: "mock",
+          async search() {
+            return [
+              {
+                url: "https://en.wikipedia.org/wiki/64th_Separate_Motor_Rifle_Brigade",
+                title: "Wikipedia",
+                snippet,
+              },
+            ]
+          },
+        },
+      ],
+    }
+
+    const result = await runEnrichment(makeRequest(), { providers })
+    expect(result.response.unresolvedReasons.militaryUnitId).toBe("conflict")
+    expect(result.response.conflicts?.militaryUnitId).toHaveLength(2)
   })
 })
 

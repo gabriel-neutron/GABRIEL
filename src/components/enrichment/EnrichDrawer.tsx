@@ -3,8 +3,14 @@ import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Textarea } from "@/components/ui/textarea"
 import type { MapEntity } from "@/types/domain.types"
-import type { EnrichmentContext } from "@/types/enrichment.types"
+import type {
+  EnrichmentConflictCandidate,
+  EnrichmentContext,
+  EnrichmentProposal,
+  UnresolvedReason,
+} from "@/types/enrichment.types"
 import { ProposalCard } from "./ProposalCard"
+import { SourceTag } from "./SourceTag"
 
 type EnrichDrawerProps = {
   open: boolean
@@ -15,19 +21,10 @@ type EnrichDrawerProps = {
   queryTrace: string[]
   depthUsed: number
   unresolvedFields: string[]
+  unresolvedReasons: Record<string, UnresolvedReason>
+  conflicts?: Record<string, EnrichmentConflictCandidate[]>
   notes: string
-  proposals: Array<{
-    field: string
-    currentValue: unknown
-    proposedValue: unknown
-    sources: Array<{
-      url: string
-      title: string
-      snippet: string
-      domainType: "wikipedia" | "official" | "osint" | "social" | "forum" | "news" | "web"
-    }>
-    reasoning: string
-  }>
+  proposals: EnrichmentProposal[]
   decisions: Record<string, "accepted" | "rejected" | "pending">
   errorMessage: string | null
   closeNotice: string | null
@@ -51,6 +48,25 @@ function formatAnalyzedAt(value: string | null | undefined): string {
   return date.toLocaleString()
 }
 
+function reasonBadgeLabel(reason: UnresolvedReason): string {
+  switch (reason) {
+    case "conflict":
+      return "Conflict"
+    case "stale":
+      return "Stale"
+    case "no-evidence":
+      return "No evidence"
+    default:
+      return "Other"
+  }
+}
+
+function renderConflictValue(value: unknown): string {
+  if (value === null || value === undefined || value === "") return "(empty)"
+  if (Array.isArray(value)) return value.join(", ")
+  if (typeof value === "object") return JSON.stringify(value)
+  return String(value)
+}
 
 export function EnrichDrawer({
   open,
@@ -61,6 +77,8 @@ export function EnrichDrawer({
   queryTrace,
   depthUsed,
   unresolvedFields,
+  unresolvedReasons,
+  conflicts,
   notes,
   proposals,
   decisions,
@@ -207,8 +225,40 @@ export function EnrichDrawer({
 
                 {unresolvedFields.length > 0 && (
                   <Card className="text-sm">
-                    <p className="font-medium px-2.5">Unresolved fields</p>
-                    <p className="mt-0.5 break-words text-muted-foreground px-2.5">{unresolvedFields.join(", ")}</p>
+                    <p className="font-medium px-2.5 pt-2.5">Unresolved fields</p>
+                    <ul className="mt-2 space-y-3 px-2.5 pb-2.5">
+                      {unresolvedFields.map((field) => {
+                        const reason = unresolvedReasons[field] ?? "no-evidence"
+                        const rows = conflicts?.[field]
+                        return (
+                          <li key={field} className="rounded-md border bg-muted/20 p-2">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="font-mono text-xs font-semibold">{field}</span>
+                              <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium">
+                                {reasonBadgeLabel(reason)}
+                              </span>
+                            </div>
+                            {reason === "conflict" && rows != null && rows.length > 0 && (
+                              <div className="mt-2 space-y-2 border-t border-border/60 pt-2">
+                                {rows.map((row, index) => (
+                                  <div key={`${field}-c-${index}`} className="space-y-1">
+                                    <p className="text-xs text-muted-foreground">Candidate</p>
+                                    <p className="break-words text-sm font-medium">{renderConflictValue(row.value)}</p>
+                                    <ul className="flex flex-wrap gap-1">
+                                      {row.sources.map((source) => (
+                                        <li key={`${field}-c-${index}-${source.url}`}>
+                                          <SourceTag source={source} />
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </li>
+                        )
+                      })}
+                    </ul>
                   </Card>
                 )}
                 {notes !== "" && (
@@ -225,4 +275,3 @@ export function EnrichDrawer({
     </div>
   )
 }
-

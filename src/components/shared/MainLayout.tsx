@@ -272,6 +272,8 @@ export function MainLayout({
         queryTrace={enrichment.queryTrace}
         depthUsed={enrichment.depthUsed}
         unresolvedFields={enrichment.unresolvedFields}
+        unresolvedReasons={enrichment.unresolvedReasons}
+        conflicts={enrichment.conflicts}
         notes={enrichment.notes}
         proposals={enrichment.proposals}
         decisions={enrichment.decisions}

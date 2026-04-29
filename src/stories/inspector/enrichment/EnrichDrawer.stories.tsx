@@ -1,7 +1,12 @@
 import type { Meta, StoryObj } from "@storybook/react-vite"
 import { EnrichDrawer } from "@/components/enrichment/EnrichDrawer"
 import type { MapEntity } from "@/types/domain.types"
-import type { EnrichmentContext, EnrichmentProposal } from "@/types/enrichment.types"
+import type {
+  EnrichmentConflictCandidate,
+  EnrichmentContext,
+  EnrichmentProposal,
+  UnresolvedReason,
+} from "@/types/enrichment.types"
 
 const noop = () => {}
 
@@ -44,6 +49,7 @@ const baseProposal: EnrichmentProposal = {
       title: "Official briefing",
       snippet: "The brigade supports engineering and logistics activities in the eastern corridor.",
       domainType: "official",
+      publishedAt: "2020-01-15T00:00:00.000Z",
     },
     {
       url: "https://example.net/report",
@@ -98,6 +104,7 @@ const baseArgs = {
   queryTrace: [],
   depthUsed: 0,
   unresolvedFields: [],
+  unresolvedReasons: {} as Record<string, UnresolvedReason>,
   notes: "",
   proposals: [] as EnrichmentProposal[],
   decisions: {} as Record<string, "accepted" | "rejected" | "pending">,
@@ -160,6 +167,7 @@ export const SuccessFewProposals: Story = {
   args: {
     ...baseArgs,
     status: "success",
+    unresolvedReasons: {},
     proposals: [
       baseProposal,
       {
@@ -197,11 +205,43 @@ export const PartialWithUnresolved: Story = {
         field: "notes",
       },
     ],
-    unresolvedFields: ["natoSymbolCode", "osmRelationId"],
+    unresolvedFields: ["militaryUnitId", "osmRelationId"],
+    unresolvedReasons: {
+      militaryUnitId: "conflict",
+      osmRelationId: "no-evidence",
+    },
+    conflicts: {
+      militaryUnitId: [
+        {
+          value: "MU-5MB",
+          sources: [
+            {
+              url: "https://example.org/orbat-a",
+              title: "ORBAT listing A",
+              snippet:
+                "Listing A describes the brigade under the original military unit identifier with supporting context.",
+              domainType: "official" as const,
+            },
+          ],
+        },
+        {
+          value: "MU-5MB-ALT",
+          sources: [
+            {
+              url: "https://example.net/orbat-b",
+              title: "ORBAT listing B",
+              snippet:
+                "Listing B references a reorganized identifier for the same formation with different source lineage.",
+              domainType: "osint" as const,
+            },
+          ],
+        },
+      ],
+    } satisfies Record<string, EnrichmentConflictCandidate[]>,
     notes:
-      "Partial results available. Conflicting source confidence for symbol code and relation mapping.",
+      "Partial results available. Conflicting source confidence for military unit id and relation mapping.",
     queryTrace: [
-      "5th Mechanized Brigade symbol code",
+      "5th Mechanized Brigade military unit id",
       "5th Mechanized Brigade OSM relation",
     ],
     depthUsed: 3,
@@ -227,7 +267,12 @@ export const LongScrollableContent: Story = {
         index % 3 === 0 ? "accepted" : index % 3 === 1 ? "rejected" : "pending",
       ]),
     ) as Record<string, "accepted" | "rejected" | "pending">,
-    unresolvedFields: ["domain", "type", "natoSymbolCode", "sources"],
+    unresolvedFields: ["sources", "militaryUnitId", "osmRelationId"],
+    unresolvedReasons: {
+      sources: "stale",
+      militaryUnitId: "no-evidence",
+      osmRelationId: "other",
+    },
     notes:
       "This scenario is intentionally dense to stress scroll containers and confirm there are no visual artifacts.",
   },

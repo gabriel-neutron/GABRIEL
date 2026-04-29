@@ -110,6 +110,8 @@ a local-first GIS + OSINT workflow.
 
 ## Phase 4 — OSINT Evidence Quality Gate (Weeks 5-7)
 
+**Status:** complete (citation contract, AI-driven contradiction/staleness policy, client validation, drawer UX).
+
 **Goal**: Ensure enrichment outputs are auditable, not just plausible.
 
 **Scope**
@@ -125,15 +127,15 @@ a local-first GIS + OSINT workflow.
 - `src/components/enrichment/` (presentation of conflict/unresolved states)
 
 **Tasks**
-- [ ] Enforce field-level citation binding (proposal field -> concrete retrieved URL(s)).
-- [ ] Add contradiction detection for conflicting candidate values.
-- [ ] Add stale-evidence policy (date metadata where available + scoring penalty/rules).
-- [ ] Ensure unresolved/contradictory fields are explicit in UI and not silently accepted.
+- [x] Enforce field-level citation binding (proposal field -> concrete retrieved URL(s); `MIN_SOURCES_PER_PROPOSAL`).
+- [x] Add contradiction detection for conflicting candidate values (`unresolvedReasons` / `conflicts`, AI + normalization).
+- [x] Add stale-evidence policy (Tavily `publishedAt` on sources; invalid ISO rejected; **Stale** UI when published date is more than 365 days old; synthesize instructions).
+- [x] Ensure unresolved/contradictory fields are explicit in UI and not silently accepted.
 
 **Exit Criteria**
-- [ ] Each accepted enrichment field has verifiable source linkage.
-- [ ] Contradictions are surfaced as unresolved, not flattened into single "confident" output.
-- [ ] Evidence freshness policy is enforced in scoring/selection, not prompt text alone.
+- [x] Each accepted enrichment field has verifiable source linkage (≥1 URL per proposal; validated before apply).
+- [x] Contradictions are surfaced as unresolved, not flattened into single "confident" output (drawer + `conflict` candidates or downgrade when empty).
+- [x] Evidence freshness is enforced in validation/UI and model instructions (full scoring pipeline extension deferred if not required).
 
 ---
 
@@ -193,7 +195,86 @@ a local-first GIS + OSINT workflow.
 
 ---
 
-## Phase 7 — Performance and Scalability Baseline (Weeks 10-11)
+## Phase 7 — Legacy & Compatibility Cleanup (Weeks 10-11)
+
+**Goal**: Remove unnecessary backward-compatibility layers, silent fallbacks, and obsolete abstractions in file management and persistence paths for a single-user workflow.
+
+**Scope**
+- File open/save and export code paths.
+- GeoPackage schema compatibility logic and migration handling.
+- IndexedDB persistence error semantics and versioning policy.
+- Read-only adapters and no-op wrappers.
+- Docs/comments alignment with actual runtime behavior.
+
+**Primary Targets**
+- `src/services/geopackage.service.ts`
+- `src/pages/EditPage.tsx`
+- `src/components/shared/AppShell.tsx`
+- `src/pages/ViewPage.tsx`
+- `src/services/projectStorage.service.ts`
+- `src/store/useProjectStore.ts`
+- `README.md`
+- `docs/ARCHITECTURE.md`
+- `docs/CONSTRAINTS.md`
+
+**Tasks**
+- [ ] Replace implicit schema fallbacks with explicit version/migration strategy (or documented hard fail).
+- [ ] Remove no-op compatibility adapters in read-only UI contracts.
+- [ ] Decide and document single browser/file-export strategy; remove extra branches if out of scope.
+- [ ] Eliminate dead state and unused compatibility fields.
+- [ ] Replace silent catches in persistence/load flows with explicit, typed handling.
+- [ ] Run a targeted docs drift pass on file-management and persistence behavior.
+
+**Exit Criteria**
+- [ ] No silent fallback masks corruption/version issues in file/persistence paths.
+- [ ] No compatibility wrapper remains without an explicit documented requirement.
+- [ ] File import/export behavior is single-path or intentionally dual-path with documented rationale.
+- [ ] Docs and inline comments match current implementation for the targeted modules.
+
+---
+
+## Phase 8 — Enrichment Simplification Review & Refactor (Weeks 11-12)
+
+**Goal**: Reduce enrichment complexity and coupling while preserving current behavior, evidence integrity, and validation guarantees.
+
+**Scope**
+- Orchestration complexity in `runEnrichment` and related helper logic.
+- Hook-level lifecycle and cancellation flow in `useEnrichment`.
+- Layered-research orchestration overlap and provider bundle usage.
+- Prompt/provider boundary normalization and fallback behavior.
+- UI contract simplification between enrichment state and drawer rendering.
+
+**Primary Targets**
+- `src/services/enrichment/enrichment.service.ts`
+- `src/hooks/useEnrichment.ts`
+- `src/services/research/layered-research.service.ts`
+- `src/store/enrichment.store.ts`
+- `src/services/enrichment/providers/openai.adapter.ts`
+- `src/services/enrichment/providers/provider.types.ts`
+- `src/components/enrichment/EnrichDrawer.tsx`
+- `src/types/enrichment.types.ts`
+- `src/services/enrichment/enrichment.service.test.ts`
+- `src/services/enrichment/providers/openai.adapter.test.ts`
+
+**Tasks**
+- [ ] Split `runEnrichment` into focused modules (validation, retrieval loop, synthesis normalization, response assembly).
+- [ ] Replace stringly diagnostics and stop-reason assembly with typed internal structures.
+- [ ] Consolidate relevance/confidence/source-mapping heuristics into a single shared scoring layer.
+- [ ] Extract async run/cancel/epoch logic from `useEnrichment` into a dedicated runner hook/service.
+- [ ] Reduce no-op/stale UI API surface in enrichment drawer contracts.
+- [ ] Align layered and single-entity enrichment orchestration semantics and error statuses.
+- [ ] Keep or improve current validation/citation/conflict guarantees with explicit tests.
+
+**Exit Criteria**
+- [ ] Enrichment orchestration files are materially smaller and single-responsibility.
+- [ ] Public enrichment behavior remains stable (no regression in proposal, unresolved, and conflict handling).
+- [ ] Cancellation/close flow is deterministic and easier to reason about.
+- [ ] Test coverage for enrichment critical paths is maintained or improved.
+- [ ] No new fallback/compatibility branch is introduced without explicit rationale.
+
+---
+
+## Phase 9 — Performance and Scalability Baseline (Weeks 10-11)
 
 **Goal**: Make performance regressions visible before users feel them.
 
@@ -221,7 +302,7 @@ a local-first GIS + OSINT workflow.
 
 ---
 
-## Phase 8 — Release Excellence and Team Scale (Weeks 11-12)
+## Phase 10 — Release Excellence and Team Scale (Weeks 11-12)
 
 **Goal**: Make high-quality delivery repeatable with minimal heroics.
 
@@ -250,7 +331,7 @@ a local-first GIS + OSINT workflow.
 
 ---
 
-## Ongoing Cadence (Post Phase 8)
+## Ongoing Cadence (Post Phase 10)
 
 - Weekly: triage lint/test/build/CI drift.
 - Bi-weekly: architecture/doc drift review.

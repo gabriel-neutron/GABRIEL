@@ -5,9 +5,15 @@ import type {
   EnrichmentResponse,
   EnrichmentSource,
   SourceDomainType,
+  UnresolvedReason,
 } from "@/types/enrichment.types"
 import { ENRICHMENT_DOMAIN_TYPES } from "@/types/enrichment.types"
 import { ENRICHMENT_MAX_DEPTH_HARD_LIMIT } from "./schema.fixtures"
+
+/** Minimum URLs attached to each accepted proposal (citation contract). */
+export const MIN_SOURCES_PER_PROPOSAL = 1
+
+const UNRESOLVED_REASON_SET = new Set<UnresolvedReason>(["conflict", "stale", "no-evidence", "other"])
 
 const SOURCE_BLOCKLIST = new Set([
   "example-tabloid.invalid",
@@ -149,6 +155,13 @@ export function validateSource(source: EnrichmentSource): string[] {
     }
   }
 
+  if (source.publishedAt != null && source.publishedAt.trim().length > 0) {
+    const t = Date.parse(source.publishedAt.trim())
+    if (Number.isNaN(t)) {
+      errors.push("source.publishedAt must be a parseable ISO date")
+    }
+  }
+
   return errors
 }
 
@@ -156,8 +169,8 @@ export function validateProposal(proposal: EnrichmentProposal): string[] {
   const errors: string[] = []
   if (proposal.field.trim().length === 0) errors.push("proposal.field is required")
   if (proposal.reasoning.trim().length === 0) errors.push("proposal.reasoning is required")
-  if (!Array.isArray(proposal.sources) || proposal.sources.length === 0) {
-    errors.push("proposal must contain at least one source")
+  if (!Array.isArray(proposal.sources) || proposal.sources.length < MIN_SOURCES_PER_PROPOSAL) {
+    errors.push(`proposal must contain at least ${MIN_SOURCES_PER_PROPOSAL} source(s)`)
     return errors
   }
   for (const source of proposal.sources) {
@@ -174,10 +187,39 @@ export function validateEnrichmentResponse(response: EnrichmentResponse): string
   if (response.featureId.trim().length === 0) errors.push("featureId is required")
   if (!Array.isArray(response.proposals)) errors.push("proposals must be an array")
   if (!Array.isArray(response.unresolvedFields)) errors.push("unresolvedFields must be an array")
+  if (!isObject(response.unresolvedReasons)) {
+    errors.push("unresolvedReasons must be an object")
+  }
   if (!Array.isArray(response.queryTrace)) errors.push("queryTrace must be an array")
   if (response.processingTimeMs < 0) errors.push("processingTimeMs must be >= 0")
   for (const proposal of response.proposals) {
     errors.push(...validateProposal(proposal))
+  }
+  for (const field of response.unresolvedFields) {
+    const reason = response.unresolvedReasons[field]
+    if (typeof reason !== "string" || !UNRESOLVED_REASON_SET.has(reason as UnresolvedReason)) {
+      errors.push(`unresolvedReasons missing or invalid for field: ${field}`)
+    }
+    if (reason === "conflict") {
+      const list = response.conflicts?.[field]
+      if (!Array.isArray(list) || list.length === 0) {
+        errors.push(`conflicts[${field}] required when reason is conflict`)
+      } else {
+        for (const candidate of list) {
+          if (!isObject(candidate)) {
+            errors.push(`conflicts[${field}] entries must be objects`)
+            break
+          }
+          if (!Array.isArray(candidate.sources) || candidate.sources.length < MIN_SOURCES_PER_PROPOSAL) {
+            errors.push(`conflicts[${field}] each candidate needs at least ${MIN_SOURCES_PER_PROPOSAL} source(s)`)
+            break
+          }
+          for (const src of candidate.sources) {
+            errors.push(...validateSource(src).map((e) => `conflicts[${field}]: ${e}`))
+          }
+        }
+      }
+    }
   }
   return errors
 }
