@@ -51,6 +51,9 @@ export type EnrichmentRequest = {
   maxDepth: number
 }
 
+export const CORE_ENRICHMENT_FIELDS = ["notes", "sources", "militaryUnitId", "osmRelationId"] as const
+export type CoreEnrichmentField = (typeof CORE_ENRICHMENT_FIELDS)[number]
+
 /** Why a field could not be proposed as an auditable value (AI-assigned; see enrichment prompt). */
 export type UnresolvedReason = "conflict" | "stale" | "no-evidence" | "other"
 

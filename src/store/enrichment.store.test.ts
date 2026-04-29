@@ -8,9 +8,14 @@ import {
   rejectProposal,
   startEnrichmentRun,
 } from "./enrichment.store"
+import { CORE_ENRICHMENT_FIELDS } from "@/types/enrichment.types"
 import type { EnrichmentResponse } from "@/types/enrichment.types"
 
 describe("enrichment store", () => {
+  it("keeps the minimal core enrichment field contract", () => {
+    expect(CORE_ENRICHMENT_FIELDS).toEqual(["notes", "sources", "militaryUnitId", "osmRelationId"])
+  })
+
   it("starts a run and updates status", () => {
     const next = startEnrichmentRun(INITIAL_ENRICHMENT_UI_STATE, {
       featureId: "feature-1",

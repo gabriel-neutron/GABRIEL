@@ -290,10 +290,6 @@ export function MainLayout({
           const proposal = enrichment.proposals.find((item) => item.field === field)
           if (proposal) enrichment.reject(proposal)
         }}
-        onIgnore={(field) => {
-          const proposal = enrichment.proposals.find((item) => item.field === field)
-          if (proposal) enrichment.ignore(proposal)
-        }}
       />
     </>
   )

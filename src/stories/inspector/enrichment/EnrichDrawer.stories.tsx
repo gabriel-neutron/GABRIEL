@@ -115,7 +115,6 @@ const baseArgs = {
   onRun: noop,
   onAccept: noop,
   onReject: noop,
-  onIgnore: noop,
 }
 
 const meta: Meta<typeof EnrichDrawer> = {

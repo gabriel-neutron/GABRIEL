@@ -33,7 +33,6 @@ type EnrichDrawerProps = {
   onRun: () => void
   onAccept: (field: string) => void
   onReject: (field: string) => void
-  onIgnore: (field: string) => void
 }
 
 function renderChildren(context: EnrichmentContext | null): string {

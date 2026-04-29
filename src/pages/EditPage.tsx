@@ -326,7 +326,6 @@ export function EditPage({ onViewMode, onOpenAbout }: EditPageProps): React.Reac
           run: enrichment.run,
           accept: enrichment.accept,
           reject: enrichment.reject,
-          ignore: enrichment.ignore,
           clearOverlayForSelected: enrichment.clearOverlayForSelected,
         }}
         layeredResearch={{

@@ -143,23 +143,6 @@ export function resetEnrichmentRun(state: EnrichmentUiState): EnrichmentUiState 
   }
 }
 
-export function setProposalDecision(
-  state: EnrichmentUiState,
-  args: { featureId: string; field: string; decision: ProposalDecision },
-): EnrichmentUiState {
-  const current = state.decisions[args.featureId] ?? {}
-  return {
-    ...state,
-    decisions: {
-      ...state.decisions,
-      [args.featureId]: {
-        ...current,
-        [args.field]: args.decision,
-      },
-    },
-  }
-}
-
 export function acceptProposalToOverlay(
   state: EnrichmentUiState,
   args: { featureId: string; field: string; value: unknown },
@@ -188,11 +171,17 @@ export function rejectProposal(
   state: EnrichmentUiState,
   args: { featureId: string; field: string },
 ): EnrichmentUiState {
-  return setProposalDecision(state, {
-    featureId: args.featureId,
-    field: args.field,
-    decision: "rejected",
-  })
+  const current = state.decisions[args.featureId] ?? {}
+  return {
+    ...state,
+    decisions: {
+      ...state.decisions,
+      [args.featureId]: {
+        ...current,
+        [args.field]: "rejected",
+      },
+    },
+  }
 }
 
 export function clearOverlayForFeature(
@@ -203,14 +192,6 @@ export function clearOverlayForFeature(
   const nextOverlay = { ...state.overlay }
   delete nextOverlay[featureId]
   return { ...state, overlay: nextOverlay }
-}
-
-export function getOverlayValue(
-  state: EnrichmentUiState,
-  featureId: string,
-  field: string,
-): unknown {
-  return state.overlay[featureId]?.[field]
 }
 
 export function getFeatureOverlay(

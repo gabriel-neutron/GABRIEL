@@ -12,7 +12,6 @@ import {
   INITIAL_ENRICHMENT_UI_STATE,
   rejectProposal,
   resetEnrichmentRun,
-  setProposalDecision,
   startEnrichmentRun,
   updateEnrichmentProgress,
   type EnrichmentUiState,
@@ -20,7 +19,7 @@ import {
 import type { DrawnGeometry, MapEntity } from "@/types/domain.types"
 import type { EnrichmentProposal, EnrichmentResponse } from "@/types/enrichment.types"
 import { buildAcceptedPatch } from "@/utils/enrichmentApply"
-
+import { createEnrichmentRunner } from "./enrichmentRunner"
 
 export type UseEnrichmentArgs = {
   entities: MapEntity[]
@@ -39,10 +38,7 @@ export function useEnrichment({
   const [isDrawerOpen, setIsDrawerOpen] = useState(false)
   const [draftPrompt, setDraftPrompt] = useState("")
   const [closeNotice, setCloseNotice] = useState<string | null>(null)
-  const [isCancellingRun, setIsCancellingRun] = useState(false)
-  const runAbortControllerRef = useRef<AbortController | null>(null)
-  const runEpochRef = useRef(0)
-  const closeAfterCancelRef = useRef(false)
+  const runnerRef = useRef(createEnrichmentRunner(runEnrichment))
 
   const selectedEntity = useMemo(
     () => (selectedEntityId ? entities.find((entity) => entity.id === selectedEntityId) ?? null : null),
@@ -65,7 +61,6 @@ export function useEnrichment({
   const openDrawer = useCallback(() => {
     if (!feature || !context) return
     setCloseNotice(null)
-    closeAfterCancelRef.current = false
     setDraftPrompt(buildDefaultEnrichmentPrompt(feature, context))
     setIsDrawerOpen(true)
   }, [context, feature])
@@ -87,10 +82,8 @@ export function useEnrichment({
   const closeDrawer = useCallback(() => {
     const runFeatureId = state.run.featureId
     if (state.run.status === "running") {
-      closeAfterCancelRef.current = true
-      setIsCancellingRun(true)
+      runnerRef.current.requestCloseDuringRun()
       setCloseNotice("Cancelling enrichment...")
-      runAbortControllerRef.current?.abort()
       return { closed: false as const, reason: "cancelling" as const }
     }
 
@@ -106,9 +99,7 @@ export function useEnrichment({
       setState((current) => resetEnrichmentRun(current))
     }
 
-    closeAfterCancelRef.current = false
     setCloseNotice(null)
-    setIsCancellingRun(false)
     setIsDrawerOpen(false)
     return { closed: true as const, reason: "closed" as const }
   }, [applyAcceptedProposals, state])
@@ -129,21 +120,16 @@ export function useEnrichment({
   }, [applyAcceptedProposals, state])
 
   const forceCloseDrawer = useCallback(() => {
+    runnerRef.current.cancelNow()
     setState((current) => resetEnrichmentRun(current))
     setCloseNotice(null)
-    setIsCancellingRun(false)
-    closeAfterCancelRef.current = false
     setIsDrawerOpen(false)
   }, [])
 
   const run = useCallback(async () => {
     if (!selectedEntity || !feature || !context) return
-    closeAfterCancelRef.current = false
+    if (state.run.status === "running" || runnerRef.current.isRunning()) return
     setCloseNotice(null)
-    const runEpoch = runEpochRef.current + 1
-    runEpochRef.current = runEpoch
-    const abortController = new AbortController()
-    runAbortControllerRef.current = abortController
     setState((current) =>
       startEnrichmentRun(current, {
         featureId: selectedEntity.id,
@@ -151,61 +137,47 @@ export function useEnrichment({
         maxDepth: ENRICHMENT_MAX_DEPTH_DEFAULT,
       }),
     )
-    try {
-      const result = await runEnrichment(
-        {
-          prompt: draftPrompt,
-          feature,
-          context,
-          outputSchema: DEFAULT_ENRICHMENT_OUTPUT_SCHEMA,
-          maxDepth: ENRICHMENT_MAX_DEPTH_DEFAULT,
+    await runnerRef.current.run(
+      {
+        prompt: draftPrompt,
+        feature,
+        context,
+        outputSchema: DEFAULT_ENRICHMENT_OUTPUT_SCHEMA,
+        maxDepth: ENRICHMENT_MAX_DEPTH_DEFAULT,
+      },
+      {
+        onProgress: (progress) => {
+          setState((current) => updateEnrichmentProgress(current, progress))
         },
-        {
-          signal: abortController.signal,
-          onProgress: (progress) => {
-            if (runEpochRef.current !== runEpoch) return
-            setState((current) => updateEnrichmentProgress(current, progress))
-          },
+        onSuccess: (response, usage) => {
+          setState((current) => completeEnrichmentRun(current, response))
+          if (usage.estimatedInputTokens + usage.estimatedOutputTokens > 0) {
+            console.debug("Enrichment usage", usage)
+          }
         },
-      )
-      if (runEpochRef.current !== runEpoch) return
-      setState((current) => completeEnrichmentRun(current, result.response))
-      if (result.usage.estimatedInputTokens + result.usage.estimatedOutputTokens > 0) {
-        console.debug("Enrichment usage", result.usage)
-      }
-    } catch (error) {
-      if (runEpochRef.current !== runEpoch) return
-      if (
-        (error instanceof DOMException && error.name === "AbortError") ||
-        (error instanceof Error && error.name === "AbortError")
-      ) {
-        setState((current) => resetEnrichmentRun(current))
-        setIsCancellingRun(false)
-        if (closeAfterCancelRef.current) {
+        onAbort: (closeAfterCancel) => {
+          setState((current) => resetEnrichmentRun(current))
+          if (closeAfterCancel) {
+            setCloseNotice(null)
+            setIsDrawerOpen(false)
+          } else {
+            setCloseNotice("Enrichment cancelled.")
+          }
+        },
+        onError: (message) => {
+          setState((current) =>
+            failEnrichmentRun(current, {
+              code: "UNKNOWN",
+              message: "Enrichment failed",
+              details: message,
+            }),
+          )
           setCloseNotice(null)
-          closeAfterCancelRef.current = false
-          setIsDrawerOpen(false)
-        } else {
-          setCloseNotice("Enrichment cancelled.")
-        }
-        return
-      }
-      const message = error instanceof Error ? error.message : "Unknown enrichment failure"
-      setState((current) =>
-        failEnrichmentRun(current, {
-          code: "UNKNOWN",
-          message: "Enrichment failed",
-          details: message,
-        }),
-      )
-      setCloseNotice(null)
-    } finally {
-      if (runEpochRef.current === runEpoch) {
-        runAbortControllerRef.current = null
-        setIsCancellingRun(false)
-      }
-    }
-  }, [context, draftPrompt, feature, selectedEntity])
+        },
+        onFinally: () => {},
+      },
+    )
+  }, [context, draftPrompt, feature, selectedEntity, state.run.status])
 
   const accept = useCallback(
     (proposal: EnrichmentProposal) => {
@@ -229,21 +201,6 @@ export function useEnrichment({
         rejectProposal(current, {
           featureId: currentFeatureId,
           field: proposal.field,
-        }),
-      )
-    },
-    [currentFeatureId],
-  )
-
-  const ignore = useCallback(
-    (proposal: EnrichmentProposal) => {
-      if (!currentFeatureId) return
-      setCloseNotice(null)
-      setState((current) =>
-        setProposalDecision(current, {
-          featureId: currentFeatureId,
-          field: proposal.field,
-          decision: "pending",
         }),
       )
     },
@@ -275,11 +232,9 @@ export function useEnrichment({
     run,
     accept,
     reject,
-    ignore,
     clearOverlayForSelected,
     loadBatchResult,
     closeNotice,
-    isCancellingRun,
     allProposalsResolved,
     advanceBatchReview,
     forceCloseDrawer,

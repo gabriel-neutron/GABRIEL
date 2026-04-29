@@ -26,10 +26,6 @@ export type SynthesisInput = {
   }>
 }
 
-export type SynthesisAdapter = {
-  synthesize: (input: SynthesisInput, signal?: AbortSignal) => Promise<Record<string, unknown>>
-}
-
 export type AiModelAdapter = {
   generateQueries: (input: QueryGenerationInput, signal?: AbortSignal) => Promise<string[]>
   synthesize: (input: SynthesisInput, signal?: AbortSignal) => Promise<Record<string, unknown>>

@@ -160,6 +160,7 @@ export async function runLayeredResearch(
   let done = 0
 
   const overpassAdapter = new OverpassAdapter()
+  const bundle = providers ?? createLayeredResearchProviderBundle(sourceCache)
 
   outer: for (let layerIdx = 0; layerIdx < bfsLayers.length; layerIdx++) {
     const layer = bfsLayers[layerIdx]
@@ -208,8 +209,6 @@ export async function runLayeredResearch(
         const feature = toEnrichmentFeature(entity, drawnGeometries)
         const context = toEnrichmentContext(entity, entities)
         const prompt = buildDefaultEnrichmentPrompt(feature, context, poolHintUrls)
-
-        const bundle = providers ?? createLayeredResearchProviderBundle(sourceCache)
 
         const { response, usage } = await runEnrichment(
           {

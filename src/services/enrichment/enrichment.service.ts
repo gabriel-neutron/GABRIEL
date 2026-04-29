@@ -1,3 +1,6 @@
+import {
+  CORE_ENRICHMENT_FIELDS,
+} from "@/types/enrichment.types"
 import type {
   EnrichmentConflictCandidate,
   EnrichmentError,
@@ -7,7 +10,6 @@ import type {
   EnrichmentResponse,
   EnrichmentSource,
   EnrichmentUsage,
-  ProviderSearchResult,
   RetrievalChunk,
   UnresolvedReason,
 } from "@/types/enrichment.types"
@@ -29,6 +31,16 @@ type ServiceProgress = {
   depthUsed: number
   queryTrace: string[]
 }
+type StopReason = "max-depth" | "time-budget" | "token-budget" | "confidence-threshold"
+type BudgetStop = { stopReason: StopReason; note: string } | null
+type RetrievalLoopResult = {
+  depthUsed: number
+  queryTrace: string[]
+  allChunks: RetrievalChunk[]
+  unresolvedFields: string[]
+  notes: string[]
+  stopReason: StopReason
+}
 
 export type RunEnrichmentOptions = {
   providers?: ProviderBundle
@@ -43,7 +55,7 @@ export type RunEnrichmentResult = {
 
 const CONFIDENCE_THRESHOLD = 0.5
 const REQUEST_TIMEOUT_MS = 8000
-const ALLOWED_ENRICHMENT_FIELDS = new Set(["notes", "sources", "militaryUnitId", "osmRelationId"])
+const ALLOWED_ENRICHMENT_FIELDS = new Set<string>(CORE_ENRICHMENT_FIELDS)
 
 const UNRESOLVED_REASON_VALUES = new Set<UnresolvedReason>(["conflict", "stale", "no-evidence", "other"])
 
@@ -149,6 +161,30 @@ function createError(
   return { code, message, details }
 }
 
+function withStopReason(notes: string, stopReason: StopReason): string {
+  return notes === "" ? `stop=${stopReason}` : `stop=${stopReason} | ${notes}`
+}
+
+function getBudgetStop(elapsedMs: number, estimatedTokens: number): BudgetStop {
+  if (elapsedMs >= ENRICHMENT_MAX_ELAPSED_MS) {
+    return {
+      stopReason: "time-budget",
+      note: `Stopped early: time budget reached (${elapsedMs}ms).`,
+    }
+  }
+  if (estimatedTokens >= ENRICHMENT_MAX_ESTIMATED_TOKENS) {
+    return {
+      stopReason: "token-budget",
+      note: `Stopped early: token budget reached (${estimatedTokens} est.).`,
+    }
+  }
+  return null
+}
+
+function getStopReasonFromConfidence(confidence: number): StopReason {
+  return confidence >= CONFIDENCE_THRESHOLD ? "confidence-threshold" : "max-depth"
+}
+
 function withTimeout(signalMs: number, externalSignal?: AbortSignal): AbortSignal {
   const timeoutSignal = AbortSignal.timeout(signalMs)
   if (!externalSignal) return timeoutSignal
@@ -184,12 +220,8 @@ function dedupeChunks(chunks: RetrievalChunk[]): RetrievalChunk[] {
   return output
 }
 
-function getSchemaFields(schema: EnrichmentOutputSchema): string[] {
-  return Object.keys(schema.properties)
-}
-
 function getAllowedSchemaFields(schema: EnrichmentOutputSchema): string[] {
-  return getSchemaFields(schema).filter((field) => ALLOWED_ENRICHMENT_FIELDS.has(field))
+  return Object.keys(schema.properties).filter((field) => ALLOWED_ENRICHMENT_FIELDS.has(field))
 }
 
 /**
@@ -238,7 +270,10 @@ function sanitizeSynthesisObject(
   return sanitized
 }
 
-function normalizeProviderResult(query: string, result: ProviderSearchResult): RetrievalChunk {
+function normalizeProviderResult(
+  query: string,
+  result: { url: string; title: string; snippet: string; publishedAt?: string },
+): RetrievalChunk {
   const domainType = getDomainTypeFromUrl(result.url)
   const chunk: RetrievalChunk = {
     query,
@@ -415,6 +450,69 @@ function buildResponse(
   }
 }
 
+async function runRetrievalLoop(
+  args: {
+    request: EnrichmentRequest
+    fields: string[]
+    hopBudget: number
+    providers: ProviderBundle
+    usage: EnrichmentUsage
+    startedAtMs: number
+    onProgress?: (progress: ServiceProgress) => void
+    signal?: AbortSignal
+  },
+): Promise<RetrievalLoopResult> {
+  let depthUsed = 0
+  let queryTrace: string[] = []
+  let allChunks: RetrievalChunk[] = []
+  const notes: string[] = []
+  let unresolvedFields = [...args.fields]
+  let stopReason: StopReason = "max-depth"
+
+  for (let hop = 0; hop < args.hopBudget; hop += 1) {
+    throwIfAborted(args.signal)
+    const elapsedMs = Date.now() - args.startedAtMs
+    const estimatedTokens = args.usage.estimatedInputTokens + args.usage.estimatedOutputTokens
+    const budgetStop = getBudgetStop(elapsedMs, estimatedTokens)
+    if (budgetStop != null) {
+      stopReason = budgetStop.stopReason
+      notes.push(budgetStop.note)
+      break
+    }
+
+    depthUsed = hop + 1
+    args.usage.providerCalls.openai_query_generation =
+      (args.usage.providerCalls.openai_query_generation ?? 0) + 1
+    const generated = await args.providers.model.generateQueries(
+      {
+        feature: args.request.feature,
+        context: args.request.context,
+        prompt: args.request.prompt,
+        unresolvedFields,
+      },
+      args.signal,
+    )
+    const queries = dedupeQueries(generated).slice(0, 6)
+    queryTrace = [...queryTrace, ...queries]
+    args.usage.estimatedInputTokens += estimateTokens(JSON.stringify(queries))
+    args.onProgress?.({ depthUsed, queryTrace })
+
+    const retrieval = await retrieveParallel(queries, args.providers.retrieval, args.usage, args.signal)
+    notes.push(...retrieval.notes)
+    allChunks = dedupeChunks([...allChunks, ...retrieval.chunks])
+
+    const { confidence, coveredFields } = computeConfidence(allChunks, args.fields)
+    unresolvedFields = args.fields.filter((field) => !coveredFields.includes(field))
+    const shouldStop = confidence >= CONFIDENCE_THRESHOLD || hop === args.hopBudget - 1
+    if (shouldStop) {
+      stopReason = getStopReasonFromConfidence(confidence)
+      break
+    }
+  }
+
+  return { depthUsed, queryTrace, allChunks, unresolvedFields, notes, stopReason }
+}
+
 export async function runEnrichment(
   request: EnrichmentRequest,
   options: RunEnrichmentOptions = {},
@@ -442,98 +540,40 @@ export async function runEnrichment(
     )
   }
   const hopBudget = Math.min(request.maxDepth, ENRICHMENT_MAX_DEPTH_HARD_LIMIT)
-  let depthUsed = 0
-  let queryTrace: string[] = []
-  let allChunks: RetrievalChunk[] = []
-  const notes: string[] = []
-  let unresolvedFields = [...fields]
-  let stopReason = "max-depth"
-
-  for (let hop = 0; hop < hopBudget; hop += 1) {
-    throwIfAborted(options.signal)
-    const elapsedMs = Date.now() - startedAtMs
-    if (elapsedMs >= ENRICHMENT_MAX_ELAPSED_MS) {
-      stopReason = "time-budget"
-      notes.push(`Stopped early: time budget reached (${elapsedMs}ms).`)
-      break
-    }
-    const estimatedTokens = usage.estimatedInputTokens + usage.estimatedOutputTokens
-    if (estimatedTokens >= ENRICHMENT_MAX_ESTIMATED_TOKENS) {
-      stopReason = "token-budget"
-      notes.push(`Stopped early: token budget reached (${estimatedTokens} est.).`)
-      break
-    }
-
-    depthUsed = hop + 1
-    usage.providerCalls.openai_query_generation =
-      (usage.providerCalls.openai_query_generation ?? 0) + 1
-    const generated = await providers.model.generateQueries(
-      {
-        feature: request.feature,
-        context: request.context,
-        prompt: request.prompt,
-        unresolvedFields,
-      },
-      options.signal,
-    )
-    const queries = dedupeQueries(generated).slice(0, 6)
-    queryTrace = [...queryTrace, ...queries]
-    usage.estimatedInputTokens += estimateTokens(JSON.stringify(queries))
-    options.onProgress?.({ depthUsed, queryTrace })
-
-    const retrieval = await retrieveParallel(queries, providers.retrieval, usage, options.signal)
-    notes.push(...retrieval.notes)
-    const merged = dedupeChunks([...allChunks, ...retrieval.chunks])
-    allChunks = merged
-
-    const { confidence, coveredFields } = computeConfidence(allChunks, fields)
-    unresolvedFields = fields.filter((field) => !coveredFields.includes(field))
-    if (confidence >= CONFIDENCE_THRESHOLD || hop === hopBudget - 1) {
-      if (confidence >= CONFIDENCE_THRESHOLD) {
-        stopReason = "confidence-threshold"
-      } else {
-        stopReason = "max-depth"
-      }
-      break
-    }
-  }
-
-  if (allChunks.length === 0) {
-    const response = buildResponse(
-      request,
-      fields,
-      depthUsed,
-      queryTrace,
-      [],
-      {},
-      {},
-      notes,
-      startedAtMs,
-    )
-    response.notes = response.notes === "" ? `stop=${stopReason}` : `stop=${stopReason} | ${response.notes}`
-    return { response, usage }
-  }
-
-  const synthesisObject = await synthesizeWithSingleModel(
+  const retrievalLoop = await runRetrievalLoop({
     request,
     fields,
-    allChunks,
+    hopBudget,
     providers,
     usage,
-    options.signal,
-  )
+    startedAtMs,
+    onProgress: options.onProgress,
+    signal: options.signal,
+  })
+
+  const synthesisObject =
+    retrievalLoop.allChunks.length === 0
+      ? {}
+      : await synthesizeWithSingleModel(
+          request,
+          fields,
+          retrievalLoop.allChunks,
+          providers,
+          usage,
+          options.signal,
+        )
   const response = buildResponse(
     request,
     fields,
-    depthUsed,
-    queryTrace,
-    allChunks,
+    retrievalLoop.depthUsed,
+    retrievalLoop.queryTrace,
+    retrievalLoop.allChunks,
     sanitizeSynthesisObject(synthesisObject, fields),
     synthesisObject,
-    notes,
+    retrievalLoop.notes,
     startedAtMs,
   )
-  response.notes = response.notes === "" ? `stop=${stopReason}` : `stop=${stopReason} | ${response.notes}`
+  response.notes = withStopReason(response.notes, retrievalLoop.stopReason)
   const responseErrors = validateEnrichmentResponse(response)
   if (responseErrors.length > 0) {
     throw createError("VALIDATION_ERROR", "Response contract validation failed", responseErrors.join("; "))

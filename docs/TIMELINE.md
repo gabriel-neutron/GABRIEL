@@ -238,6 +238,8 @@ Roadmap sequencing note: Phase 5 is intentionally skipped for active planning; P
 
 ## Phase 8 — Enrichment Simplification Review & Refactor (Weeks 11-12)
 
+**Status:** complete (strict-scope simplification finished: typed stop diagnostics, leaner run orchestration, dedicated enrichment runner lifecycle, stale API surface removal, and regression coverage updates).
+
 **Goal**: Reduce enrichment complexity and coupling while preserving current behavior, evidence integrity, and validation guarantees.
 
 **Scope**
@@ -260,20 +262,20 @@ Roadmap sequencing note: Phase 5 is intentionally skipped for active planning; P
 - `src/services/enrichment/providers/openai.adapter.test.ts`
 
 **Tasks**
-- [ ] Split `runEnrichment` into focused modules (validation, retrieval loop, synthesis normalization, response assembly).
-- [ ] Replace stringly diagnostics and stop-reason assembly with typed internal structures.
-- [ ] Consolidate relevance/confidence/source-mapping heuristics into a single shared scoring layer.
-- [ ] Extract async run/cancel/epoch logic from `useEnrichment` into a dedicated runner hook/service.
-- [ ] Reduce no-op/stale UI API surface in enrichment drawer contracts.
-- [ ] Align layered and single-entity enrichment orchestration semantics and error statuses.
-- [ ] Keep or improve current validation/citation/conflict guarantees with explicit tests.
+- [x] Split `runEnrichment` into focused modules (validation, retrieval loop, synthesis normalization, response assembly).
+- [x] Replace stringly diagnostics and stop-reason assembly with typed internal structures.
+- [x] Consolidate relevance/confidence/source-mapping heuristics into a single shared scoring layer.
+- [x] Extract async run/cancel/epoch logic from `useEnrichment` into a dedicated runner hook/service.
+- [x] Reduce no-op/stale UI API surface in enrichment drawer contracts.
+- [x] Align layered and single-entity enrichment orchestration semantics and error statuses.
+- [x] Keep or improve current validation/citation/conflict guarantees with explicit tests.
 
 **Exit Criteria**
-- [ ] Enrichment orchestration files are materially smaller and single-responsibility.
-- [ ] Public enrichment behavior remains stable (no regression in proposal, unresolved, and conflict handling).
-- [ ] Cancellation/close flow is deterministic and easier to reason about.
-- [ ] Test coverage for enrichment critical paths is maintained or improved.
-- [ ] No new fallback/compatibility branch is introduced without explicit rationale.
+- [x] Enrichment orchestration files are materially smaller and single-responsibility.
+- [x] Public enrichment behavior remains stable (no regression in proposal, unresolved, and conflict handling).
+- [x] Cancellation/close flow is deterministic and easier to reason about.
+- [x] Test coverage for enrichment critical paths is maintained or improved.
+- [x] No new fallback/compatibility branch is introduced without explicit rationale.
 
 ---
 

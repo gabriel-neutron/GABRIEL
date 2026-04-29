@@ -135,14 +135,33 @@ function readLayers(geoPackage: GeoPackage): GpkgLayer[] {
 
 const VALID_POSITION_MODES = new Set<PositionMode>(["own", "parent", "none"])
 
+function getTableColumnNames(geoPackage: GeoPackage, tableName: string): Set<string> {
+  try {
+    const rows = geoPackage.connection.all(`PRAGMA table_info(${tableName})`) as Array<{ name?: string }>
+    return new Set(
+      rows
+        .map((row) => (row.name != null ? String(row.name) : ""))
+        .filter((name) => name.length > 0),
+    )
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e)
+    throw new Error(`Unsupported schema: failed to inspect '${tableName}' columns (${message}).`)
+  }
+}
+
 function readEntities(geoPackage: GeoPackage): GpkgEntity[] {
+  const columns = getTableColumnNames(geoPackage, UNITS_TABLE)
+  const analyzedAtSelection = columns.has("analyzed_at") ? "analyzed_at" : "NULL AS analyzed_at"
+  const positionModeSelection = columns.has("position_mode") ? "position_mode" : "'own' AS position_mode"
+  const exactPositionSelection =
+    columns.has("is_exact_position") ? "is_exact_position" : "0 AS is_exact_position"
   const result = geoPackage.connection.all(
     `SELECT id, name, layer_id, parent_id, type, nato_symbol_code,
             echelon, affiliation, domain, osm_relation_id,
             military_unit_id, notes, sources,
-            analyzed_at,
-            position_mode,
-            is_exact_position
+            ${analyzedAtSelection},
+            ${positionModeSelection},
+            ${exactPositionSelection}
      FROM ${UNITS_TABLE}`,
   ) as Array<{
     id: string

@@ -31,7 +31,6 @@ export type EnrichmentControls = {
   run: () => void
   accept: (proposal: EnrichmentProposal) => void
   reject: (proposal: EnrichmentProposal) => void
-  ignore: (proposal: EnrichmentProposal) => void
   clearOverlayForSelected: () => void
 }
 
