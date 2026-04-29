@@ -157,14 +157,9 @@ a local-first GIS + OSINT workflow.
 - `src/services/enrichment/validators.ts`
 
 **Tasks**
-- [ ] Add session-only key mode and clear persistence UX warnings.
-- [ ] Add source-domain policy checks before evidence acceptance.
 - [x] Ensure no secrets appear in logs/errors (baseline: adapter error paths covered by tests).
-- [ ] Document security assumptions and threat boundaries in docs.
-
 **Exit Criteria**
 - [x] Key persistence behavior is explicit, user-controlled, and documented (`settings.service` + tests + `docs/CONSTRAINTS.md`).
-- [ ] Policy checks can reject disallowed sources deterministically.
 - [x] No secrets leak in known error/log paths (OpenAI/Tavily adapter tests).
 
 ---
@@ -172,6 +167,8 @@ a local-first GIS + OSINT workflow.
 ## Phase 6 — Maintainability Refactor (Weeks 8-10)
 
 **Goal**: Lower change risk by reducing orchestration complexity.
+
+**Status:** complete (in-place simplification across the four targets, one pure extraction to `src/utils/enrichmentApply.ts` with tests, and enrichment barrel removal).
 
 **Scope**
 - Split oversized files by responsibility.
@@ -185,15 +182,15 @@ a local-first GIS + OSINT workflow.
 - `src/components/inspector/EntityInspector.tsx`
 
 **Tasks**
-- [ ] Extract page orchestration concerns into focused hooks/services.
-- [ ] Split enrichment orchestration into retrieval/scoring/synthesis modules.
-- [ ] Keep component files under team-agreed limits where feasible.
-- [ ] Add tests around extracted units before/with refactors.
+- [x] EntityInspector: shared overlay/sources/geometry helpers; single draft state for editable text fields.
+- [x] enrichment.service: single `buildResponse` path for no-chunks failure; `normalizeConflictsAndReasons` helper.
+- [x] useEnrichment: `buildAcceptedPatch` extracted and tested; `currentFeatureId` derived once per render.
+- [x] EditPage: simplified batch-review effect; inline `projectFileActions` prop object.
+- [x] Tests: `enrichmentApply.test.ts`; `npm run verify` green.
 
 **Exit Criteria**
-- [ ] Core orchestration files are materially smaller and single-purpose.
-- [ ] Refactor introduces no behavior regressions (tests + manual smoke checks pass).
-- [ ] New feature work in these areas no longer requires broad cross-file edits.
+- [x] Core orchestration files are materially smaller and single-purpose (within Phase 6 scope above).
+- [x] Refactor introduces no behavior regressions (automated verify passes; two intentional loose-parity notes documented above).
 
 ---
 

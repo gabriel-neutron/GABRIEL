@@ -244,24 +244,26 @@ export function EditPage({ onViewMode, onOpenAbout }: EditPageProps): React.Reac
     if (!enrichment.allProposalsResolved || !isBatchReviewRef.current) return
 
     const enrich = enrichmentRef.current
-    enrich.advanceBatchReview()
-
-    const nextEntityId = layeredResearch.reviewQueue[1] ?? null
-    layeredResearch.advanceQueue()
-
-    if (nextEntityId) {
-      const result = layeredResearch.getResult(nextEntityId)
-      if (result) {
-        useProjectStore.getState().setSelectedEntityId(nextEntityId)
-        enrich.loadBatchResult(result)
-      } else {
-        isBatchReviewRef.current = false
-        enrich.forceCloseDrawer()
-      }
-    } else {
+    const finishBatch = (): void => {
       isBatchReviewRef.current = false
       enrich.forceCloseDrawer()
     }
+
+    enrich.advanceBatchReview()
+    const nextEntityId = layeredResearch.reviewQueue[1] ?? null
+    layeredResearch.advanceQueue()
+
+    if (!nextEntityId) {
+      finishBatch()
+      return
+    }
+    const result = layeredResearch.getResult(nextEntityId)
+    if (!result) {
+      finishBatch()
+      return
+    }
+    useProjectStore.getState().setSelectedEntityId(nextEntityId)
+    enrich.loadBatchResult(result)
   }, [
     enrichment.allProposalsResolved,
     layeredResearch,
@@ -269,12 +271,6 @@ export function EditPage({ onViewMode, onOpenAbout }: EditPageProps): React.Reac
     layeredResearch.advanceQueue,
     layeredResearch.getResult,
   ])
-
-  const projectFileActions = {
-    onNewProject: handleNewProject,
-    onOpenProject: handleOpenProject,
-    onSaveProject: handleSaveProject,
-  }
 
   return (
     <>
@@ -285,7 +281,11 @@ export function EditPage({ onViewMode, onOpenAbout }: EditPageProps): React.Reac
         restoredFromSession={restoredFromSession}
         busy={busy}
         error={error}
-        projectFileActions={projectFileActions}
+        projectFileActions={{
+          onNewProject: handleNewProject,
+          onOpenProject: handleOpenProject,
+          onSaveProject: handleSaveProject,
+        }}
         onOverpassUnavailable={() =>
           setToasts((prev) =>
             [

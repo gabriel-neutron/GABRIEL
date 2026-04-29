@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
@@ -14,7 +14,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { FilterableSelect } from "@/components/shared/FilterableSelect"
-import type { DrawnGeometry, PositionMode } from "@/types/domain.types"
+import type { DrawnGeometry, MapEntity, PositionMode } from "@/types/domain.types"
 import {
   AFFILIATION_OPTIONS,
   DOMAIN_OPTIONS,
@@ -33,6 +33,22 @@ const POSITION_MODE_OPTIONS: { value: PositionMode; label: string }[] = [
   { value: "parent", label: "Linked to parent" },
   { value: "none", label: "Unknown location" },
 ]
+
+type FieldDraft = {
+  name: string
+  militaryUnitId: string
+  notes: string
+  osmRelationId: string
+}
+
+function draftFromEntity(entity: MapEntity): FieldDraft {
+  return {
+    name: entity.name ?? "",
+    militaryUnitId: entity.militaryUnitId ?? "",
+    notes: entity.notes ?? "",
+    osmRelationId: entity.osmRelationId?.toString() ?? "",
+  }
+}
 
 function geometryLabel(g: DrawnGeometry): string {
   if (g.type === "point") return `Point (${g.lat.toFixed(4)}, ${g.lng.toFixed(4)})`
@@ -62,6 +78,160 @@ function capitalizeFirst(value: string): string {
 
 function positionModeLabel(mode?: PositionMode): string {
   return POSITION_MODE_OPTIONS.find((o) => o.value === mode)?.label ?? "Own geometry"
+}
+
+function EnrichedSessionBlock({
+  overlay,
+  variant,
+}: {
+  overlay: Record<string, unknown>
+  variant: "readonly" | "edit"
+}) {
+  const entries = Object.entries(overlay)
+  if (entries.length === 0) return null
+
+  if (variant === "readonly") {
+    return (
+      <ReadOnlyField label="Enriched (session)">
+        <ul className="mt-1 space-y-1 text-xs">
+          {entries.map(([field, value]) => (
+            <li key={field}>
+              <span className="font-medium">{field}:</span> {String(value)}{" "}
+              <span className="text-emerald-600">(Enriched)</span>
+            </li>
+          ))}
+        </ul>
+      </ReadOnlyField>
+    )
+  }
+
+  return (
+    <Field>
+      <div className="rounded border bg-muted/30 p-2 text-xs">
+        {entries.map(([field, value]) => (
+          <p key={field}>
+            <span className="font-medium">{field}:</span> {String(value)}{" "}
+            <span className="text-emerald-600">(Enriched)</span>
+          </p>
+        ))}
+      </div>
+    </Field>
+  )
+}
+
+function SourcesList({
+  sources,
+  readOnly,
+  onRemove,
+}: {
+  sources: string[]
+  readOnly: boolean
+  onRemove?: (index: number) => void
+}) {
+  if (sources.length === 0) return null
+
+  const listClass = readOnly ? "mt-1 space-y-1 text-xs" : "mb-2 space-y-1 text-xs"
+
+  return (
+    <ul className={listClass}>
+      {sources.map((src, index) => (
+        <li key={index} className="flex items-start gap-2">
+          <div className="min-w-0 flex-1">
+            {isUrl(src) ? (
+              <a
+                href={src}
+                target="_blank"
+                rel="noreferrer"
+                title={src}
+                className={
+                  readOnly
+                    ? "min-w-0 flex-1 truncate text-blue-600 hover:underline"
+                    : "block truncate text-blue-600 hover:underline"
+                }
+              >
+                {src}
+              </a>
+            ) : (
+              <span
+                className={
+                  readOnly
+                    ? "min-w-0 flex-1 whitespace-pre-wrap break-words"
+                    : "block whitespace-pre-wrap break-words"
+                }
+              >
+                {src}
+              </span>
+            )}
+          </div>
+          {!readOnly && onRemove != null && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-7 w-7 shrink-0 p-0"
+              onClick={() => onRemove(index)}
+              aria-label="Remove source"
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          )}
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+function LinkedGeometriesList({
+  linkedGeometries,
+  onDeleteGeometry,
+}: {
+  linkedGeometries: DrawnGeometry[]
+  onDeleteGeometry?: (id: string) => void
+}) {
+  if (linkedGeometries.length === 0) {
+    if (onDeleteGeometry) {
+      return (
+        <div className="rounded border border-dashed bg-muted/20 px-2 py-2 text-xs text-muted-foreground">
+          No geometries linked. The symbol is placed at the first linked geometry. Draw on the map
+          and link to this entity to add one.
+        </div>
+      )
+    }
+    return <div className="text-muted-foreground">None</div>
+  }
+
+  if (onDeleteGeometry) {
+    return (
+      <ul className="space-y-1">
+        {linkedGeometries.map((g) => (
+          <li
+            key={g.id}
+            className="flex items-center justify-between gap-2 rounded border bg-muted/30 px-2 py-1.5 text-sm"
+          >
+            <span className="min-w-0 truncate">{geometryLabel(g)}</span>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 shrink-0 text-destructive hover:text-destructive"
+              onClick={() => onDeleteGeometry(g.id)}
+            >
+              Delete
+            </Button>
+          </li>
+        ))}
+      </ul>
+    )
+  }
+
+  return (
+    <ul className="mt-1 space-y-1">
+      {linkedGeometries.map((g) => (
+        <li key={g.id} className="truncate rounded border bg-muted/30 px-2 py-1 text-xs">
+          {geometryLabel(g)}
+        </li>
+      ))}
+    </ul>
+  )
 }
 
 type Props = {
@@ -102,10 +272,14 @@ export function EntityInspector({ readOnly = false, enrichedOverlay = {} }: Prop
     handleRemoveSource,
   } = useEntityInspector()
 
-  const [localName, setLocalName] = useState(entity?.name ?? "")
-  const [localMilitaryUnitId, setLocalMilitaryUnitId] = useState(entity?.militaryUnitId ?? "")
-  const [localNotes, setLocalNotes] = useState(entity?.notes ?? "")
-  const [localOsmRelationId, setLocalOsmRelationId] = useState(entity?.osmRelationId?.toString() ?? "")
+  const [draft, setDraft] = useState<FieldDraft>(() =>
+    entity != null ? draftFromEntity(entity) : { name: "", militaryUnitId: "", notes: "", osmRelationId: "" },
+  )
+
+  useEffect(() => {
+    if (entity != null) setDraft(draftFromEntity(entity))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [entity?.id])
 
   function handleDeleteEntity(entityId: string): void {
     if (!window.confirm("Delete this entity and all its linked geometries?")) return
@@ -134,39 +308,10 @@ export function EntityInspector({ readOnly = false, enrichedOverlay = {} }: Prop
         )}
         {sources.length > 0 && (
           <ReadOnlyField label="Sources">
-            <ul className="mt-1 space-y-1 text-xs">
-              {sources.map((src, index) => (
-                <li key={index} className="flex items-start gap-2">
-                  {isUrl(src) ? (
-                    <a
-                      href={src}
-                      target="_blank"
-                      rel="noreferrer"
-                      title={src}
-                      className="min-w-0 flex-1 truncate text-blue-600 hover:underline"
-                    >
-                      {src}
-                    </a>
-                  ) : (
-                    <span className="min-w-0 flex-1 whitespace-pre-wrap break-words">{src}</span>
-                  )}
-                </li>
-              ))}
-            </ul>
+            <SourcesList sources={sources} readOnly />
           </ReadOnlyField>
         )}
-        {Object.keys(enrichedOverlay).length > 0 && (
-          <ReadOnlyField label="Enriched (session)">
-            <ul className="mt-1 space-y-1 text-xs">
-              {Object.entries(enrichedOverlay).map(([field, value]) => (
-                <li key={field}>
-                  <span className="font-medium">{field}:</span> {String(value)}{" "}
-                  <span className="text-emerald-600">(Enriched)</span>
-                </li>
-              ))}
-            </ul>
-          </ReadOnlyField>
-        )}
+        <EnrichedSessionBlock overlay={enrichedOverlay} variant="readonly" />
         <div className="grid grid-cols-2 gap-2">
           <ReadOnlyField label="Echelon">{entity.echelon ?? "—"}</ReadOnlyField>
           <ReadOnlyField label="Type">
@@ -198,17 +343,7 @@ export function EntityInspector({ readOnly = false, enrichedOverlay = {} }: Prop
         </ReadOnlyField>
         <div>
           <div className="text-xs font-medium text-muted-foreground">Linked geometries</div>
-          {linkedGeometries.length === 0 ? (
-            <div className="text-muted-foreground">None</div>
-          ) : (
-            <ul className="mt-1 space-y-1">
-              {linkedGeometries.map((g) => (
-                <li key={g.id} className="truncate rounded border bg-muted/30 px-2 py-1 text-xs">
-                  {geometryLabel(g)}
-                </li>
-              ))}
-            </ul>
-          )}
+          <LinkedGeometriesList linkedGeometries={linkedGeometries} />
         </div>
       </div>
     )
@@ -219,34 +354,23 @@ export function EntityInspector({ readOnly = false, enrichedOverlay = {} }: Prop
   return (
     <div className="p-2">
       <FieldGroup className="gap-4 [&_[data-slot=field]]:gap-1">
-        <Field>
-          {Object.keys(enrichedOverlay).length > 0 && (
-            <div className="rounded border bg-muted/30 p-2 text-xs">
-              {Object.entries(enrichedOverlay).map(([field, value]) => (
-                <p key={field}>
-                  <span className="font-medium">{field}:</span> {String(value)}{" "}
-                  <span className="text-emerald-600">(Enriched)</span>
-                </p>
-              ))}
-            </div>
-          )}
-        </Field>
+        <EnrichedSessionBlock overlay={enrichedOverlay} variant="edit" />
         <Field>
           <FieldLabel>Name</FieldLabel>
           <Input
-            value={localName}
-            onChange={(e) => setLocalName(e.target.value)}
-            onBlur={() => handleNameChange(localName)}
+            value={draft.name}
+            onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))}
+            onBlur={() => handleNameChange(draft.name)}
           />
         </Field>
         <Field>
           <FieldLabel>Military unit ID</FieldLabel>
           <Input
-            value={localMilitaryUnitId}
-            onChange={(e) => setLocalMilitaryUnitId(e.target.value)}
+            value={draft.militaryUnitId}
+            onChange={(e) => setDraft((d) => ({ ...d, militaryUnitId: e.target.value }))}
             onBlur={() =>
               updateEntity(entity.id, {
-                militaryUnitId: localMilitaryUnitId === "" ? null : localMilitaryUnitId,
+                militaryUnitId: draft.militaryUnitId === "" ? null : draft.militaryUnitId,
               })
             }
           />
@@ -255,50 +379,18 @@ export function EntityInspector({ readOnly = false, enrichedOverlay = {} }: Prop
           <FieldLabel>Notes</FieldLabel>
           <Textarea
             placeholder="Free-form notes…"
-            value={localNotes}
-            onChange={(e) => setLocalNotes(e.target.value)}
+            value={draft.notes}
+            onChange={(e) => setDraft((d) => ({ ...d, notes: e.target.value }))}
             onBlur={() =>
               updateEntity(entity.id, {
-                notes: localNotes === "" ? null : localNotes,
+                notes: draft.notes === "" ? null : draft.notes,
               })
             }
           />
         </Field>
         <Field>
           <FieldLabel>Sources</FieldLabel>
-          {sources.length > 0 && (
-            <ul className="mb-2 space-y-1 text-xs">
-              {sources.map((src, index) => (
-                <li key={index} className="flex items-start gap-2">
-                  <div className="min-w-0 flex-1">
-                    {isUrl(src) ? (
-                      <a
-                        href={src}
-                        target="_blank"
-                        rel="noreferrer"
-                        title={src}
-                        className="block truncate text-blue-600 hover:underline"
-                      >
-                        {src}
-                      </a>
-                    ) : (
-                      <span className="block whitespace-pre-wrap break-words">{src}</span>
-                    )}
-                  </div>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="h-7 w-7 shrink-0 p-0"
-                    onClick={() => handleRemoveSource(index)}
-                    aria-label="Remove source"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </li>
-              ))}
-            </ul>
-          )}
+          <SourcesList sources={sources} readOnly={false} onRemove={handleRemoveSource} />
           <div className="flex gap-2">
             <Input
               placeholder="Add source URL or note"
@@ -340,10 +432,7 @@ export function EntityInspector({ readOnly = false, enrichedOverlay = {} }: Prop
           </Field>
           <Field>
             <FieldLabel>Type</FieldLabel>
-            <Select
-              value={typeValue}
-              onValueChange={(v) => updateEntity(entity.id, { type: v })}
-            >
+            <Select value={typeValue} onValueChange={(v) => updateEntity(entity.id, { type: v })}>
               <SelectTrigger className="h-8 text-xs">
                 <SelectValue placeholder="Type" />
               </SelectTrigger>
@@ -367,9 +456,7 @@ export function EntityInspector({ readOnly = false, enrichedOverlay = {} }: Prop
             <FieldLabel>Affiliation</FieldLabel>
             <Select
               value={affiliationValue}
-              onValueChange={(v) =>
-                updateEntity(entity.id, { affiliation: v as SymbolAffiliation })
-              }
+              onValueChange={(v) => updateEntity(entity.id, { affiliation: v as SymbolAffiliation })}
             >
               <SelectTrigger className="h-8 text-xs">
                 <SelectValue placeholder="Affiliation" />
@@ -387,9 +474,7 @@ export function EntityInspector({ readOnly = false, enrichedOverlay = {} }: Prop
             <FieldLabel>Domain</FieldLabel>
             <Select
               value={domainValue}
-              onValueChange={(v) =>
-                updateEntity(entity.id, { domain: v as SymbolDomain })
-              }
+              onValueChange={(v) => updateEntity(entity.id, { domain: v as SymbolDomain })}
             >
               <SelectTrigger className="h-8 text-xs">
                 <SelectValue placeholder="Domain" />
@@ -432,10 +517,7 @@ export function EntityInspector({ readOnly = false, enrichedOverlay = {} }: Prop
           </Field>
           <Field>
             <FieldLabel>Position</FieldLabel>
-            <Select
-              value={positionModeValue}
-              onValueChange={(v) => handlePositionModeChange(v as PositionMode)}
-            >
+            <Select value={positionModeValue} onValueChange={(v) => handlePositionModeChange(v as PositionMode)}>
               <SelectTrigger className="h-8 text-xs">
                 <SelectValue />
               </SelectTrigger>
@@ -468,12 +550,12 @@ export function EntityInspector({ readOnly = false, enrichedOverlay = {} }: Prop
           <Input
             type="number"
             placeholder="None"
-            value={localOsmRelationId}
-            onChange={(e) => setLocalOsmRelationId(e.target.value)}
+            value={draft.osmRelationId}
+            onChange={(e) => setDraft((d) => ({ ...d, osmRelationId: e.target.value }))}
             onBlur={() => {
-              const n = localOsmRelationId === "" ? null : parseInt(localOsmRelationId, 10)
+              const n = draft.osmRelationId === "" ? null : parseInt(draft.osmRelationId, 10)
               updateEntity(entity.id, {
-                osmRelationId: localOsmRelationId === "" || Number.isNaN(n) ? null : n,
+                osmRelationId: draft.osmRelationId === "" || Number.isNaN(n) ? null : n,
               })
             }}
           />
@@ -483,7 +565,7 @@ export function EntityInspector({ readOnly = false, enrichedOverlay = {} }: Prop
                 type="button"
                 variant="secondary"
                 size="sm"
-                className="w-full mt-2"
+                className="mt-2 w-full"
                 onClick={() => setFindDialogOpen(true)}
               >
                 Find OSM at point
@@ -506,31 +588,7 @@ export function EntityInspector({ readOnly = false, enrichedOverlay = {} }: Prop
         {positionModeValue === "own" && (
           <Field>
             <FieldLabel className="text-muted-foreground">Linked geometries</FieldLabel>
-            {linkedGeometries.length === 0 ? (
-              <div className="rounded border border-dashed bg-muted/20 px-2 py-2 text-xs text-muted-foreground">
-                No geometries linked. The symbol is placed at the first linked geometry. Draw on the
-                map and link to this entity to add one.
-              </div>
-            ) : (
-              <ul className="space-y-1">
-                {linkedGeometries.map((g) => (
-                  <li
-                    key={g.id}
-                    className="flex items-center justify-between gap-2 rounded border bg-muted/30 px-2 py-1.5 text-sm"
-                  >
-                    <span className="min-w-0 truncate">{geometryLabel(g)}</span>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-7 shrink-0 text-destructive hover:text-destructive"
-                      onClick={() => deleteGeometry(g.id)}
-                    >
-                      Delete
-                    </Button>
-                  </li>
-                ))}
-              </ul>
-            )}
+            <LinkedGeometriesList linkedGeometries={linkedGeometries} onDeleteGeometry={deleteGeometry} />
           </Field>
         )}
         <Field>

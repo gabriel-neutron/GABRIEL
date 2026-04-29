@@ -12,7 +12,13 @@ import type {
   UnresolvedReason,
 } from "@/types/enrichment.types"
 import { createDefaultProviderBundle, type ProviderBundle } from "./providers"
-import { getAuthorityWeight, getDomainTypeFromUrl, validateEnrichmentRequest, validateEnrichmentResponse, validateSource } from "./validators"
+import {
+  getAuthorityWeight,
+  getDomainTypeFromUrl,
+  validateEnrichmentRequest,
+  validateEnrichmentResponse,
+  validateSource,
+} from "./validators"
 import {
   ENRICHMENT_MAX_DEPTH_HARD_LIMIT,
   ENRICHMENT_MAX_ELAPSED_MS,
@@ -100,6 +106,35 @@ function parseAiConflicts(raw: unknown): Record<string, EnrichmentConflictCandid
     if (candidates.length > 0) out[field] = candidates
   }
   return Object.keys(out).length > 0 ? out : undefined
+}
+
+function normalizeConflictsAndReasons(
+  unresolvedFields: string[],
+  rawSynthesis: Record<string, unknown>,
+): {
+  unresolvedReasons: Record<string, UnresolvedReason>
+  conflicts: Record<string, EnrichmentConflictCandidate[]> | undefined
+} {
+  const aiReasons = parseAiUnresolvedReasons(rawSynthesis.unresolvedReasons)
+  let unresolvedReasons = unresolvedReasonsForFields(unresolvedFields, aiReasons)
+  let conflicts = parseAiConflicts(rawSynthesis.conflicts)
+
+  for (const field of unresolvedFields) {
+    if (unresolvedReasons[field] === "conflict" && (!conflicts?.[field] || conflicts[field].length === 0)) {
+      unresolvedReasons = { ...unresolvedReasons, [field]: "no-evidence" }
+    }
+  }
+  if (conflicts) {
+    const pruned: Record<string, EnrichmentConflictCandidate[]> = {}
+    for (const field of unresolvedFields) {
+      if (unresolvedReasons[field] !== "conflict") continue
+      const list = conflicts[field]
+      if (list != null && list.length > 0) pruned[field] = list
+    }
+    conflicts = Object.keys(pruned).length > 0 ? pruned : undefined
+  }
+
+  return { unresolvedReasons, conflicts }
 }
 
 function estimateTokens(value: string): number {
@@ -364,24 +399,7 @@ function buildResponse(
   const status: EnrichmentResponse["status"] =
     proposals.length === 0 ? "failed" : unresolvedFields.length > 0 ? "partial" : "success"
 
-  const aiReasons = parseAiUnresolvedReasons(rawSynthesis.unresolvedReasons)
-  let unresolvedReasons = unresolvedReasonsForFields(unresolvedFields, aiReasons)
-  let conflicts = parseAiConflicts(rawSynthesis.conflicts)
-
-  for (const field of unresolvedFields) {
-    if (unresolvedReasons[field] === "conflict" && (!conflicts?.[field] || conflicts[field].length === 0)) {
-      unresolvedReasons = { ...unresolvedReasons, [field]: "no-evidence" }
-    }
-  }
-  if (conflicts) {
-    const pruned: Record<string, EnrichmentConflictCandidate[]> = {}
-    for (const field of unresolvedFields) {
-      if (unresolvedReasons[field] !== "conflict") continue
-      const list = conflicts[field]
-      if (list != null && list.length > 0) pruned[field] = list
-    }
-    conflicts = Object.keys(pruned).length > 0 ? pruned : undefined
-  }
+  const { unresolvedReasons, conflicts } = normalizeConflictsAndReasons(unresolvedFields, rawSynthesis)
 
   return {
     status,
@@ -481,20 +499,18 @@ export async function runEnrichment(
   }
 
   if (allChunks.length === 0) {
-    const response: EnrichmentResponse = {
-      status: "failed",
-      featureId: String(request.feature.id ?? request.feature.properties?.id ?? "unknown-feature"),
+    const response = buildResponse(
+      request,
+      fields,
       depthUsed,
-      proposals: [],
-      unresolvedFields: fields,
-      unresolvedReasons: unresolvedReasonsForFields(fields, {}),
-      notes:
-        notes.length > 0
-          ? `stop=${stopReason} | ${notes.join(" | ")}`
-          : `stop=${stopReason} | No retrieval results from configured providers.`,
       queryTrace,
-      processingTimeMs: Date.now() - startedAtMs,
-    }
+      [],
+      {},
+      {},
+      notes,
+      startedAtMs,
+    )
+    response.notes = response.notes === "" ? `stop=${stopReason}` : `stop=${stopReason} | ${response.notes}`
     return { response, usage }
   }
 
