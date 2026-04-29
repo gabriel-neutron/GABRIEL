@@ -36,48 +36,21 @@ App
 
 ---
 
-## Current Data Flow (before refactoring)
-
-```
-EditPage
-  useMapProjectState() → layers, entities, drawnGeometries, selectedEntityId, …
-  useEnrichment()      → enrichment object (drawer state + proposals)
-  useLayeredResearch() → layeredResearch object (batch run state + queue)
-  ↓ (30+ props)
-MainLayout
-  ↓ (re-distributed as callbacks and data props)
-  MapView, LayersPanel, HierarchyPanel, EntityInspector,
-  EnrichDrawer, ResearchDialog
-```
-
-Problems: every new piece of state requires threading through EditPage → MainLayout →
-each child. `MainLayout` has > 30 props and cannot be refactored in isolation. Components
-that only need to read `entities` still receive (and must type) all sibling props.
-
----
-
-## Target Data Flow (after Phase 2–6)
+## Current Data Flow
 
 ```
 useProjectStore (Zustand)
   ← EditPage: bulk load on file open / session restore
   ← ViewPage: bulk load on demo file fetch
-  ← Any component: direct action calls (updateEntity, deleteGeometry, …)
+  ← Components: direct action calls (updateEntity, deleteGeometry, layer visibility, selection)
 
-  → MapView subscribes to:         layers, entities, drawnGeometries,
-                                    entityOsmGeometries, selectedEntityId,
-                                    showNetworks, baseMap
-  → LayersPanel subscribes to:     layers, entities, selectedEntityId
-  → HierarchyPanel subscribes to:  entities, selectedEntityId
-  → EntityInspector subscribes to: selectedEntityId, entities, layers, drawnGeometries
-  → ShowNetworksToggle subscribes: showNetworks (read + write)
-  → BaseMapSwitcher subscribes:    baseMap (read + write)
-  → TreeView subscribes to:        entities, selectedEntityId
-
-MainLayout props (after refactoring):
-  readOnly, onOpenAbout, onSwitchToEdit/View,
-  projectFileActions, busy, error,
+MainLayout props
+  readOnly, onOpenAbout, onSwitchToEdit/View, projectFileActions, busy, error,
   enrichment (hook output), layeredResearch (hook output)
+
+Child components subscribe directly to store slices:
+  MapView, LayersPanel, HierarchyPanel, TreeView, EntityInspector,
+  ShowNetworksToggle, BaseMapSwitcher
 ```
 
 ---

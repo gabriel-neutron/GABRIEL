@@ -144,5 +144,7 @@ functions with no side effects.
 
 - Update the relevant `/docs/` file whenever an architectural decision changes.
 - Do not duplicate content across docs files (the hook enforces this).
+- For agent planning commands, treat `docs/README.md` as the canonical list of planning docs.
+- Exclude `docs/TELEGRAM_OSINT_PRD.md` from generic phase commands unless the phase explicitly targets Telegram OSINT work.
 - JSDoc on exported functions is required only when the type signature alone does not convey
   intent (e.g. non-obvious parameter constraints, side-effect warnings).

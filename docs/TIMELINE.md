@@ -49,6 +49,8 @@ a local-first GIS + OSINT workflow.
 
 ## Phase 2 — Docs and Architectural Truth (Weeks 2-3)
 
+**Status:** complete (core docs aligned to current architecture; planning doc scope standardized).
+
 **Goal**: Make docs fully trustworthy for onboarding and day-to-day decisions.
 
 **Scope**
@@ -64,14 +66,14 @@ a local-first GIS + OSINT workflow.
 - `docs/CONSTRAINTS.md`
 
 **Tasks**
-- [ ] Update state-management documentation to match `useProjectStore`.
-- [ ] Correct AI provider docs to match implemented provider set.
-- [ ] Mark historical sections clearly as historical or remove them.
-- [ ] Add a short "docs updated?" checklist item to contribution workflow docs.
+- [x] Update state-management documentation to match `useProjectStore`.
+- [x] Correct AI provider docs to match implemented provider set.
+- [x] Mark historical sections clearly as historical or remove them.
+- [x] Add a short "docs updated?" checklist item to contribution workflow docs.
 
 **Exit Criteria**
-- [ ] No known docs-vs-code contradictions in core project docs.
-- [ ] New contributor can run app + understand current architecture from docs only.
+- [x] No known docs-vs-code contradictions in core project docs.
+- [x] New contributor can run app + understand current architecture from docs only.
 
 ---
 

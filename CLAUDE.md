@@ -2,7 +2,8 @@
 
 This file provides guidance to **Claude Code** (claude.ai/code) when working in this repository.
 
-**Start here for commands, CI gates, and agent workflow:** [AGENTS.md](AGENTS.md)
+**Start here for commands, CI gates, and agent workflow:** [AGENTS.md](AGENTS.md)  
+**For planning-doc scope:** use [docs/README.md](docs/README.md) as the canonical index (Telegram PRD is opt-in only).
 
 ## Commands
 

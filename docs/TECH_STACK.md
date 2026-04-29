@@ -21,9 +21,9 @@
 
 ## State Management
 
-**Current:** `useState` in `useMapProjectState` hook, passed via 30+ props to `MainLayout`.
+**Current:** Zustand (`useProjectStore`) with selector-based subscriptions in components.
 
-**Target (Phase 1–6):** Zustand.
+**Historical note:** `useMapProjectState` + heavy prop drilling was the pre-refactor model and is no longer the runtime architecture.
 
 ### Rationale
 
@@ -35,9 +35,8 @@ Three options were evaluated:
 | Zustand | Selector-based subscriptions: each component re-renders only when its subscribed slice changes. Shallow equality built in. DevTools via middleware. 1 kB. | **Chosen** |
 | Redux Toolkit | Mature and debuggable, but adds 15 kB + createSlice / thunk boilerplate with no additional benefit for a single-page local app. | Rejected |
 
-Zustand's API maps directly to the existing `useState` pattern, making migration incremental
-(one action at a time). The existing pure-reducer pattern in `enrichment.store.ts` maps cleanly
-to a Zustand action.
+Zustand was chosen for granular subscriptions and low overhead in map-heavy UI paths.
+Enrichment UI state remains reducer-based in `enrichment.store.ts` and is orchestrated from hooks.
 
 ## GeoPackage / Data
 
