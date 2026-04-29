@@ -10,11 +10,10 @@ describe("projectStorage.service", () => {
   it("saves and loads a persisted project buffer", async () => {
     const source = new Uint8Array([1, 2, 3, 4]).buffer
 
-    await saveProject(source, { fileName: "session.gpkg" })
+    await saveProject(source)
     const loaded = await loadProject()
 
     expect(loaded).not.toBeNull()
-    expect(loaded?.fileName).toBe("session.gpkg")
     expect(loaded?.buffer).toBeInstanceOf(ArrayBuffer)
     expect(Array.from(new Uint8Array(loaded?.buffer ?? new ArrayBuffer(0)))).toEqual([1, 2, 3, 4])
   })

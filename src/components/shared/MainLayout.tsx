@@ -60,7 +60,7 @@ export type MainLayoutProps = {
   onOpenAbout?: () => void
   onSwitchToEdit?: () => void
   onSwitchToView?: () => void
-  projectFileActions: ProjectFileActions
+  projectFileActions?: ProjectFileActions
   busy: boolean
   error: string | null
   enrichment: EnrichmentControls

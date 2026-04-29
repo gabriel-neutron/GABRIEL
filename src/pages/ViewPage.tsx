@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react"
 import { Loader2 } from "lucide-react"
 import { MainLayout } from "@/components/shared/MainLayout"
-import type { ProjectFileActions } from "@/components/shared/AppShell"
 import { loadGeoPackage, applyGeoPackageResult } from "@/services/geopackage.service"
 import { useProjectStore } from "@/store/useProjectStore"
 import { useEnrichment } from "@/hooks/useEnrichment"
@@ -9,12 +8,6 @@ import { useEnrichment } from "@/hooks/useEnrichment"
 export type ViewPageProps = {
   onEditMode?: () => void
   onOpenAbout?: () => void
-}
-
-const READ_ONLY_FILE_ACTIONS: ProjectFileActions = {
-  onNewProject: () => {},
-  onOpenProject: () => {},
-  onSaveProject: () => {},
 }
 
 export function ViewPage({ onEditMode, onOpenAbout }: ViewPageProps): React.ReactElement {
@@ -89,7 +82,6 @@ export function ViewPage({ onEditMode, onOpenAbout }: ViewPageProps): React.Reac
       onSwitchToEdit={onEditMode}
       busy={false}
       error={null}
-      projectFileActions={READ_ONLY_FILE_ACTIONS}
       enrichment={{
         isDrawerOpen: enrichment.isDrawerOpen,
         selectedEntity: enrichment.selectedEntity,

@@ -83,10 +83,10 @@ export function EditPage({ onViewMode, onOpenAbout }: EditPageProps): React.Reac
 
   useEffect(function restoreSession() {
     let mounted = true
-    loadProject().then((stored) => {
-      if (!stored || !mounted) return
-      loadGeoPackage(stored.buffer)
-        .then((result) => {
+    loadProject()
+      .then((stored) => {
+        if (!stored || !mounted) return
+        return loadGeoPackage(stored.buffer).then((result) => {
           if (!mounted) return
           const next = applyGeoPackageResult(result, null)
           setProject({
@@ -98,8 +98,12 @@ export function EditPage({ onViewMode, onOpenAbout }: EditPageProps): React.Reac
           })
           setRestoredFromSession(true)
         })
-        .catch(() => {})
-    })
+      })
+      .catch((e) => {
+        if (!mounted) return
+        setError(e instanceof Error ? e.message : "Failed to restore previous session")
+        console.error("restoreSession failed", e)
+      })
     return () => { mounted = false }
   }, [setProject])
 
@@ -115,30 +119,27 @@ export function EditPage({ onViewMode, onOpenAbout }: EditPageProps): React.Reac
   const writeGeoPackageToFile = useCallback(async (bytes: Uint8Array): Promise<void> => {
     const showSave = (window as Window & { showSaveFilePicker?: (opts?: unknown) => Promise<FileSystemFileHandle> })
       .showSaveFilePicker
-    if (typeof showSave === "function") {
-      const handle = await showSave.call(window, {
-        suggestedName: "project.gpkg",
-        types: [{ description: "GeoPackage", accept: { "application/octet-stream": [".gpkg"] } }],
-      })
-      const writable = await handle.createWritable()
-      const buffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer
-      await writable.write(new Uint8Array(buffer))
-      await writable.close()
-    } else {
-      const blob = new Blob([bytes.slice()], { type: "application/octet-stream" })
-      const a = document.createElement("a")
-      a.href = URL.createObjectURL(blob)
-      a.download = `gabriel-${new Date().toISOString().slice(0, 19).replace(/:/g, "-")}.gpkg`
-      a.click()
-      URL.revokeObjectURL(a.href)
-    }
+    if (typeof showSave !== "function") throw new Error("This browser does not support the File System Access API.")
+    const handle = await showSave.call(window, {
+      suggestedName: "project.gpkg",
+      types: [{ description: "GeoPackage", accept: { "application/octet-stream": [".gpkg"] } }],
+    })
+    const writable = await handle.createWritable()
+    const buffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer
+    await writable.write(new Uint8Array(buffer))
+    await writable.close()
   }, [])
 
   const handleNewProject = useCallback(async (): Promise<void> => {
     resetProject()
     setError(null)
     setRestoredFromSession(false)
-    clearProject().catch(() => {})
+    try {
+      await clearProject()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to clear persisted session")
+      console.error("clearProject failed", e)
+    }
     setBusy(true)
     try {
       const defaultLayers = getDefaultEchelonLayers()
@@ -174,7 +175,7 @@ export function EditPage({ onViewMode, onOpenAbout }: EditPageProps): React.Reac
         selectedEntityId: next.selectedEntityId,
         sourceCache: result.sourceCache,
       })
-      await saveProject(buffer, { fileName: file.name })
+      await saveProject(buffer)
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load GeoPackage")
       console.error("loadGeoPackage failed", e)

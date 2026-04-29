@@ -43,10 +43,9 @@ describe("project open/save/session-restore flow", () => {
 
     const exported = await saveGeoPackage(layers, entities, geometries, sourceCache)
     const bufferToPersist = Uint8Array.from(exported).buffer
-    await saveProject(bufferToPersist, { fileName: "session-project.gpkg" })
+    await saveProject(bufferToPersist)
 
     const restoredSession = await loadProject()
-    expect(restoredSession?.fileName).toBe("session-project.gpkg")
     expect(restoredSession?.buffer).toBeInstanceOf(ArrayBuffer)
 
     const loaded = await loadGeoPackage(restoredSession?.buffer ?? new ArrayBuffer(0))

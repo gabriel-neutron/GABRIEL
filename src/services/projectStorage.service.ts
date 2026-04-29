@@ -38,9 +38,9 @@ function withStore<T>(
   )
 }
 
-export function saveProject(buffer: ArrayBuffer, metadata?: { fileName?: string }): Promise<void> {
+export function saveProject(buffer: ArrayBuffer): Promise<void> {
   return withStore<void>("readwrite", (store, resolve, reject) => {
-    const request = store.put({ buffer, fileName: metadata?.fileName, savedAt: Date.now() }, KEY)
+    const request = store.put({ buffer, savedAt: Date.now() }, KEY)
     request.onerror = () => reject(request.error)
     request.onsuccess = () => resolve()
   })
@@ -48,21 +48,24 @@ export function saveProject(buffer: ArrayBuffer, metadata?: { fileName?: string 
 
 export interface LoadedProject {
   buffer: ArrayBuffer
-  fileName?: string
 }
 
 /**
- * Load the current project from IndexedDB, if any. Returns null if none stored or on error.
+ * Load the current project from IndexedDB, if any. Returns null if none is stored.
+ * Throws when IndexedDB operations fail.
  */
 export function loadProject(): Promise<LoadedProject | null> {
   return withStore<LoadedProject | null>("readonly", (store, resolve, reject) => {
     const request = store.get(KEY)
     request.onerror = () => reject(request.error)
     request.onsuccess = () => {
-      const row = request.result as { buffer?: ArrayBuffer; fileName?: string } | undefined
-      resolve(row?.buffer instanceof ArrayBuffer ? { buffer: row.buffer, fileName: row.fileName } : null)
+      const row = request.result as { buffer?: ArrayBuffer } | undefined
+      resolve(row?.buffer instanceof ArrayBuffer ? { buffer: row.buffer } : null)
     }
-  }).catch(() => null)
+  }).catch((reason) => {
+    const message = reason instanceof Error ? reason.message : String(reason)
+    throw new Error(`projectStorage: failed to load persisted project (${message})`)
+  })
 }
 
 /**

@@ -141,7 +141,7 @@ a local-first GIS + OSINT workflow.
 
 ## Phase 5 — Security and Privacy Hardening (Weeks 7-8)
 
-**Status:** complete (security baseline verified: `localStorage` key persistence + no secret echo in adapter errors/URLs; broader hardening items below remain deferred).
+**Status:** skipped by product decision for roadmap sequencing (historical baseline work was completed; do not resume this phase in the current roadmap).
 
 **Goal**: Reduce avoidable local-first operational risk.
 
@@ -194,7 +194,11 @@ a local-first GIS + OSINT workflow.
 
 ---
 
+Roadmap sequencing note: Phase 5 is intentionally skipped for active planning; Phase 7 is the next active phase.
+
 ## Phase 7 — Legacy & Compatibility Cleanup (Weeks 10-11)
+
+**Status:** complete (compatibility fallback branches removed in file/persistence paths; strict schema handling and docs alignment verified).
 
 **Goal**: Remove unnecessary backward-compatibility layers, silent fallbacks, and obsolete abstractions in file management and persistence paths for a single-user workflow.
 
@@ -217,18 +221,18 @@ a local-first GIS + OSINT workflow.
 - `docs/CONSTRAINTS.md`
 
 **Tasks**
-- [ ] Replace implicit schema fallbacks with explicit version/migration strategy (or documented hard fail).
-- [ ] Remove no-op compatibility adapters in read-only UI contracts.
-- [ ] Decide and document single browser/file-export strategy; remove extra branches if out of scope.
-- [ ] Eliminate dead state and unused compatibility fields.
-- [ ] Replace silent catches in persistence/load flows with explicit, typed handling.
-- [ ] Run a targeted docs drift pass on file-management and persistence behavior.
+- [x] Replace implicit schema fallbacks with explicit version/migration strategy (or documented hard fail).
+- [x] Remove no-op compatibility adapters in read-only UI contracts.
+- [x] Decide and document single browser/file-export strategy; remove extra branches if out of scope.
+- [x] Eliminate dead state and unused compatibility fields.
+- [x] Replace silent catches in persistence/load flows with explicit, typed handling.
+- [x] Run a targeted docs drift pass on file-management and persistence behavior.
 
 **Exit Criteria**
-- [ ] No silent fallback masks corruption/version issues in file/persistence paths.
-- [ ] No compatibility wrapper remains without an explicit documented requirement.
-- [ ] File import/export behavior is single-path or intentionally dual-path with documented rationale.
-- [ ] Docs and inline comments match current implementation for the targeted modules.
+- [x] No silent fallback masks corruption/version issues in file/persistence paths.
+- [x] No compatibility wrapper remains without an explicit documented requirement.
+- [x] File import/export behavior is single-path or intentionally dual-path with documented rationale.
+- [x] Docs and inline comments match current implementation for the targeted modules.
 
 ---
 

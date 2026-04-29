@@ -126,7 +126,7 @@ function readLayers(geoPackage: GeoPackage): GpkgLayer[] {
       try {
         layer.osmData = JSON.parse(row.geojson) as GeoJSON.FeatureCollection
       } catch {
-        // Invalid stored GeoJSON; leave osmData undefined for this layer row.
+        throw new Error("Unsupported schema: layer geojson payload is invalid.")
       }
     }
     return layer
@@ -136,18 +136,13 @@ function readLayers(geoPackage: GeoPackage): GpkgLayer[] {
 const VALID_POSITION_MODES = new Set<PositionMode>(["own", "parent", "none"])
 
 function readEntities(geoPackage: GeoPackage): GpkgEntity[] {
-  const unitColumns = geoPackage.connection.all(`PRAGMA table_info(${UNITS_TABLE})`) as Array<{
-    name?: string
-  }>
-  const hasIsExactPosition = unitColumns.some((col) => col.name === "is_exact_position")
-  const hasAnalyzedAt = unitColumns.some((col) => col.name === "analyzed_at")
   const result = geoPackage.connection.all(
     `SELECT id, name, layer_id, parent_id, type, nato_symbol_code,
             echelon, affiliation, domain, osm_relation_id,
             military_unit_id, notes, sources,
-            ${hasAnalyzedAt ? "analyzed_at" : "NULL AS analyzed_at"},
+            analyzed_at,
             position_mode,
-            ${hasIsExactPosition ? "is_exact_position" : "0 AS is_exact_position"}
+            is_exact_position
      FROM ${UNITS_TABLE}`,
   ) as Array<{
     id: string
@@ -197,10 +192,6 @@ function readEntities(geoPackage: GeoPackage): GpkgEntity[] {
 
 function readSourceCache(geoPackage: GeoPackage): Map<string, string> {
   try {
-    const tables = geoPackage.connection.all(
-      `SELECT name FROM sqlite_master WHERE type='table' AND name='research_sources'`,
-    ) as Array<{ name: string }>
-    if (tables.length === 0) return new Map()
     const rows = geoPackage.connection.all(
       `SELECT url, content FROM research_sources`,
     ) as Array<{ url: string; content: string | null }>
@@ -211,8 +202,9 @@ function readSourceCache(geoPackage: GeoPackage): Map<string, string> {
       }
     }
     return cache
-  } catch {
-    return new Map()
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e)
+    throw new Error(`Unsupported schema: failed to read research_sources table (${message}).`)
   }
 }
 

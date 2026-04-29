@@ -70,6 +70,8 @@ functions with no side effects.
   that feeds the error banner in `AppShell`.
 - Service functions throw typed errors with a message prefix (e.g. `"geopackage: ..."`,
   `"enrichment: ..."`).
+- IndexedDB/session-storage failures must be explicit (`projectStorage: ...`) and surfaced in UI;
+  do not swallow persistence/load errors with silent fallback values.
 - `AbortError` from cancelled fetch / enrichment runs is caught and handled silently.
 - Overpass failures are non-fatal: log to console and push a toast via `ToastStack`. Never
   set a ref that silently suppresses all future Overpass calls — reset the flag on cleanup.

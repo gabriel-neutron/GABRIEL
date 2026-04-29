@@ -45,7 +45,7 @@ useProjectStore (Zustand)
   ← Components: direct action calls (updateEntity, deleteGeometry, layer visibility, selection)
 
 MainLayout props
-  readOnly, onOpenAbout, onSwitchToEdit/View, projectFileActions, busy, error,
+  readOnly, onOpenAbout, onSwitchToEdit/View, projectFileActions (edit mode only), busy, error,
   enrichment (hook output), layeredResearch (hook output)
 
 Child components subscribe directly to store slices:
@@ -121,7 +121,8 @@ Never call it at render time.
 - **Auto-save**: `saveProject(ArrayBuffer)` is called by `EditPage.handleSaveProject` after
   every explicit user save. Writes the `.gpkg` bytes to IndexedDB.
 - **Restore**: `loadProject()` is called once on `EditPage` mount. If bytes exist, they are
-  passed through `loadGeoPackage` and hydrate the store.
+  passed through `loadGeoPackage` and hydrate the store; IndexedDB failures are surfaced to the
+  page error banner instead of being silently ignored.
 - **Reset**: `clearProject()` is called by `handleNewProject` to wipe the IndexedDB entry.
 - The IndexedDB cache and the `.gpkg` file on disk are kept in sync by the save flow —
   there is no background auto-save that could diverge from the user's explicit save.

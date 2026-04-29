@@ -49,7 +49,7 @@ Output in `dist/`. Serve with any static host.
 
 ## Features
 
-- Load/save project as GeoPackage; optional IndexedDB auto-save.
+- Load/save project as GeoPackage; explicit IndexedDB session persistence and restore.
 - Echelon + custom + OSM layers; draw points, lines, polygons.
 - Units (entities) with hierarchy; MIL-STD-2525 symbols; link to OSM relations.
 - Read-only hierarchy tree; search (Nominatim) and Overpass OSM layer.

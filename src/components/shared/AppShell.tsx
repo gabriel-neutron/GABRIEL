@@ -29,7 +29,7 @@ type Props = {
   onCloseDetail: () => void
   busy: boolean
   error: string | null
-  projectFileActions: ProjectFileActions
+  projectFileActions?: ProjectFileActions
   readOnly?: boolean
   onOpenAbout?: () => void
   onSwitchToEdit?: () => void
@@ -107,7 +107,7 @@ export function AppShell({
                     size="sm"
                     variant="outline"
                     disabled={busy}
-                    onClick={projectFileActions.onNewProject}
+                    onClick={() => projectFileActions?.onNewProject()}
                     title="New project"
                   >
                     New
@@ -125,7 +125,7 @@ export function AppShell({
                     size="sm"
                     variant="secondary"
                     disabled={busy}
-                    onClick={projectFileActions.onSaveProject}
+                    onClick={() => projectFileActions?.onSaveProject()}
                     title="Save project"
                   >
                     Save
@@ -209,7 +209,7 @@ export function AppShell({
               className="hidden"
               onChange={(e) => {
                 const file = e.currentTarget.files?.[0]
-                if (file) projectFileActions.onOpenProject(file)
+                if (file) projectFileActions?.onOpenProject(file)
                 e.currentTarget.value = ""
               }}
             />
