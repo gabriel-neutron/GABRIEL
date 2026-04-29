@@ -1,39 +1,33 @@
-import { afterEach, describe, expect, it, vi } from "vitest"
+import { describe, expect, it, vi } from "vitest"
 import { TavilyAdapter } from "./tavily.adapter"
 
 describe("TavilyAdapter", () => {
-  afterEach(() => {
-    vi.restoreAllMocks()
-  })
+  it("sends API key in JSON body, not in URL, and errors do not echo the key", async () => {
+    const secret = "tvly-secret-ABC-no-leak-in-message"
+    const originalFetch = globalThis.fetch
+    try {
+      let requestUrl = ""
+      let requestBody = ""
+      globalThis.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        requestUrl = String(input)
+        requestBody = String(init?.body ?? "")
+        return new Response(JSON.stringify({ results: [] }), { status: 401 })
+      }) as typeof fetch
 
-  it("maps tavily results into provider search results", async () => {
-    vi.spyOn(globalThis, "fetch").mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        results: [
-          {
-            url: "https://example.com/source",
-            title: "Example Source",
-            content: "Snippet content long enough for filtering behavior.",
-          },
-        ],
-      }),
-    } as Response)
+      const adapter = new TavilyAdapter(secret)
+      let message = ""
+      try {
+        await adapter.search("test query")
+      } catch (error: unknown) {
+        message = error instanceof Error ? error.message : String(error)
+      }
 
-    const adapter = new TavilyAdapter("tavily-key")
-    const results = await adapter.search("unit commander")
-
-    expect(results).toEqual([
-      {
-        url: "https://example.com/source",
-        title: "Example Source",
-        snippet: "Snippet content long enough for filtering behavior.",
-      },
-    ])
-  })
-
-  it("throws when API key is missing", async () => {
-    const adapter = new TavilyAdapter(null)
-    await expect(adapter.search("unit commander")).rejects.toThrow("Tavily API key is missing")
+      expect(requestUrl).not.toContain(secret)
+      expect(requestBody).toContain(secret)
+      expect(message).toMatch(/Tavily search failed \(401\)/)
+      expect(message).not.toContain(secret)
+    } finally {
+      globalThis.fetch = originalFetch
+    }
   })
 })

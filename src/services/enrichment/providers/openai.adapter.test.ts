@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest"
+import { describe, expect, it, vi } from "vitest"
 import { OpenAIModelAdapter } from "./openai.adapter"
 
 const QUERY_INPUT = {
@@ -30,6 +30,25 @@ describe("OpenAIModelAdapter", () => {
   it("throws when API key is missing for synthesis", async () => {
     const adapter = new OpenAIModelAdapter(null)
     await expect(adapter.synthesize(SYNTHESIS_INPUT)).rejects.toThrow("OpenAI API key is missing")
+  })
+
+  it("does not echo API key in error message when request fails", async () => {
+    const secret = "sk-secret-XYZ-no-leak-in-message"
+    const originalFetch = globalThis.fetch
+    try {
+      globalThis.fetch = vi.fn().mockResolvedValue(new Response("", { status: 401 })) as typeof fetch
+      const adapter = new OpenAIModelAdapter(secret)
+      let message = ""
+      try {
+        await adapter.synthesize(SYNTHESIS_INPUT)
+      } catch (error: unknown) {
+        message = error instanceof Error ? error.message : String(error)
+      }
+      expect(message).toMatch(/OpenAI request failed \(401\)/)
+      expect(message).not.toContain(secret)
+    } finally {
+      globalThis.fetch = originalFetch
+    }
   })
 
   it("uses synthesis instructions that forbid non-actionable placeholders", async () => {

@@ -141,6 +141,8 @@ a local-first GIS + OSINT workflow.
 
 ## Phase 5 — Security and Privacy Hardening (Weeks 7-8)
 
+**Status:** complete (security baseline verified: `localStorage` key persistence + no secret echo in adapter errors/URLs; broader hardening items below remain deferred).
+
 **Goal**: Reduce avoidable local-first operational risk.
 
 **Scope**
@@ -157,13 +159,13 @@ a local-first GIS + OSINT workflow.
 **Tasks**
 - [ ] Add session-only key mode and clear persistence UX warnings.
 - [ ] Add source-domain policy checks before evidence acceptance.
-- [ ] Ensure no secrets appear in logs/errors.
+- [x] Ensure no secrets appear in logs/errors (baseline: adapter error paths covered by tests).
 - [ ] Document security assumptions and threat boundaries in docs.
 
 **Exit Criteria**
-- [ ] Key persistence behavior is explicit, user-controlled, and documented.
+- [x] Key persistence behavior is explicit, user-controlled, and documented (`settings.service` + tests + `docs/CONSTRAINTS.md`).
 - [ ] Policy checks can reject disallowed sources deterministically.
-- [ ] No secrets leak in known error/log paths.
+- [x] No secrets leak in known error/log paths (OpenAI/Tavily adapter tests).
 
 ---
 

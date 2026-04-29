@@ -111,6 +111,9 @@ functions with no side effects.
 
 - API keys (OpenAI, Tavily) stored only in `localStorage`. Never log them. Never include them
   in error messages or thrown errors.
+- Persistence (`localStorage` round-trip) and no-leak guarantees (no key in error messages or
+  request URLs for OpenAI) are enforced by `settings.service.test.ts` and the provider adapter
+  tests (`openai.adapter.test.ts`, `tavily.adapter.test.ts`).
 - No `eval`. No `dangerouslySetInnerHTML` except for pre-computed SVG strings from milsymbol
   (which generates its own sanitised output).
 - GeoPackage files are parsed entirely in the browser. No file contents are transmitted to
