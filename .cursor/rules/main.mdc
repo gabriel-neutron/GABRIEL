@@ -42,7 +42,16 @@ You are an expert Frontend GIS Engineer for this project.
   * `src/types/` – Domain and symbol types (`domain.types`, `symbol.types`); echelon options in `symbol.types`
   * `src/lib/` – App/tooling helpers (e.g. `lib/utils.ts` for `cn()` class-name merge; shadcn convention)
   * `src/utils/` – Pure domain or shared helpers (e.g. geometry), no UI/tooling
-  * `src/store/` – Centralized state (Zustand), when used
+  * `src/store/` – Centralized state: `useProjectStore` (Zustand) for project data; enrichment reducers in `enrichment.store.ts`
+
+---
+
+## Workflow and verification (agents)
+
+- Read **[AGENTS.md](AGENTS.md)** before non-trivial changes (commands, CI, OSINT rules, stop-ship triggers).
+- Before claiming a task complete: run **`npm run verify`** (see AGENTS.md).
+- Do not disable lint or coverage thresholds to pass CI without explicit agreement and doc updates.
+- For large refactors, follow Cursor’s guidance: produce a scoped plan and file list first ([large codebases](https://docs.cursor.com/guides/advanced/large-codebases)).
 
 ---
 

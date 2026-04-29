@@ -1,20 +1,18 @@
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { ViewPage } from "@/pages/ViewPage"
 import { EditPage } from "@/pages/EditPage"
 import { AboutDialog } from "@/components/shared/AboutDialog"
 
 const ABOUT_SEEN_KEY = "aboutSeen"
 
+function readAboutOpenInitial(): boolean {
+  if (typeof localStorage === "undefined") return false
+  return localStorage.getItem(ABOUT_SEEN_KEY) === null
+}
+
 export default function App(): React.ReactElement {
   const [mode, setMode] = useState<"view" | "edit">("view")
-  const [aboutOpen, setAboutOpen] = useState(false)
-
-  useEffect(function showAboutOnFirstVisit() {
-    if (typeof localStorage === "undefined") return
-    if (localStorage.getItem(ABOUT_SEEN_KEY) === null) {
-      setAboutOpen(true)
-    }
-  }, [])
+  const [aboutOpen, setAboutOpen] = useState(readAboutOpenInitial)
 
   function handleAboutClose(): void {
     setAboutOpen(false)

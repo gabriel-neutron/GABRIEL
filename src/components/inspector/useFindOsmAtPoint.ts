@@ -10,8 +10,6 @@ export function useFindOsmAtPoint(open: boolean, lat: number, lng: number) {
 
   useEffect(() => {
     if (!open) {
-      setError(null)
-      setCandidates([])
       return
     }
     const controller = new AbortController()
@@ -27,6 +25,10 @@ export function useFindOsmAtPoint(open: boolean, lat: number, lng: number) {
       .finally(() => setLoading(false))
     return () => controller.abort()
   }, [open, lat, lng])
+
+  if (!open) {
+    return { loading: false, error: null, candidates: [] as OsmElementCandidate[] }
+  }
 
   return { loading, error, candidates }
 }

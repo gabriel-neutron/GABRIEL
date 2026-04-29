@@ -264,6 +264,7 @@ export function EditPage({ onViewMode, onOpenAbout }: EditPageProps): React.Reac
     }
   }, [
     enrichment.allProposalsResolved,
+    layeredResearch,
     layeredResearch.reviewQueue,
     layeredResearch.advanceQueue,
     layeredResearch.getResult,

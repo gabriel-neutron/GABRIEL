@@ -125,7 +125,9 @@ function readLayers(geoPackage: GeoPackage): GpkgLayer[] {
     if (kind === "osm" && row.geojson != null && row.geojson !== "") {
       try {
         layer.osmData = JSON.parse(row.geojson) as GeoJSON.FeatureCollection
-      } catch {}
+      } catch {
+        // Invalid stored GeoJSON; leave osmData undefined for this layer row.
+      }
     }
     return layer
   })

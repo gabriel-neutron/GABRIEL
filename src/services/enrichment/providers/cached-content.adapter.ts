@@ -22,7 +22,9 @@ export class CachedContentAdapter implements RetrievalAdapter {
     }))
   }
 
-  async search(_query: string, _signal?: AbortSignal): Promise<ProviderSearchResult[]> {
+  async search(query: string, signal?: AbortSignal): Promise<ProviderSearchResult[]> {
+    void query
+    void signal
     return this.entries
   }
 }

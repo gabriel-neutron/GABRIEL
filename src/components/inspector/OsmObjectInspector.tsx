@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { fetchOsmObjectDetails, type OsmObjectDetails } from "@/services/overpass.service"
 import { OsmObjectDetailsView } from "./OsmObjectDetailsView"
 
@@ -47,37 +47,40 @@ type Props = {
 }
 
 export function OsmObjectInspector({ type, id, cachedFeature }: Props) {
-  const hasCache = !!cachedFeature
-  const [details, setDetails] = useState<OsmObjectDetails | null>(() =>
-    cachedFeature ? detailsFromCachedFeature(type, id, cachedFeature) : null,
+  const cacheDetails = useMemo(
+    () => (cachedFeature ? detailsFromCachedFeature(type, id, cachedFeature) : null),
+    [type, id, cachedFeature],
   )
-  const [loading, setLoading] = useState(!hasCache)
+
+  const [remoteDetails, setRemoteDetails] = useState<OsmObjectDetails | null>(null)
+  const [loadingRemote, setLoadingRemote] = useState(cacheDetails === null)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    if (cachedFeature) {
-      setDetails(detailsFromCachedFeature(type, id, cachedFeature))
-      setLoading(false)
-      setError(null)
+    if (cacheDetails !== null) {
       return
     }
-    setLoading(true)
-    setError(null)
-    setDetails(null)
+
     const controller = new AbortController()
+    setLoadingRemote(true)
+    setError(null)
+    setRemoteDetails(null)
     fetchOsmObjectDetails(type, id, { signal: controller.signal })
       .then((data) => {
-        if (!controller.signal.aborted) setDetails(data)
+        if (!controller.signal.aborted) setRemoteDetails(data)
       })
       .catch((e) => {
         if (e?.name === "AbortError") return
         setError(e instanceof Error ? e.message : "Failed to fetch OSM object details")
       })
       .finally(() => {
-        if (!controller.signal.aborted) setLoading(false)
+        if (!controller.signal.aborted) setLoadingRemote(false)
       })
     return () => controller.abort()
-  }, [type, id, hasCache])
+  }, [cacheDetails, type, id])
+
+  const details = cacheDetails ?? remoteDetails
+  const loading = cacheDetails === null && loadingRemote
 
   if (loading) {
     return (

@@ -13,7 +13,7 @@ export type ViewPageProps = {
 
 const READ_ONLY_FILE_ACTIONS: ProjectFileActions = {
   onNewProject: () => {},
-  onOpenProject: (_file: File) => {},
+  onOpenProject: () => {},
   onSaveProject: () => {},
 }
 
@@ -33,7 +33,6 @@ export function ViewPage({ onEditMode, onOpenAbout }: ViewPageProps): React.Reac
   useEffect(function loadDemoProject() {
     let mounted = true
     const controller = new AbortController()
-    setProjectLoading(true)
     fetch("/project.gpkg", { signal: controller.signal })
       .then((res) => {
         if (!res.ok) throw new Error("Failed to load demo project")

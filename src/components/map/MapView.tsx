@@ -169,9 +169,11 @@ export function MapView({
     [positionMap],
   )
 
-  // Stable ref so the GeoJSON click callback always reads current tool without being in deps
   const mapToolRef = useRef(mapTool)
-  mapToolRef.current = mapTool
+
+  useEffect(() => {
+    mapToolRef.current = mapTool
+  }, [mapTool])
 
   const onEachOsmFeature = useCallback(
     function onEachOsmFeature(feature: GeoJSON.Feature & { id?: string }, layer: L.Layer) {

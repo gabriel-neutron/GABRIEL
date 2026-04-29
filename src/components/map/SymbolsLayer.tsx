@@ -1,4 +1,4 @@
-import { useMemo, useRef } from "react"
+import { useMemo, useLayoutEffect, useState } from "react"
 import L from "leaflet"
 import { Marker, Popup } from "react-leaflet"
 import { getRenderedSymbolForEntity } from "@/services/symbol.service"
@@ -6,7 +6,6 @@ import { useProjectStore } from "@/store/useProjectStore"
 import type { LatLng } from "@/types/coordinates"
 import type { MapBounds } from "./MapBoundsReporter"
 
-// Extend viewport by this fraction on each side to prevent symbol pop-in during panning
 const BOUNDS_BUFFER = 0.5
 
 type Props = {
@@ -39,7 +38,6 @@ export function SymbolsLayer({
   mapBounds,
 }: Props): React.ReactElement {
   const entities = useProjectStore((s) => s.entities)
-  const iconCache = useRef(new Map<string, L.Icon>())
 
   const visible = useMemo(() => {
     return entities.flatMap((entity) => {
@@ -64,44 +62,53 @@ export function SymbolsLayer({
     })
   }, [visible, mapBounds])
 
+  const markerItems = useMemo(
+    () =>
+      visibleInBounds.map(({ entity, position }) => {
+        const mode = entity.positionMode ?? "own"
+        const opacity = mode === "none" ? 0.75 : 1
+        const cacheKey = `${entity.id}:${entity.natoSymbolCode ?? ""}:${entity.type ?? ""}:${entity.echelon ?? ""}:${entity.affiliation ?? ""}:${entity.domain ?? ""}:${entity.name}`
+        return { entity, position, cacheKey, opacity }
+      }),
+    [visibleInBounds],
+  )
+
+  const [icons, setIcons] = useState<Map<string, L.Icon>>(() => new Map())
+
+  useLayoutEffect(() => {
+    setIcons((prev) => {
+      const next = new Map<string, L.Icon>()
+      for (const item of markerItems) {
+        let icon = prev.get(item.cacheKey)
+        if (!icon) {
+          const { pngDataUri, anchor, width, height } = getRenderedSymbolForEntity(item.entity)
+          icon = makeSymbolIcon(pngDataUri, anchor, width, height)
+        }
+        next.set(item.cacheKey, icon)
+      }
+      return next
+    })
+  }, [markerItems])
+
   return (
     <>
-      {(() => {
-        const usedKeys = new Set<string>()
-        const markers = visibleInBounds.map(({ entity, position }) => {
-          const mode = entity.positionMode ?? "own"
-          const opacity = mode === "none" ? 0.75 : 1
-          const cacheKey = `${entity.id}:${entity.natoSymbolCode ?? ""}:${entity.type ?? ""}:${entity.echelon ?? ""}:${entity.affiliation ?? ""}:${entity.domain ?? ""}:${entity.name}`
-          usedKeys.add(cacheKey)
-
-          let icon = iconCache.current.get(cacheKey)
-          if (!icon) {
-            const { pngDataUri, anchor, width, height } = getRenderedSymbolForEntity(entity)
-            icon = makeSymbolIcon(pngDataUri, anchor, width, height)
-            iconCache.current.set(cacheKey, icon)
-          }
-
-          return (
-            <Marker
-              key={entity.id}
-              position={position}
-              icon={icon}
-              opacity={opacity}
-              eventHandlers={{
-                click: () => onSelectEntity(entity.id),
-              }}
-            >
-              <Popup>{entity.name}</Popup>
-            </Marker>
-          )
-        })
-
-        for (const key of iconCache.current.keys()) {
-          if (!usedKeys.has(key)) iconCache.current.delete(key)
-        }
-
-        return markers
-      })()}
+      {markerItems.map((item) => {
+        const icon = icons.get(item.cacheKey)
+        if (!icon) return null
+        return (
+          <Marker
+            key={item.entity.id}
+            position={item.position}
+            icon={icon}
+            opacity={item.opacity}
+            eventHandlers={{
+              click: () => onSelectEntity(item.entity.id),
+            }}
+          >
+            <Popup>{item.entity.name}</Popup>
+          </Marker>
+        )
+      })}
     </>
   )
 }

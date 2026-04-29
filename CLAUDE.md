@@ -1,23 +1,27 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to **Claude Code** (claude.ai/code) when working in this repository.
+
+**Start here for commands, CI gates, and agent workflow:** [AGENTS.md](AGENTS.md)
 
 ## Commands
 
 ```bash
 npm run dev          # Start Vite dev server
+npm run verify       # lint + test (with coverage) + build — use before claiming done
 npm run build        # Type-check + production build
 npm run lint         # ESLint
-npm run test         # Run all tests (Vitest, single pass)
+npm run test         # Vitest, single pass
+npm run test:coverage # Vitest with coverage (thresholds in vitest.config.ts)
 npm run test:watch   # Vitest in watch mode
 npm run storybook    # Storybook on port 6006
 ```
 
 Path alias `@/` maps to `src/` (configured in `vite.config.ts`).
 
-## Architecture
+## Architecture (summary)
 
-This is a React + Vite SPA for military map editing (ORBAT / order of battle). Projects are stored as **GeoPackage** (`.gpkg`) files, loaded and saved in-browser using `@ngageoint/geopackage` (WASM-backed SQLite).
+This is a React + Vite SPA for military map editing (ORBAT). Projects are stored as **GeoPackage** (`.gpkg`) files, loaded and saved in-browser using `@ngageoint/geopackage` (WASM-backed SQLite).
 
 ### Data model
 
@@ -33,28 +37,18 @@ Three persisted tables inside every GeoPackage:
 
 ### State management
 
-All project state lives in `useMapProjectState` (layers, entities, geometries, selection, OSM overlays). GeoPackage I/O and mutations stay in the page components (`EditPage`, `ViewPage`). There is no global Redux/Zustand store for project data — it flows via props from the page down to `MainLayout`.
+Runtime project state (layers, entities, drawn geometries, selection, OSM overlays, etc.) lives in the Zustand store **`useProjectStore`** ([`src/store/useProjectStore.ts`](src/store/useProjectStore.ts)). GeoPackage load/save and IndexedDB session persistence stay in [`src/pages/EditPage.tsx`](src/pages/EditPage.tsx) and [`src/pages/ViewPage.tsx`](src/pages/ViewPage.tsx); components read/write the store directly per [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
-Enrichment UI state is managed by a pure reducer in `src/store/enrichment.store.ts` (no external library), with `useEnrichment` as the hook that ties it to a selected entity.
+Enrichment UI state uses a pure reducer in [`src/store/enrichment.store.ts`](src/store/enrichment.store.ts) with [`src/hooks/useEnrichment.ts`](src/hooks/useEnrichment.ts).
 
 ### Enrichment pipeline
 
-`src/services/enrichment/` is the AI enrichment subsystem:
-
-- **`enrichment.service.ts`** — `runEnrichment(request, options)` orchestrates multi-hop retrieval and synthesis. Returns `{ response: EnrichmentResponse, usage }`. Hard limits: 3 hops, 55 s, ~24k estimated tokens.
-- **`providers/openai.adapter.ts`** — `OpenAIModelAdapter` implements `AiModelAdapter`. Calls OpenAI `/v1/responses` for query generation (`gpt-4.1-mini`) and synthesis (same model). Both methods use hardcoded system instructions focused on HQ/garrison evidence.
-- **`providers/tavily.adapter.ts`** — `TavilyAdapter` wraps Tavily search API.
-- **`providers/overpass.adapter.ts`** — `OverpassAdapter` queries Overpass for OSM military nodes by name.
-- **`providers/index.ts`** — `createDefaultProviderBundle()` wires the three adapters together.
-- **`promptTemplate.ts`** — `buildDefaultEnrichmentPrompt(feature, context)` builds the user-facing prompt string passed into `runEnrichment`.
-- **`schema.fixtures.ts`** — `DEFAULT_ENRICHMENT_OUTPUT_SCHEMA` (four allowed fields: `notes`, `sources`, `militaryUnitId`, `osmRelationId`) and budget constants.
-
-The hook `useEnrichment` (`src/hooks/useEnrichment.ts`) drives the single-entity enrichment flow. It converts a `MapEntity` to an `EnrichmentFeature` (GeoJSON), calls `runEnrichment`, and exposes accept/reject/ignore handlers that mutate `EnrichmentUiState` via store functions. Results land in `state.run`; accepted values are staged in `state.overlay` and applied to the entity on drawer close via `onApplyAccepted`.
+See [AGENTS.md](AGENTS.md) for paths. Implemented providers: **OpenAI** (queries + synthesis), **Tavily** (web search), **CachedContentAdapter** (layered research), **Overpass** (OSM lookup from layered research). Default bundle wiring: [`src/services/enrichment/providers/index.ts`](src/services/enrichment/providers/index.ts).
 
 ### Map rendering
 
-`react-leaflet` with `leaflet.markercluster`. Military symbols are rendered via `milsymbol` (NATO SIDC). `SymbolsLayer` and `NetworkLinksLayer` consume a `positionMap` (entityId → `LatLng`) derived from `drawnGeometries`. Coordinate order: internal app uses `LatLng` (`[lat, lng]`, `src/types/coordinates.ts`); GeoPackage storage uses `LngLat` (`[lng, lat]`). Conversion only in `geopackage.service.ts`. OSM relation geometries are fetched lazily via `useOsmRelationGeometries`.
+`react-leaflet` with `leaflet.markercluster`. Military symbols via milsymbol (NATO SIDC). `SymbolsLayer` and `NetworkLinksLayer` consume a `positionMap` from `drawnGeometries`. Coordinate order: internal [`LatLng`](src/types/coordinates.ts); GeoPackage storage [`LngLat`](src/types/coordinates.ts); conversion in [`src/services/geopackage.service.ts`](src/services/geopackage.service.ts). OSM relation geometries: [`src/hooks/useOsmRelationGeometries.ts`](src/hooks/useOsmRelationGeometries.ts).
 
 ### Terminology
 
-Use "entity" in UI code, not "unit". "Unit" appears only in GeoPackage schema (`units` table, `GpkgEntity`) for database compatibility.
+Use **entity** in UI code, not **unit**. **Unit** appears only in GeoPackage schema (`units` table, `GpkgEntity`).

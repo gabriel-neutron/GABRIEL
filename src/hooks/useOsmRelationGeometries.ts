@@ -44,7 +44,10 @@ export function useOsmRelationGeometries(options?: UseOsmRelationGeometriesOptio
   const setEntityOsmGeometries = useProjectStore((s) => s.setEntityOsmGeometries)
 
   const onOverpassUnavailableRef = useRef(options?.onOverpassUnavailable)
-  onOverpassUnavailableRef.current = options?.onOverpassUnavailable
+
+  useEffect(() => {
+    onOverpassUnavailableRef.current = options?.onOverpassUnavailable
+  }, [options?.onOverpassUnavailable])
 
   const relationGeometryCacheRef = useRef<Map<number, GeoJSON.FeatureCollection>>(new Map())
 

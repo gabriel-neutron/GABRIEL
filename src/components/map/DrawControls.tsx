@@ -46,7 +46,10 @@ export function DrawControls({
   const map = useMap()
   const drawHandlerRef = useRef<L.Draw.Marker | L.Draw.Polyline | L.Draw.Polygon | null>(null)
   const onCreatedRef = useRef(onCreated)
-  onCreatedRef.current = onCreated
+
+  useEffect(() => {
+    onCreatedRef.current = onCreated
+  }, [onCreated])
 
   useEffect(() => {
     if (!enabled) {
@@ -60,8 +63,7 @@ export function DrawControls({
     const drawnItems = new L.FeatureGroup()
     map.addLayer(drawnItems)
 
-    // @types/leaflet-draw expects DrawMap; react-leaflet's L.Map works at runtime
-    const drawMap = map as any
+    const drawMap = map as L.DrawMap
 
     let handler: L.Draw.Marker | L.Draw.Polyline | L.Draw.Polygon
     if (geometryType === "point") {

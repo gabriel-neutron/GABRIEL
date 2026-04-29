@@ -186,7 +186,6 @@ export function useLayeredResearch(
       drawnGeometries,
       batchSize,
       richnessThreshold,
-      skipAnalyzedWithinDays,
       onEntityAnalyzed,
       buildRecentAnalyzedEntityIds,
     ],

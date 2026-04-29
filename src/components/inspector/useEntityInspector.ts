@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react"
+import { useCallback, useMemo, useState } from "react"
 import type { DrawnGeometry, MapEntity, PositionMode } from "@/types/domain.types"
 import type { SymbolAffiliation, SymbolDomain, SymbolEchelon } from "@/types/symbol.types"
 import { useProjectStore } from "@/store/useProjectStore"
@@ -69,9 +69,10 @@ export function useEntityInspector(): EntityInspectorState {
   const entity = selectedEntityId
     ? entities.find((e) => e.id === selectedEntityId) ?? null
     : null
-  const linkedGeometries = entity
-    ? drawnGeometries.filter((g) => g.entityId === entity.id)
-    : []
+  const linkedGeometries = useMemo(
+    () => (entity ? drawnGeometries.filter((g) => g.entityId === entity.id) : []),
+    [entity, drawnGeometries],
+  )
 
   const layerName = entity
     ? layers.find((l) => l.id === entity.layerId)?.name ?? entity.layerId
@@ -92,7 +93,7 @@ export function useEntityInspector(): EntityInspectorState {
   const isEchelonLayerSelected =
     entity != null &&
     layers.some((l) => l.kind === "echelon" && l.id === entity.layerId)
-  const sources = entity ? parseSources(entity.sources) : []
+  const sources = useMemo(() => (entity ? parseSources(entity.sources) : []), [entity])
 
   const handleNameChange = useCallback(
     (name: string) => {
@@ -171,7 +172,7 @@ export function useEntityInspector(): EntityInspectorState {
     const next = entity.sources ? `${entity.sources}${SOURCES_DELIMITER}${value}` : value
     updateEntity(entity.id, { sources: next })
     setNewSource("")
-  }, [entity, newSource, updateEntity, sources])
+  }, [entity, newSource, updateEntity])
 
   const handleRemoveSource = useCallback(
     (index: number) => {

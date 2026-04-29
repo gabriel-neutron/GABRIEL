@@ -88,6 +88,13 @@ functions with no side effects.
   `GeometryActionMenu`, `NetworkLinksLayer` (with 500-entity fixture for performance testing).
 - No mocking of the GeoPackage library in integration tests — use real WASM execution.
 
+## CI and local verification
+
+- **Canonical check:** `npm run verify` runs `lint` → `test:coverage` → `build` (see root `package.json`).
+- **CI:** GitHub Actions workflow [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) runs the same on `push` / `pull_request` to `main` or `master`.
+- **Coverage thresholds** live in [`vitest.config.ts`](../vitest.config.ts) (global baseline; raise as more of `src/` is covered). HTML/LCOV output is written to `coverage/` (gitignored).
+- **Agent entry point:** [`AGENTS.md`](../AGENTS.md) — keep commands and stop-ship rules in sync when changing tooling.
+
 ## Code Style
 
 - Max **300 lines** per file. Files approaching this limit should be split by concern.
@@ -117,8 +124,8 @@ functions with no side effects.
 - `computeAllEntityPositions` (orbital BFS) must be called inside a `useMemo` keyed on
   `[entities, drawnGeometries]`. Never move it into render-time logic.
 - `NetworkLinksLayer` BFS traversal must be inside `useMemo([entities, selectedEntityId])`.
-- `SymbolsLayer` icon cache (`useRef<Map>`) prevents re-creating Leaflet `DivIcon` objects.
-  Keep stale key cleanup on every render.
+- `SymbolsLayer` keeps a stable Leaflet `L.Icon` map in state, refreshed in `useLayoutEffect`
+  from visible markers so icons are not recreated every pan; prune happens when marker keys change.
 - After Phase 5/6: Zustand selectors in map components must return stable references.
   Use `shallow` equality for object/array selectors to avoid spurious re-renders.
 - OSM GeoJSON layer features should only re-render when `layer.osmData` reference changes
@@ -131,7 +138,7 @@ functions with no side effects.
 - Branch naming: `phase/<N>-<short-description>` for refactoring work
   (e.g. `phase/1-zustand-store`, `phase/8-coordinate-safety`).
 - Each phase ends with a working build (`npm run build` passes) and passing tests
-  (`npm test` passes). No half-finished phases committed to `main`.
+  (`npm run verify` passes). No half-finished phases committed to `main`.
 
 ## Documentation Rules
 

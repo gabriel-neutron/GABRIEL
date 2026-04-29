@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useMemo } from "react"
 import { Eye, EyeOff } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useProjectStore } from "@/store/useProjectStore"
@@ -74,13 +74,12 @@ export function LayersPanel({ readOnly = false }: Props) {
       entities.some((e) => e.layerId === layer.id),
   )
 
-  const entityHasChildren = useRef<Map<string, boolean>>(new Map())
-  useEffect(() => {
+  const entityHasChildren = useMemo(() => {
     const hasChildren = new Map<string, boolean>()
     for (const e of entities) {
       if (e.parentId) hasChildren.set(e.parentId, true)
     }
-    entityHasChildren.current = hasChildren
+    return hasChildren
   }, [entities])
 
   return (
@@ -106,8 +105,8 @@ export function LayersPanel({ readOnly = false }: Props) {
           const layerEntities = entities
             .filter((e) => e.layerId === layer.id)
             .sort((a, b) => {
-              const aGroup = entityHasChildren.current.get(a.id) === true
-              const bGroup = entityHasChildren.current.get(b.id) === true
+              const aGroup = entityHasChildren.get(a.id) === true
+              const bGroup = entityHasChildren.get(b.id) === true
               if (aGroup !== bGroup) return aGroup ? -1 : 1
               return a.name.localeCompare(b.name, undefined, { sensitivity: "base" })
             })

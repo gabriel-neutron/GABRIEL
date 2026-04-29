@@ -16,6 +16,8 @@ a local-first GIS + OSINT workflow.
 
 ## Phase 1 — Baseline Integrity (Weeks 1-2)
 
+**Status:** complete (CI + `npm run verify`; ESLint errors/warnings cleared; generated folders excluded).
+
 **Goal**: Restore trust in local and CI quality signals.
 
 **Scope**
@@ -33,15 +35,15 @@ a local-first GIS + OSINT workflow.
 - `src/components/inspector/OsmObjectInspector.tsx`
 
 **Tasks**
-- [ ] Fix all ESLint errors in `src/` and `docs`-owned source files.
-- [ ] Add explicit ignores for build/generated folders (for example `dist`, `storybook-static`).
-- [ ] Resolve React hooks/ref anti-patterns flagged by current rules.
-- [ ] Keep story files aligned with Storybook framework lint rules.
+- [x] Fix all ESLint errors in `src/` and `docs`-owned source files.
+- [x] Add explicit ignores for build/generated folders (for example `dist`, `storybook-static`).
+- [x] Resolve React hooks/ref anti-patterns flagged by current rules (remaining `exhaustive-deps` warnings tracked separately).
+- [x] Keep story files aligned with Storybook framework lint rules.
 
 **Exit Criteria**
-- [ ] `npm run lint` returns 0 errors.
-- [ ] `npm run test` passes.
-- [ ] `npm run build` passes without new warnings introduced by project code.
+- [x] `npm run lint` returns 0 errors.
+- [x] `npm run test` passes.
+- [x] `npm run build` passes without new warnings introduced by project code.
 
 ---
 
@@ -75,6 +77,8 @@ a local-first GIS + OSINT workflow.
 
 ## Phase 3 — Testing and Release Gates (Weeks 3-5)
 
+**Status:** in progress (CI + coverage gate + `npm run verify`; GeoPackage WASM integration and page-level tests still open).
+
 **Goal**: Move from "tests exist" to "critical workflows are defended."
 
 **Scope**
@@ -90,15 +94,15 @@ a local-first GIS + OSINT workflow.
 - `src/hooks/useEnrichment.ts` / `src/hooks/useLayeredResearch.ts` (behavior tests)
 
 **Tasks**
-- [ ] Add CI pipeline running lint, test, and build on PRs.
+- [x] Add CI pipeline running lint, test, and build on PRs.
 - [ ] Add at least one real GeoPackage WASM round-trip integration test.
 - [ ] Add integration tests for open/save/session-restore path.
-- [ ] Enable coverage output and define minimum baseline for critical modules.
+- [x] Enable coverage output and define minimum baseline for critical modules.
 
 **Exit Criteria**
 - [ ] PRs cannot merge without passing CI checks.
 - [ ] GeoPackage persistence boundary has real integration coverage.
-- [ ] Coverage is reported in CI and enforced for agreed critical paths.
+- [x] Coverage is reported in CI and enforced for agreed critical paths.
 
 ---
 
