@@ -174,84 +174,86 @@ export function UnifiedSearch({ flyToRef }: Props) {
   const hasInstant = instantResults.length > 0
   const hasNominatim = nominatimResults.length > 0
 
-  const dropdown = open && dropdownPos ? createPortal(
-    <div
-      ref={dropdownRef}
-      role="listbox"
-      style={{ position: "fixed", top: dropdownPos.top, left: dropdownPos.left, width: dropdownPos.width }}
-      className="z-[9999] max-h-72 overflow-auto rounded-md border bg-background shadow-md"
-    >
-      {!hasInstant && !hasNominatim && !loading && query.trim() && (
-        <p className="px-3 py-4 text-center text-sm text-muted-foreground">
-          No results — press Enter to search online
-        </p>
-      )}
-
-      {instantResults.map((r, i) => {
-        const isEntity = r.source === "entity"
-        const isCoord = r.source === "coordinates"
-        const isOsm = r.source === "local-osm"
-        const key = isEntity ? `ent-${r.id}` : isCoord ? `coord-${r.lat}-${r.lng}` : `osm-${i}`
-        return (
-          <button
-            key={key}
-            type="button"
-            role="option"
-            aria-selected={false}
-            className={cn(
-              "w-full px-3 py-2 text-left text-sm hover:bg-accent focus:bg-accent focus:outline-none",
-              isEntity && "border-l-2 border-l-violet-500 bg-violet-500/5 hover:bg-violet-500/10",
-              isCoord && "border-l-2 border-l-sky-500 bg-sky-500/5 hover:bg-sky-500/10",
-              isOsm && "border-l-2 border-l-amber-500 bg-amber-500/5 hover:bg-amber-500/10",
-            )}
-            onMouseDown={(e) => e.preventDefault()}
-            onClick={() => handleSelect(r)}
-          >
-            <span className="line-clamp-1 font-medium">{isEntity ? r.name : r.display_name}</span>
-            <span className="mt-0.5 block text-xs text-muted-foreground">
-              {isEntity ? "Entity" : isCoord ? "Coordinates" : (isOsm ? (r.detail ?? r.layerLabel) : "")}
-            </span>
-          </button>
-        )
-      })}
-
-      {hasInstant && hasNominatim && <div className="mx-3 my-1 border-t border-border" />}
-
-      {nominatimResults.map((r, i) => (
-        <button
-          key={`nom-${r.osm_type ?? ""}-${r.osm_id ?? i}`}
-          type="button"
-          role="option"
-          aria-selected={false}
-          className="w-full px-3 py-2 text-left text-sm hover:bg-accent focus:bg-accent focus:outline-none"
-          onMouseDown={(e) => e.preventDefault()}
-          onClick={() => handleSelect(r)}
+  const dropdown = open && dropdownPos
+    ? createPortal(
+        <div
+          ref={dropdownRef}
+          role="listbox"
+          style={{ position: "fixed", top: dropdownPos.top, left: dropdownPos.left, width: dropdownPos.width }}
+          className="z-[9999] max-h-72 overflow-auto rounded-md border bg-background shadow-md"
         >
-          <span className="line-clamp-2">{r.display_name}</span>
-          {(r.type ?? r.class) && (
-            <span className="mt-0.5 block text-xs text-muted-foreground">
-              {[r.type, r.class].filter(Boolean).join(" · ")}
-            </span>
+          {!hasInstant && !hasNominatim && !loading && query.trim() && (
+            <p className="px-3 py-4 text-center text-sm text-muted-foreground">
+              No results — press Enter to search online
+            </p>
           )}
-        </button>
-      ))}
 
-      {loading && (
-        <p className={cn("px-3 py-2 text-xs text-muted-foreground", (hasInstant || hasNominatim) && "border-t")}>
-          {hasInstant || hasNominatim ? "Loading online results…" : "Searching…"}
-        </p>
-      )}
+          {instantResults.map((r, i) => {
+            const isEntity = r.source === "entity"
+            const isCoord = r.source === "coordinates"
+            const isOsm = r.source === "local-osm"
+            const key = isEntity ? `ent-${r.id}` : isCoord ? `coord-${r.lat}-${r.lng}` : `osm-${i}`
+            return (
+              <button
+                key={key}
+                type="button"
+                role="option"
+                aria-selected={false}
+                className={cn(
+                  "w-full px-3 py-2 text-left text-sm hover:bg-accent focus:bg-accent focus:outline-none",
+                  isEntity && "border-l-2 border-l-violet-500 bg-violet-500/5 hover:bg-violet-500/10",
+                  isCoord && "border-l-2 border-l-sky-500 bg-sky-500/5 hover:bg-sky-500/10",
+                  isOsm && "border-l-2 border-l-amber-500 bg-amber-500/5 hover:bg-amber-500/10",
+                )}
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => handleSelect(r)}
+              >
+                <span className="line-clamp-1 font-medium">{isEntity ? r.name : r.display_name}</span>
+                <span className="mt-0.5 block text-xs text-muted-foreground">
+                  {isEntity ? "Entity" : isCoord ? "Coordinates" : (isOsm ? (r.detail ?? r.layerLabel) : "")}
+                </span>
+              </button>
+            )
+          })}
 
-      {error && <p className="border-t px-3 py-2 text-sm text-destructive">{error}</p>}
+          {hasInstant && hasNominatim && <div className="mx-3 my-1 border-t border-border" />}
 
-      {hasInstant && !hasNominatim && !loading && (
-        <p className="border-t px-3 py-2 text-xs text-muted-foreground">
-          Press Enter to search online places
-        </p>
-      )}
-    </div>,
-    document.body,
-  ) : null
+          {nominatimResults.map((r, i) => (
+            <button
+              key={`nom-${r.osm_type ?? ""}-${r.osm_id ?? i}`}
+              type="button"
+              role="option"
+              aria-selected={false}
+              className="w-full px-3 py-2 text-left text-sm hover:bg-accent focus:bg-accent focus:outline-none"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => handleSelect(r)}
+            >
+              <span className="line-clamp-2">{r.display_name}</span>
+              {(r.type ?? r.class) && (
+                <span className="mt-0.5 block text-xs text-muted-foreground">
+                  {[r.type, r.class].filter(Boolean).join(" · ")}
+                </span>
+              )}
+            </button>
+          ))}
+
+          {loading && (
+            <p className={cn("px-3 py-2 text-xs text-muted-foreground", (hasInstant || hasNominatim) && "border-t")}>
+              {hasInstant || hasNominatim ? "Loading online results…" : "Searching…"}
+            </p>
+          )}
+
+          {error && <p className="border-t px-3 py-2 text-sm text-destructive">{error}</p>}
+
+          {hasInstant && !hasNominatim && !loading && (
+            <p className="border-t px-3 py-2 text-xs text-muted-foreground">
+              Press Enter to search online places
+            </p>
+          )}
+        </div>,
+        document.body,
+      )
+    : null
 
   return (
     <>

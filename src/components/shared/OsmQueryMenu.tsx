@@ -92,7 +92,10 @@ export function OsmQueryMenu({ layers, onAddLayer }: Props) {
               <Button
                 size="sm"
                 variant="ghost"
-                onClick={() => { setOpen(false); setError(null); }}
+                onClick={() => {
+                  setOpen(false)
+                  setError(null)
+                }}
                 aria-label="Close"
               >
                 Close
@@ -122,7 +125,9 @@ export function OsmQueryMenu({ layers, onAddLayer }: Props) {
             </CardContent>
             <CardFooter>
               <Button
-                onClick={handleRunQuery}
+                onClick={() => {
+                  void handleRunQuery()
+                }}
                 disabled={loading || !query.trim()}
               >
                 {loading ? "Running…" : "Run query"}

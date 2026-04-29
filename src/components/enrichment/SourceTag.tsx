@@ -20,7 +20,8 @@ function formatPublished(iso: string): string {
 }
 
 export function SourceTag({ source }: SourceTagProps) {
-  let sourceName = source.title.trim()
+  const title = source.title.trim()
+  let sourceName = title
   if (sourceName === "") {
     try {
       sourceName = new URL(source.url).hostname.replace(/^www\./, "")
@@ -38,7 +39,7 @@ export function SourceTag({ source }: SourceTagProps) {
         href={source.url}
         target="_blank"
         rel="noreferrer noopener"
-        aria-label={`Open source: ${source.title}`}
+        aria-label={`Open source: ${title || sourceName}`}
         className="inline-flex max-w-full items-center rounded-md border px-2.5 py-1 text-xs font-medium text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
         title={source.snippet}
       >

@@ -47,6 +47,26 @@ type Props = {
   details: OsmObjectDetails
 }
 
+type OsmObjectMetaProps = {
+  details: OsmObjectDetails
+}
+
+function OsmObjectMeta({ details }: OsmObjectMetaProps) {
+  if (!(details.timestamp || details.user || details.changeset > 0)) return null
+
+  return (
+    <div className="space-y-1 text-sm text-muted-foreground">
+      {(details.timestamp || details.user) && (
+        <p>
+          Modifie {formatRelativeTime(details.timestamp)} par {details.user || "Unknown"}
+        </p>
+      )}
+      {details.changeset > 0 && <p>Groupe de modifications #{details.changeset}</p>}
+      {details.timestamp && <p className="text-xs">{formatTimestamp(details.timestamp)}</p>}
+    </div>
+  )
+}
+
 export function OsmObjectDetailsView({ details }: Props) {
   const { type, id } = details
   const typeLabel = type.charAt(0).toUpperCase() + type.slice(1)
@@ -66,19 +86,7 @@ export function OsmObjectDetailsView({ details }: Props) {
         </div>
       )}
 
-      {(details.timestamp || details.user || details.changeset > 0) && (
-        <div className="space-y-1 text-sm text-muted-foreground">
-          {(details.timestamp || details.user) && (
-            <p>
-              Modifié {formatRelativeTime(details.timestamp)} par {details.user || "Unknown"}
-            </p>
-          )}
-          {details.changeset > 0 && <p>Groupe de modifications #{details.changeset}</p>}
-          {details.timestamp && (
-            <p className="text-xs">{formatTimestamp(details.timestamp)}</p>
-          )}
-        </div>
-      )}
+      <OsmObjectMeta details={details} />
 
       <Field>
         <FieldLabel>Attributs</FieldLabel>

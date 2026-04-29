@@ -42,7 +42,7 @@ export function GeometryActionMenu({
           />
         </Field>
         <Field>
-          <Button size="sm" variant="ghost"onClick={onCancel}>
+          <Button size="sm" variant="ghost" onClick={onCancel}>
             Cancel
           </Button>
         </Field>

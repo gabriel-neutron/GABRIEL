@@ -132,94 +132,91 @@ export function MainLayout({
         onSwitchToEdit={onSwitchToEdit}
         onSwitchToView={onSwitchToView}
         mapSlot={
-        <MapView
-          readOnly={readOnly}
-          onCreateNewEntity={handleCreateNewEntity}
-          onLinkGeometryToEntity={handleLinkGeometryToEntity}
-          defaultLayerId={defaultLayerId}
-          hiddenEntityIds={hiddenEntityIds}
-          onOverpassUnavailable={onOverpassUnavailable}
-          flyToRef={flyToRef}
-        />
-      }
-      treeSlot={<TreeView />}
-      leftSlot={
-        <div className="flex h-full flex-col">
-          <div className="shrink-0 border-b border-border px-3 py-2">
-            <Tabs value={leftMode} onValueChange={(v) => setLeftMode(v as typeof leftMode)}>
-              <TabsList className="w-full">
-                <TabsTrigger value="layers" className="flex-1 text-xs">Layers</TabsTrigger>
-                <TabsTrigger value="hierarchy" className="flex-1 text-xs">Army</TabsTrigger>
-              </TabsList>
-            </Tabs>
+          <MapView
+            readOnly={readOnly}
+            onCreateNewEntity={handleCreateNewEntity}
+            onLinkGeometryToEntity={handleLinkGeometryToEntity}
+            defaultLayerId={defaultLayerId}
+            hiddenEntityIds={hiddenEntityIds}
+            onOverpassUnavailable={onOverpassUnavailable}
+            flyToRef={flyToRef}
+          />
+        }
+        treeSlot={<TreeView />}
+        leftSlot={
+          <div className="flex h-full flex-col">
+            <div className="shrink-0 border-b border-border px-3 py-2">
+              <Tabs value={leftMode} onValueChange={(value) => setLeftMode(value as typeof leftMode)}>
+                <TabsList className="w-full">
+                  <TabsTrigger value="layers" className="flex-1 text-xs">Layers</TabsTrigger>
+                  <TabsTrigger value="hierarchy" className="flex-1 text-xs">Army</TabsTrigger>
+                </TabsList>
+              </Tabs>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
+              {leftMode === "layers" ? (
+                <LayersPanel readOnly={readOnly} />
+              ) : (
+                <HierarchyPanel hiddenEntityIds={hiddenEntityIds} onToggleEntityVisible={handleToggleEntityVisible} />
+              )}
+            </div>
           </div>
-          <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
-            {leftMode === "layers" ? (
-              <LayersPanel readOnly={readOnly} />
-            ) : (
-              <HierarchyPanel
-                hiddenEntityIds={hiddenEntityIds}
-                onToggleEntityVisible={handleToggleEntityVisible}
-              />
+        }
+        headerPrimarySlot={
+          <div className="flex min-w-0 items-center gap-2">
+            {!readOnly && (
+              <div className="w-full max-w-[340px]">
+                <UnifiedSearch flyToRef={flyToRef} />
+              </div>
+            )}
+            {!readOnly && restoredFromSession && (
+              <span className="text-muted-foreground text-xs">Project restored from last session</span>
             )}
           </div>
-        </div>
-      }
-      headerPrimarySlot={
-        <div className="flex min-w-0 items-center gap-2">
-          {!readOnly && (
-            <div className="w-full max-w-[340px]">
-              <UnifiedSearch flyToRef={flyToRef} />
-            </div>
-          )}
-          {!readOnly && restoredFromSession && (
-            <span className="text-muted-foreground text-xs">Project restored from last session</span>
-          )}
-        </div>
-      }
-      headerSecondarySlot={
-        <div className="flex flex-wrap items-center gap-2">
-          <BaseMapSwitcher />
-          <ShowNetworksToggle />
-          {!readOnly && layeredResearch && (
+        }
+        headerSecondarySlot={
+          <div className="flex flex-wrap items-center gap-2">
+            <BaseMapSwitcher />
+            <ShowNetworksToggle />
+            {!readOnly && layeredResearch && (
+              <Button
+                type="button"
+                size="icon"
+                variant={layeredResearch.status === "running" ? "secondary" : "outline"}
+                onClick={layeredResearch.openDialog}
+                title={
+                  layeredResearch.status === "running"
+                    ? "Research all entities (running)"
+                    : layeredResearch.reviewQueueLength > 0
+                      ? `Review research queue (${layeredResearch.reviewQueueLength})`
+                      : "Research all entities"
+                }
+              >
+                <FlaskConical className="h-4 w-4" />
+                <span className="sr-only">
+                  {layeredResearch.status === "running" ? "Researching entities" : "Research all entities"}
+                </span>
+              </Button>
+            )}
+            <ModeToggle />
+          </div>
+        }
+        headerMenuSlot={!readOnly ? <OsmQueryMenu layers={layers} onAddLayer={addLayer} /> : null}
+        selectedEntityId={selectedEntityId}
+        selectedOsmObject={selectedOsmObject}
+        onCloseDetail={closeDetail}
+        detailHeaderActions={
+          !readOnly && selectedEntityId !== null && selectedOsmObject === null ? (
             <Button
               type="button"
-              size="icon"
-              variant={layeredResearch.status === "running" ? "secondary" : "outline"}
-              onClick={layeredResearch.openDialog}
-              title={
-                layeredResearch.status === "running"
-                  ? "Research all entities (running)"
-                  : layeredResearch.reviewQueueLength > 0
-                    ? `Review research queue (${layeredResearch.reviewQueueLength})`
-                    : "Research all entities"
-              }
+              size="sm"
+              variant="outline"
+              onClick={enrichment.openDrawer}
             >
-              <FlaskConical className="h-4 w-4" />
-              <span className="sr-only">
-                {layeredResearch.status === "running" ? "Researching entities" : "Research all entities"}
-              </span>
+              Enrich with AI
             </Button>
-          )}
-          <ModeToggle />
-        </div>
-      }
-      headerMenuSlot={!readOnly ? <OsmQueryMenu layers={layers} onAddLayer={addLayer} /> : null}
-      selectedEntityId={selectedEntityId}
-      selectedOsmObject={selectedOsmObject}
-      onCloseDetail={closeDetail}
-      detailHeaderActions={
-        !readOnly && selectedEntityId !== null && selectedOsmObject === null ? (
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            onClick={enrichment.openDrawer}
-          >
-            Enrich with AI
-          </Button>
-        ) : null
-      }
+          ) : null
+        }
         rightSlot={
           selectedOsmObject ? (
             <OsmObjectInspector

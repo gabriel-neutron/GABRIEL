@@ -63,9 +63,7 @@ export function AboutDialog({ open, onClose, onFirstClose }: Props) {
               <TabsTrigger value="en">English</TabsTrigger>
               <TabsTrigger value="fr">Français</TabsTrigger>
             </TabsList>
-            <div className="mt-3 text-sm text-muted-foreground">
-              <p>{content.description}</p>
-            </div>
+            <p className="mt-3 text-sm text-muted-foreground">{content.description}</p>
           </Tabs>
           <div className="flex flex-wrap gap-2">
             {SOCIAL_LINKS.map((link) => (

@@ -46,6 +46,41 @@ type Props = {
   cachedFeature?: GeoJSON.Feature & { id?: string }
 }
 
+type OsmObjectInspectorViewProps = {
+  loading: boolean
+  error: string | null
+  details: OsmObjectDetails | null
+}
+
+function OsmObjectInspectorView({ loading, error, details }: OsmObjectInspectorViewProps) {
+  if (loading) {
+    return (
+      <div className="flex h-full items-center justify-center p-4 text-sm text-muted-foreground">
+        Loading...
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="flex h-full flex-col items-center justify-center gap-1 p-4 text-sm">
+        <p className="text-destructive">Error loading OSM object</p>
+        <p className="text-xs text-muted-foreground">{error}</p>
+      </div>
+    )
+  }
+
+  if (!details) {
+    return (
+      <div className="flex h-full items-center justify-center p-4 text-sm text-muted-foreground">
+        No data available
+      </div>
+    )
+  }
+
+  return <OsmObjectDetailsView details={details} />
+}
+
 export function OsmObjectInspector({ type, id, cachedFeature }: Props) {
   const cacheDetails = useMemo(
     () => (cachedFeature ? detailsFromCachedFeature(type, id, cachedFeature) : null),
@@ -82,30 +117,5 @@ export function OsmObjectInspector({ type, id, cachedFeature }: Props) {
   const details = cacheDetails ?? remoteDetails
   const loading = cacheDetails === null && loadingRemote
 
-  if (loading) {
-    return (
-      <div className="flex h-full items-center justify-center p-4 text-sm text-muted-foreground">
-        Loading...
-      </div>
-    )
-  }
-
-  if (error) {
-    return (
-      <div className="flex h-full flex-col items-center justify-center gap-1 p-4 text-sm">
-        <p className="text-destructive">Error loading OSM object</p>
-        <p className="text-xs text-muted-foreground">{error}</p>
-      </div>
-    )
-  }
-
-  if (!details) {
-    return (
-      <div className="flex h-full items-center justify-center p-4 text-sm text-muted-foreground">
-        No data available
-      </div>
-    )
-  }
-
-  return <OsmObjectDetailsView details={details} />
+  return <OsmObjectInspectorView loading={loading} error={error} details={details} />
 }

@@ -1,3 +1,4 @@
+import type { KeyboardEvent } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import type { OsmElementCandidate } from "@/components/inspector/useFindOsmAtPoint"
@@ -37,6 +38,15 @@ export function FindOsmAtPointDialogContent({
   candidates,
   onSelectRelation,
 }: FindOsmAtPointDialogContentProps) {
+  function handleCandidateKeyDown(
+    event: KeyboardEvent<HTMLLIElement>,
+    relationId: number,
+  ) {
+    if (event.key !== "Enter" && event.key !== " ") return
+    event.preventDefault()
+    onSelectRelation(relationId)
+  }
+
   if (!open) return null
 
   return (
@@ -65,7 +75,7 @@ export function FindOsmAtPointDialogContent({
           ) : candidates.length === 0 ? (
             <p className="text-sm text-muted-foreground">No OSM elements found.</p>
           ) : (
-            <ul className="flex flex-col gap-2 list-none p-0 m-0">
+            <ul className="m-0 flex list-none flex-col gap-2 p-0">
               {candidates.map((el) => {
                 const label = candidateLabel(el)
                 const landuseType = getLanduseTypeLabel(el.tags ?? {})
@@ -76,12 +86,7 @@ export function FindOsmAtPointDialogContent({
                     tabIndex={0}
                     className="flex flex-wrap items-center gap-2 rounded-lg border bg-card px-3 py-2 cursor-pointer transition-colors hover:bg-muted/50 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
                     onClick={() => onSelectRelation(el.id)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        e.preventDefault()
-                        onSelectRelation(el.id)
-                      }
-                    }}
+                    onKeyDown={(event) => handleCandidateKeyDown(event, el.id)}
                   >
                     <span
                       className="inline-flex shrink-0 items-center rounded-md bg-muted px-2 py-0.5 text-xs font-medium capitalize text-muted-foreground"

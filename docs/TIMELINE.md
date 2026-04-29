@@ -1,346 +1,344 @@
-# Best-Practices Timeline — Gabriel
+# Implementation Timeline — Telegram OSINT Module
 
-This timeline replaces migration-history tracking with a forward-looking, multi-phase quality plan.
-Its goal is to make this repository a concrete example of production-grade frontend engineering for
-a local-first GIS + OSINT workflow.
+This timeline covers the implementation of the Telegram OSINT Graph Module described in `TELEGRAM_OSINT_PRD.md`.  
+See the main `TIMELINE.md` for the parent project's quality timeline.
 
 ## Principles
 
-- Keep scope practical: fix what blocks safe feature delivery first.
-- Prefer measurable outcomes over broad intentions.
-- Enforce standards in tooling, not in memory.
-- Keep architecture simple and explicit.
-- Strengthen reliability without introducing unnecessary dependencies.
+- Validate every external tool empirically before building features that depend on it.
+- If a tool fails its validation gate, stop and reassess — do not build around broken assumptions.
+- Keep each phase independently shippable: the system should work at the end of every phase.
+- Store only what is confirmed to work; do not design database schemas around unverified data shapes.
+- Rate limits and data volumes must be measured on real data, not estimated.
 
 ---
 
-## Phase 1 — Baseline Integrity (Weeks 1-2)
+## Phase 1 — External Tool Validation (Weeks 1-2)
 
-**Status:** complete (CI + `npm run verify`; ESLint errors/warnings cleared; generated folders excluded).
+**Status:** not started
 
-**Goal**: Restore trust in local and CI quality signals.
+**Goal**: Validate each external dependency in isolation before any integration code is written. Exit criteria are hard stops — a failed validation blocks all subsequent phases.
 
-**Scope**
-- Resolve current lint failures and warnings that indicate correctness risks.
-- Ensure generated artifacts are excluded from source linting.
-- Standardize "green" baseline: lint, test, build.
+**Scope**  
+This phase produces no production code. It produces a set of documented capability reports for each tool that inform the design of Phase 2 onward.
 
-**Primary Targets**
-- `eslint.config.js`
-- `src/App.tsx`
-- `src/pages/ViewPage.tsx`
-- `src/components/map/MapView.tsx`
-- `src/components/map/SymbolsLayer.tsx`
-- `src/components/map/DrawControls.tsx`
-- `src/components/inspector/OsmObjectInspector.tsx`
+**Tool Validation Tasks**
 
-**Tasks**
-- [x] Fix all ESLint errors in `src/` and `docs`-owned source files.
-- [x] Add explicit ignores for build/generated folders (for example `dist`, `storybook-static`).
-- [x] Resolve React hooks/ref anti-patterns flagged by current rules (remaining `exhaustive-deps` warnings tracked separately).
-- [x] Keep story files aligned with Storybook framework lint rules.
+- [ ] **Telethon — basic connectivity**
+  - Connect with real `api_id`/`api_hash` against a known public channel.
+  - Confirm: channel entity shape, message object fields, member list structure.
+  - Measure: how many API calls per channel before a `FloodWaitError` is raised.
+  - Document actual rate limits (requests/minute, messages/minute, members/call).
+
+- [ ] **Telethon — channel metadata collection**
+  - Collect metadata from 5 public Russian military channels.
+  - Confirm: `GetParticipantsRequest` works for public groups.
+  - Measure: time and call count for 100-member, 1,000-member, 10,000-member groups.
+  - Confirm: message batch size (`GetHistoryRequest` limit) and pagination behavior.
+
+- [ ] **tgspyder — private channel scraping**
+  - Install and run tgspyder against a controlled private test channel.
+  - Confirm: member scraping works, output format is parseable.
+  - Confirm: invite-link join behavior (works / patched / requires manual join).
+  - Document: which capabilities work vs. what requires an already-joined account.
+
+- [ ] **OpenAI gpt-4o-mini — Russian military NER**
+  - Prepare 50 real Russian Telegram message samples (manually sourced).
+  - Send to gpt-4o-mini with a structured NER prompt for UNIT / MUN / PERSON / LOCATION / EQUIPMENT.
+  - Measure: accuracy on known entities (manually evaluate 50 samples).
+  - Measure: cost per 1,000 messages (token count × price).
+  - Confirm: batch size limit and latency for a 100-message batch.
+
+- [ ] **Sigma.js + @react-sigma — graph performance**
+  - Build a standalone React prototype with a mock graph of 1,000, 5,000, and 10,000 nodes.
+  - Measure: frame rate on target hardware during zoom/pan.
+  - Confirm: click-to-select, label rendering, edge routing are acceptable at 5,000 nodes.
+  - Confirm: graphology data model fits the planned schema (channels + users as nodes, edges as typed).
+
+- [ ] **SQLite (aiosqlite) — data volume**
+  - Populate a test `.tgdb` with synthetic data: 1,000 channels, 3M messages, 500K users, 2M edges.
+  - Measure: file size on disk.
+  - Measure: query time for: graph traversal (2-hop BFS), full-text search on messages, relevance score sort.
+  - Confirm: acceptable performance without additional indexes.
 
 **Exit Criteria**
-- [x] `npm run lint` returns 0 errors.
-- [x] `npm run test` passes.
-- [x] `npm run build` passes without new warnings introduced by project code.
+- [ ] Each tool has a documented capability report (what works, what doesn't, actual limits).
+- [ ] Telethon rate limits are known; BFS crawl speed can be estimated.
+- [ ] tgspyder private channel path is confirmed working or an alternative is documented.
+- [ ] OpenAI NER accuracy ≥ 70% on Russian military test set; cost per 1K messages is known.
+- [ ] Sigma.js renders 5,000 nodes at acceptable frame rate on target hardware.
+- [ ] SQLite query times are acceptable at expected data volume.
+
+**Blocker gate:** Any tool that fails its exit criteria requires a documented decision (swap tool, narrow scope, or accept limitation) before Phase 2 begins.
 
 ---
 
-## Phase 2 — Docs and Architectural Truth (Weeks 2-3)
+## Phase 2 — Sidecar Foundation (Weeks 2-3)
 
-**Status:** complete (core docs aligned to current architecture; planning doc scope standardized).
+**Status:** not started  
+**Prerequisite:** Phase 1 exit criteria all passed.
 
-**Goal**: Make docs fully trustworthy for onboarding and day-to-day decisions.
+**Goal**: Stand up the Python sidecar with credentials, SQLite schema, and a health check that the React app can verify. No crawling yet.
 
-**Scope**
-- Remove contradictions between architecture docs and implementation.
-- Define one source of truth per topic (state, enrichment providers, testing rules).
-- Establish a lightweight docs update rule for future PRs.
+**Scope**  
+Foundation infrastructure only. The sidecar must start, connect to Telegram, and be reachable from the browser before any collection features are built.
 
 **Primary Targets**
-- `README.md`
-- `CLAUDE.md`
-- `docs/TECH_STACK.md`
-- `docs/ARCHITECTURE.md`
-- `docs/CONSTRAINTS.md`
+- `sidecar/main.py` (FastAPI application, lifespan setup)
+- `sidecar/db.py` (SQLite schema init + helpers via aiosqlite)
+- `sidecar/telegram_client.py` (Telethon session management, connect/disconnect)
+- `sidecar/requirements.txt`
+- `sidecar/.env.example` (api_id, api_hash, openai_api_key)
+- `package.json` (add `sidecar` script)
 
 **Tasks**
-- [x] Update state-management documentation to match `useProjectStore`.
-- [x] Correct AI provider docs to match implemented provider set.
-- [x] Mark historical sections clearly as historical or remove them.
-- [x] Add a short "docs updated?" checklist item to contribution workflow docs.
+- [ ] Create `sidecar/` directory with FastAPI app skeleton.
+- [ ] Implement SQLite schema init (all tables from PRD) with idempotent `CREATE TABLE IF NOT EXISTS`.
+- [ ] Implement `GET /health` returning sidecar version and Telegram connection status.
+- [ ] Add `npm run sidecar` to `package.json` (runs `uvicorn sidecar.main:app --reload`).
+- [ ] Document credential setup in `sidecar/README.md`: where to get `api_id`/`api_hash`, `.session` file location, `.gitignore` entries.
+- [ ] Add `.session` and `.env` to `.gitignore` if not already present.
+- [ ] Add a React sidecar status indicator (green/red dot in header) that polls `GET /health`.
 
 **Exit Criteria**
-- [x] No known docs-vs-code contradictions in core project docs.
-- [x] New contributor can run app + understand current architecture from docs only.
+- [ ] `npm run sidecar` starts without errors and stays running.
+- [ ] `GET /health` returns `{ status: "ok", telegram: "connected" }` with valid credentials.
+- [ ] SQLite schema is created correctly on first run; re-running is idempotent.
+- [ ] React app shows sidecar connection status.
+- [ ] `.session` and `.env` are listed in `.gitignore`.
 
 ---
 
-## Phase 3 — Testing and Release Gates (Weeks 3-5)
+## Phase 3 — Small-Scale Collection Proof-of-Concept (Weeks 3-4)
 
-**Status:** complete (local Phase 3 scope complete; branch protection enforcement explicitly deferred by user decision).
+**Status:** not started  
+**Prerequisite:** Phase 2 exit criteria passed; Telethon rate limits from Phase 1 are factored into implementation.
 
-**Goal**: Move from "tests exist" to "critical workflows are defended."
+**Goal**: Prove the collection pipeline works on a small set (≤ 20 seed channels) before building the full crawler. Validate that collected data matches the Phase 1 schema assumptions.
 
-**Scope**
-- Add missing enforcement (CI).
-- Add integration coverage where failures are most expensive.
-- Start tracking coverage for critical modules.
+**Scope**  
+Manual seed import and single-hop collection only. No BFS traversal yet. Focus on data quality and schema fitness.
 
 **Primary Targets**
-- `.github/workflows/` (new)
-- `package.json`
-- `src/services/geopackage.service.test.ts`
-- `src/pages/EditPage.tsx` (integration tests around key flows)
-- `src/hooks/useEnrichment.ts` / `src/hooks/useLayeredResearch.ts` (behavior tests)
+- `sidecar/collector.py` (channel metadata, messages, members)
+- `sidecar/tgspyder_adapter.py` (wrapper for tgspyder; use only if Telethon member scraping is insufficient)
+- `sidecar/rate_limiter.py` (FloodWaitError handling, configurable delays)
+- FastAPI: `POST /seed/import`, `POST /collect/{channel_id}`, `GET /channels`
 
 **Tasks**
-- [x] Add CI pipeline running lint, test, and build on PRs.
-- [x] Add at least one real GeoPackage WASM round-trip integration test.
-- [x] Add integration tests for open/save/session-restore path.
-- [x] Enable coverage output and define minimum baseline for critical modules.
+- [ ] Implement seed import (CSV + manual input) → insert channels with `status=seed`.
+- [ ] Implement single-channel collection: fetch metadata, last N messages, admin list.
+- [ ] Implement FloodWaitError handler: catch, log wait time, resume automatically.
+- [ ] Implement member scraping fallback via tgspyder if `GetParticipantsRequest` is rate-limited.
+- [ ] Run collection against 10 known public Russian military channels.
+- [ ] Validate: all expected fields present in collected data; schema matches PRD.
+- [ ] Validate: message volume per channel matches Phase 1 estimates; adjust N if needed.
+- [ ] Validate: member scraping works for at least 3 channels (including 1 private via tgspyder).
 
 **Exit Criteria**
-- [ ] PRs cannot merge without passing CI checks. *(Skipped for now by user request; enforce in repo settings later.)*
-- [x] GeoPackage persistence boundary has real integration coverage.
-- [x] Coverage is reported in CI and enforced for agreed critical paths.
+- [ ] 10+ channels collected successfully with metadata + messages + at least partial member lists.
+- [ ] Data is stored correctly in `.tgdb` and queryable via `GET /channels`.
+- [ ] Rate limit handler tested: sidecar survives a FloodWaitError and resumes collection.
+- [ ] Collected data shape is confirmed; any schema deviations from PRD are documented and resolved.
 
 ---
 
-## Phase 4 — OSINT Evidence Quality Gate (Weeks 5-7)
+## Phase 4 — Analysis Proof-of-Concept (Weeks 4-5)
 
-**Status:** complete (citation contract, AI-driven contradiction/staleness policy, client validation, drawer UX).
+**Status:** not started  
+**Prerequisite:** Phase 3 exit criteria passed; Phase 1 OpenAI NER validation passed.
 
-**Goal**: Ensure enrichment outputs are auditable, not just plausible.
+**Goal**: Validate military relevance scoring and entity extraction on real collected data before scaling the pipeline.
 
-**Scope**
-- Strengthen claim-to-source reliability.
-- Add contradiction handling.
-- Add stale evidence controls.
+**Scope**  
+Analysis runs on the ≤ 20 channels collected in Phase 3. Validate accuracy on real data (not just the Phase 1 test set).
 
 **Primary Targets**
-- `src/services/enrichment/enrichment.service.ts`
-- `src/services/enrichment/validators.ts`
-- `src/services/enrichment/promptTemplate.ts`
-- `src/types/enrichment.types.ts`
-- `src/components/enrichment/` (presentation of conflict/unresolved states)
+- `sidecar/relevance.py` (keyword/regex rule engine + OpenAI classifier)
+- `sidecar/ner.py` (OpenAI batch NER, structured output)
+- `sidecar/keywords/` (Russian military keyword dictionaries — MUNs, ranks, weapon systems, unit types)
+- FastAPI: `GET /channel/{id}` (include relevance score + extracted entities)
 
 **Tasks**
-- [x] Enforce field-level citation binding (proposal field -> concrete retrieved URL(s); `MIN_SOURCES_PER_PROPOSAL`).
-- [x] Add contradiction detection for conflicting candidate values (`unresolvedReasons` / `conflicts`, AI + normalization).
-- [x] Add stale-evidence policy (Tavily `publishedAt` on sources; invalid ISO rejected; **Stale** UI when published date is more than 365 days old; synthesize instructions).
-- [x] Ensure unresolved/contradictory fields are explicit in UI and not silently accepted.
+- [ ] Build Russian military keyword dictionary (MUN patterns, rank words, weapon names, unit designators in Russian/English). Source from existing OSINT references or build manually.
+- [ ] Implement rule engine: score each channel based on keyword matches in title + description + messages.
+- [ ] Implement OpenAI batch NER: process message batches, extract UNIT / MUN / PERSON / LOCATION / EQUIPMENT.
+- [ ] Implement OpenAI relevance classifier: send ambiguous channels (mid-range rule scores) for AI classification.
+- [ ] Run analysis on Phase 3 collected channels.
+- [ ] Manually review results: are high-scoring channels actually military-relevant?
+- [ ] Measure actual OpenAI cost on Phase 3 data; project cost at 5,000-channel scale.
+- [ ] Tune score thresholds based on manual review.
 
 **Exit Criteria**
-- [x] Each accepted enrichment field has verifiable source linkage (≥1 URL per proposal; validated before apply).
-- [x] Contradictions are surfaced as unresolved, not flattened into single "confident" output (drawer + `conflict` candidates or downgrade when empty).
-- [x] Evidence freshness is enforced in validation/UI and model instructions (full scoring pipeline extension deferred if not required).
+- [ ] Rule engine scores all collected channels; high-scorers are confirmed military-relevant by manual review (≥ 80% precision).
+- [ ] NER extracts recognizable entities from Russian military message text.
+- [ ] OpenAI cost per channel is measured; cost at 5,000-channel scale is within acceptable bounds.
+- [ ] Score thresholds are set and documented based on real data (not assumptions).
 
 ---
 
-## Phase 5 — Security and Privacy Hardening (Weeks 7-8)
+## Phase 5 — BFS Discovery Crawler (Weeks 5-6)
 
-**Status:** skipped by product decision for roadmap sequencing (historical baseline work was completed; do not resume this phase in the current roadmap).
+**Status:** not started  
+**Prerequisite:** Phases 3 and 4 exit criteria passed; rate limits from Phase 1 factored into BFS delay budget.
 
-**Goal**: Reduce avoidable local-first operational risk.
+**Goal**: Build and validate the BFS discovery crawler. Scale from 20 seed channels to 200+ discovered channels.
 
-**Scope**
-- Improve API key handling behavior.
-- Introduce retrieval policy enforcement.
-- Keep local-first guarantees explicit and testable.
+**Scope**  
+Full BFS traversal using the three confirmed discovery signals: linked channels, shared admins/members, keyword mentions. Depth limit and pause/resume controls. WebSocket progress stream.
 
 **Primary Targets**
-- `src/services/enrichment/settings.service.ts`
-- `src/components/shared/AiProviderSettingsDialog.tsx`
-- `src/services/enrichment/providers/*`
-- `src/services/enrichment/validators.ts`
+- `sidecar/crawler.py` (BFS engine, session state, pause/resume)
+- `sidecar/edges.py` (edge discovery: linked channels, member overlap, keyword mentions)
+- FastAPI: `POST /crawl/start`, `POST /crawl/pause`, `POST /crawl/resume`, `GET /crawl/status`, `WS /ws/crawl`
 
 **Tasks**
-- [x] Ensure no secrets appear in logs/errors (baseline: adapter error paths covered by tests).
+- [ ] Implement BFS traversal: expand frontier, skip already-collected channels, respect depth limit.
+- [ ] Implement linked-channel discovery: parse t.me/ links from channel descriptions and pinned messages.
+- [ ] Implement shared-member edge discovery: find users appearing in multiple collected channels.
+- [ ] Implement keyword-mention edge discovery: tag channels that mention known entity names.
+- [ ] Implement crawl session state in SQLite (`crawl_sessions` table): persist BFS frontier so paused crawls can resume.
+- [ ] Implement FloodWaitError-aware BFS: pause frontier expansion during wait, resume after.
+- [ ] Implement WebSocket progress endpoint streaming node/edge counts and current frontier size.
+- [ ] Run a full crawl from 10 seed channels to depth 3; measure time and final graph size.
+- [ ] Validate: at least 200 channels discovered; graph is acyclic-safe (visited set prevents loops).
+
 **Exit Criteria**
-- [x] Key persistence behavior is explicit, user-controlled, and documented (`settings.service` + tests + `docs/CONSTRAINTS.md`).
-- [x] No secrets leak in known error/log paths (OpenAI/Tavily adapter tests).
+- [ ] Crawl from 10 seeds reaches ≥ 200 channels at depth 3.
+- [ ] Pause and resume work: restarting from a paused session continues from the correct frontier.
+- [ ] FloodWaitError during crawl does not lose state.
+- [ ] WebSocket streams real-time progress to a browser client.
+- [ ] Crawl completes within an acceptable time window given Phase 1 rate limit measurements.
 
 ---
 
-## Phase 6 — Maintainability Refactor (Weeks 8-10)
+## Phase 6 — React Graph UI (Weeks 6-8)
 
-**Goal**: Lower change risk by reducing orchestration complexity.
+**Status:** not started  
+**Prerequisite:** Phase 5 exit criteria passed; Sigma.js performance validated in Phase 1.
 
-**Status:** complete (in-place simplification across the four targets, one pure extraction to `src/utils/enrichmentApply.ts` with tests, and enrichment barrel removal).
+**Goal**: Build the interactive Telegram graph view in the React app. The analyst can open a `.tgdb` file, view the network, search, and inspect nodes.
 
-**Scope**
-- Split oversized files by responsibility.
-- Keep behavior unchanged while clarifying boundaries.
-- Improve testability of orchestration logic.
+**Scope**  
+New `TelegramPage` in the React app. Sigma.js graph, channel/user detail panel, crawl controls, search. No OOB proposals yet (Phase 7).
 
 **Primary Targets**
-- `src/pages/EditPage.tsx`
-- `src/hooks/useEnrichment.ts`
-- `src/services/enrichment/enrichment.service.ts`
-- `src/components/inspector/EntityInspector.tsx`
+- `src/pages/TelegramPage.tsx` (new page, launched from EditPage header button)
+- `src/store/useTelegramStore.ts` (new Zustand store: sidecar state, graph data, selected node)
+- `src/components/telegram/TelegramGraph.tsx` (Sigma.js WebGL graph)
+- `src/components/telegram/ChannelDetail.tsx` (selected node detail panel)
+- `src/components/telegram/CrawlControls.tsx` (seed import, depth input, start/pause, progress)
+- `src/components/telegram/GraphSearch.tsx` (search by unit, MUN, channel, person)
+- `src/App.tsx` (add `telegram` to mode type)
+- `src/pages/EditPage.tsx` (add Telegram launch button to header)
+- `package.json` (add `@react-sigma/core`, `sigma`, `graphology`)
 
 **Tasks**
-- [x] EntityInspector: shared overlay/sources/geometry helpers; single draft state for editable text fields.
-- [x] enrichment.service: single `buildResponse` path for no-chunks failure; `normalizeConflictsAndReasons` helper.
-- [x] useEnrichment: `buildAcceptedPatch` extracted and tested; `currentFeatureId` derived once per render.
-- [x] EditPage: simplified batch-review effect; inline `projectFileActions` prop object.
-- [x] Tests: `enrichmentApply.test.ts`; `npm run verify` green.
+- [ ] Install and configure `@react-sigma/core`, `sigma`, `graphology`.
+- [ ] Create `useTelegramStore` with: sidecar URL, connection status, graph data, selected channel ID, crawl state.
+- [ ] Build `TelegramGraph`: fetch `/graph` on mount, render with Sigma.js, wire node click to detail panel.
+- [ ] Build `ChannelDetail`: display channel metadata, relevance score, extracted entities, member count.
+- [ ] Build `CrawlControls`: CSV seed import, depth selector, start/pause/resume buttons, WebSocket progress display.
+- [ ] Build `GraphSearch`: input → `GET /search?q=` → highlight matching nodes on graph.
+- [ ] Add "Telegram" button to `EditPage` header that switches to `TelegramPage`.
+- [ ] Test with real Phase 5 crawl data at 200+ nodes; verify render performance.
+- [ ] Test with mock data at 1,000 and 5,000 nodes; verify frame rate (from Phase 1 baseline).
 
 **Exit Criteria**
-- [x] Core orchestration files are materially smaller and single-purpose (within Phase 6 scope above).
-- [x] Refactor introduces no behavior regressions (automated verify passes; two intentional loose-parity notes documented above).
+- [ ] TelegramPage opens from EditPage and displays a real crawled graph.
+- [ ] Node click shows correct channel detail.
+- [ ] Search returns results and highlights nodes.
+- [ ] Crawl controls start/pause/resume a real crawl and show live progress.
+- [ ] Graph renders at ≥ 30 FPS at 5,000 nodes (validated against Phase 1 baseline hardware).
 
 ---
 
-Roadmap sequencing note: Phase 5 is intentionally skipped for active planning; Phase 7 is the next active phase.
+## Phase 7 — OOB Linkage (Weeks 8-9)
 
-## Phase 7 — Legacy & Compatibility Cleanup (Weeks 10-11)
+**Status:** not started  
+**Prerequisite:** Phase 6 exit criteria passed; Phase 4 NER validated.
 
-**Status:** complete (compatibility fallback branches removed in file/persistence paths; strict schema handling and docs alignment verified).
-
-**Goal**: Remove unnecessary backward-compatibility layers, silent fallbacks, and obsolete abstractions in file management and persistence paths for a single-user workflow.
-
-**Scope**
-- File open/save and export code paths.
-- GeoPackage schema compatibility logic and migration handling.
-- IndexedDB persistence error semantics and versioning policy.
-- Read-only adapters and no-op wrappers.
-- Docs/comments alignment with actual runtime behavior.
+**Goal**: Implement the OOB match proposal flow: sidecar matches extracted entities to OOB units, React surfaces proposals for analyst review, accepted proposals write to the `.gpkg`.
 
 **Primary Targets**
-- `src/services/geopackage.service.ts`
-- `src/pages/EditPage.tsx`
-- `src/components/shared/AppShell.tsx`
-- `src/pages/ViewPage.tsx`
-- `src/services/projectStorage.service.ts`
-- `src/store/useProjectStore.ts`
-- `README.md`
-- `docs/ARCHITECTURE.md`
-- `docs/CONSTRAINTS.md`
+- `sidecar/oob_matcher.py` (fuzzy match entity names vs OOB entity names)
+- `sidecar/gpkg_reader.py` (read-only `.gpkg` loader for OOB entity names; sidecar never writes `.gpkg`)
+- FastAPI: `GET /oob/proposals`, `POST /oob/accept/{id}`, `POST /oob/reject/{id}`
+- `src/components/telegram/OobProposals.tsx` (proposal review panel)
+- `src/services/geopackage.service.ts` (add `appendSource(entityId, url)` helper if not present)
 
 **Tasks**
-- [x] Replace implicit schema fallbacks with explicit version/migration strategy (or documented hard fail).
-- [x] Remove no-op compatibility adapters in read-only UI contracts.
-- [x] Decide and document single browser/file-export strategy; remove extra branches if out of scope.
-- [x] Eliminate dead state and unused compatibility fields.
-- [x] Replace silent catches in persistence/load flows with explicit, typed handling.
-- [x] Run a targeted docs drift pass on file-management and persistence behavior.
+- [ ] Implement sidecar `.gpkg` loader: read entity names and IDs from the GeoPackage (read-only).
+- [ ] Implement fuzzy matcher: compare extracted unit names to OOB entity names (string similarity ≥ 0.75).
+- [ ] Store proposals in `oob_proposals` table with confidence score and evidence text.
+- [ ] Implement `GET /oob/proposals` returning pending proposals with context.
+- [ ] Implement `POST /oob/accept/{id}`: returns `{ oob_entity_id, channel_url }` to React.
+- [ ] Implement `POST /oob/reject/{id}`: marks proposal rejected in SQLite.
+- [ ] Build `OobProposals` panel in React: list proposals, show evidence, accept/reject buttons.
+- [ ] On accept: React calls `appendSource(entityId, channelUrl)` in `geopackage.service.ts` and triggers a `.gpkg` save.
+- [ ] Test: manually verify that an accepted proposal correctly appears in the OOB entity's `sources` field after save.
 
 **Exit Criteria**
-- [x] No silent fallback masks corruption/version issues in file/persistence paths.
-- [x] No compatibility wrapper remains without an explicit documented requirement.
-- [x] File import/export behavior is single-path or intentionally dual-path with documented rationale.
-- [x] Docs and inline comments match current implementation for the targeted modules.
+- [ ] Sidecar generates proposals for at least 3 confirmed channel-to-unit matches from Phase 5 crawl data.
+- [ ] Analyst can review and accept/reject proposals from the React UI.
+- [ ] Accepted proposal URL appears in the correct `.gpkg` entity's `sources` field after save.
+- [ ] Rejected proposals are not re-surfaced.
+- [ ] Sidecar never writes to the `.gpkg`.
 
 ---
 
-## Phase 8 — Enrichment Simplification Review & Refactor (Weeks 11-12)
+## Phase 8 — Export and Hardening (Weeks 9-10)
 
-**Status:** complete (strict-scope simplification finished: typed stop diagnostics, leaner run orchestration, dedicated enrichment runner lifecycle, stale API surface removal, and regression coverage updates).
+**Status:** not started  
+**Prerequisite:** Phase 7 exit criteria passed.
 
-**Goal**: Reduce enrichment complexity and coupling while preserving current behavior, evidence integrity, and validation guarantees.
+**Goal**: Add GraphML/Neo4j export and harden the sidecar for reliable daily use.
 
-**Scope**
-- Orchestration complexity in `runEnrichment` and related helper logic.
-- Hook-level lifecycle and cancellation flow in `useEnrichment`.
-- Layered-research orchestration overlap and provider bundle usage.
-- Prompt/provider boundary normalization and fallback behavior.
-- UI contract simplification between enrichment state and drawer rendering.
+**Scope**  
+Export endpoints, error handling, credential security, and a basic operational health check.
 
 **Primary Targets**
-- `src/services/enrichment/enrichment.service.ts`
-- `src/hooks/useEnrichment.ts`
-- `src/services/research/layered-research.service.ts`
-- `src/store/enrichment.store.ts`
-- `src/services/enrichment/providers/openai.adapter.ts`
-- `src/services/enrichment/providers/provider.types.ts`
-- `src/components/enrichment/EnrichDrawer.tsx`
-- `src/types/enrichment.types.ts`
-- `src/services/enrichment/enrichment.service.test.ts`
-- `src/services/enrichment/providers/openai.adapter.test.ts`
+- `sidecar/export.py` (GraphML serializer, Neo4j Cypher generator)
+- `sidecar/main.py` (error handling middleware, structured logging)
+- FastAPI: `GET /export/graphml`, `GET /export/neo4j`
+- `src/components/telegram/TelegramGraph.tsx` (add export buttons)
+- `sidecar/README.md` (operational guide: credentials, rate limit behavior, known limitations)
 
 **Tasks**
-- [x] Split `runEnrichment` into focused modules (validation, retrieval loop, synthesis normalization, response assembly).
-- [x] Replace stringly diagnostics and stop-reason assembly with typed internal structures.
-- [x] Consolidate relevance/confidence/source-mapping heuristics into a single shared scoring layer.
-- [x] Extract async run/cancel/epoch logic from `useEnrichment` into a dedicated runner hook/service.
-- [x] Reduce no-op/stale UI API surface in enrichment drawer contracts.
-- [x] Align layered and single-entity enrichment orchestration semantics and error statuses.
-- [x] Keep or improve current validation/citation/conflict guarantees with explicit tests.
+- [ ] Implement GraphML export: serialize nodes + edges from `.tgdb` to GraphML format; validate it loads in Gephi.
+- [ ] Implement Neo4j Cypher export: generate `MERGE` statements for nodes and relationships.
+- [ ] Add structured error logging to sidecar (log to file, not just stdout).
+- [ ] Add global exception handler: all unhandled errors return a structured JSON error with a request ID.
+- [ ] Confirm `.session` and `.env` are in `.gitignore`; add pre-commit warning if session file is staged.
+- [ ] Write `sidecar/README.md`: credential setup, first-run guide, known rate limits, `.tgdb` file management.
+- [ ] Run a 500-channel crawl end-to-end; export GraphML and verify in Gephi.
 
 **Exit Criteria**
-- [x] Enrichment orchestration files are materially smaller and single-responsibility.
-- [x] Public enrichment behavior remains stable (no regression in proposal, unresolved, and conflict handling).
-- [x] Cancellation/close flow is deterministic and easier to reason about.
-- [x] Test coverage for enrichment critical paths is maintained or improved.
-- [x] No new fallback/compatibility branch is introduced without explicit rationale.
+- [ ] GraphML export loads in Gephi without errors on a 500-channel graph.
+- [ ] Neo4j Cypher export can be imported into a local Neo4j instance.
+- [ ] All errors surfaced in sidecar are structured JSON; no unhandled 500s reach the browser.
+- [ ] Operational README covers all setup steps a new analyst would need.
+- [ ] No credentials appear in any log output.
 
 ---
 
-## Phase 9 — Performance and Scalability Baseline (Weeks 10-11)
+## Ongoing Cadence (Post Phase 8)
 
-**Goal**: Make performance regressions visible before users feel them.
-
-**Scope**
-- Add practical performance checks for map-heavy flows.
-- Start controlling bundle growth.
-
-**Primary Targets**
-- `src/components/map/MapView.tsx`
-- `src/components/map/NetworkLinksLayer.tsx`
-- `src/components/map/SymbolsLayer.tsx`
-- `src/stories/map/` (performance stories/fixtures)
-- `vite.config.ts`
-
-**Tasks**
-- [ ] Add/restore performance story for `NetworkLinksLayer` with large fixture.
-- [ ] Verify memoization/selectors under realistic entity counts.
-- [ ] Add bundle-size tracking and define warning/error budgets.
-- [ ] Introduce code-splitting only where it reduces critical-path cost.
-
-**Exit Criteria**
-- [ ] Performance story exists and is used for regression checks.
-- [ ] Bundle budget is measurable and tracked in CI or release checklist.
-- [ ] No major map interaction regressions at target dataset size.
+- After each investigation: archive `.tgdb` with the matching `.gpkg`; do not accumulate all investigations in one file.
+- Monthly: re-test tgspyder against a private channel to confirm it still works (Telegram patches can break it without notice).
+- Monthly: re-evaluate OpenAI cost per channel as message volumes grow.
+- Quarterly: check for Telethon updates that affect rate limits or private channel handling.
+- On Telegram ToS change: re-assess which collection methods remain authorized.
 
 ---
 
-## Phase 10 — Release Excellence and Team Scale (Weeks 11-12)
+## Risk Register
 
-**Goal**: Make high-quality delivery repeatable with minimal heroics.
-
-**Scope**
-- Formalize release checklist.
-- Add stop-ship rules for quality/security/OSINT integrity.
-- Improve onboarding and contribution workflow.
-
-**Primary Targets**
-- `docs/CONSTRAINTS.md`
-- `docs/ARCHITECTURE.md`
-- `docs/TIMELINE.md`
-- `README.md`
-- CI workflow and PR template docs
-
-**Tasks**
-- [ ] Add explicit stop-shipping triggers to release docs.
-- [ ] Add PR checklist sections: docs sync, risk level, test evidence.
-- [ ] Add onboarding quickstart for architecture + quality gates.
-- [ ] Define quarterly maintenance cadence for docs/tooling rules.
-
-**Exit Criteria**
-- [ ] Release checklist is actively used and versioned.
-- [ ] Contributors can ship safely through documented workflow only.
-- [ ] "Best-practice" expectations are enforced by process and tooling.
-
----
-
-## Ongoing Cadence (Post Phase 10)
-
-- Weekly: triage lint/test/build/CI drift.
-- Bi-weekly: architecture/doc drift review.
-- Monthly: OSINT quality gate review with sample audits.
-- Quarterly: dependency refresh + performance baseline re-check.
-
-This cadence prevents quality decay while the feature surface grows.
+| Risk | Phase at Risk | Signal to Watch | Response |
+|---|---|---|---|
+| Telethon rate limits stricter than expected | Phase 1 → all | FloodWaitError frequency > 1/hour | Increase delays; reduce BFS parallelism; consider session rotation |
+| tgspyder private channel join no longer works | Phase 1 → Phase 3 | Join request fails on test channel | Document manual-join-first workaround; remove auto-join from scope |
+| OpenAI NER accuracy < 70% on real data | Phase 4 | Manual review precision < threshold | Improve prompt; add few-shot examples; consider keyword pre-filter |
+| Sigma.js performance inadequate at 5K nodes | Phase 1 → Phase 6 | FPS < 30 on target hardware | Reduce rendered edges; add LOD (hide edge labels at zoom-out); consider reagraph |
+| SQLite query too slow at 10K channels | Phase 1 → Phase 5 | Query time > 2s for graph traversal | Add composite indexes; partition messages into separate table by date |
+| Forward chain exclusion limits discovery quality | Phase 5 | < 200 channels found at depth 3 from 10 seeds | Add forward-chain edge type in v2; document gap |

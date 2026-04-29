@@ -57,7 +57,7 @@ function ValueBlock({ label, value, tone, actionLabel, onAction, disabled }: Val
 
 function ProposalReasoning({ text }: { text: string }) {
   return (
-    <section className="space-y-0.5">
+    <section>
       <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Reasoning</p>
       <p className="break-words text-sm leading-6 text-foreground">{text}</p>
     </section>
@@ -89,7 +89,7 @@ export function ProposalCard({
   const rejected = decision === "rejected"
 
   return (
-    <Card className="p-3">
+    <Card className="space-y-3 p-3">
       <h4 className="text-base font-semibold leading-none text-foreground">{proposal.field}</h4>
 
       <div className="grid gap-2 sm:grid-cols-2">

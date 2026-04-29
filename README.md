@@ -1,62 +1,96 @@
-# Gabriel
+# Gabriel - Local ORBAT Mapping Workstation
 
-[![CI](https://github.com/Netechoppe/gabriel/actions/workflows/ci.yml/badge.svg)](https://github.com/Netechoppe/gabriel/actions)
+![Gabriel icon](public/image.png)
 
-Local-first military mapping app: annotate units and geometries on a map, link to OSM, and export to GeoPackage.
+Gabriel is a local-first web app to build, inspect, and maintain military map projects from a structured Order of Battle (ORBAT) point of view.
 
-> **For AI agents:** read [AGENTS.md](AGENTS.md) first (verify command, CI gates, OSINT rules).  
-> If the badge above 404s, replace `Netechoppe/gabriel` with your GitHub `owner/repo`.
+Made  with 🍷, 🥖 and 🧀 in France.
 
-## Stack
+The current project context is a **Russian ORBAT research workflow**: identify units, place geometries, connect open-source evidence, and keep a coherent operational picture over time.  
+The software is still generic: you can use the same workflow for any country, coalition, or historical theater.
 
-React 19, TypeScript, Vite, Leaflet, React Flow, shadcn/ui. GeoPackage via `@ngageoint/geopackage` (browser). NATO symbols via milsymbol.
+## Project Goal
 
-## Run
+Turn fragmented military information into one clean, reusable project file:
+
+- entities (units) with hierarchy and metadata,
+- map geometries (points, lines, polygons),
+- layers (custom, echelon, OSM overlay),
+- optional enrichment suggestions before human validation.
+
+Everything is designed around one principle: **your GeoPackage is the source of truth**.
+
+## Site Access
+
+Gabriel runs locally in the browser.
 
 ```bash
 npm install
 npm run dev
 ```
 
-Open the URL shown (e.g. http://localhost:5173). No backend; everything runs in the browser.
+Then open the URL shown by Vite (usually `http://localhost:5173`).
 
-## AI enrichment setup
+Public deployed version: [https://gabriel0x0.netlify.app/](https://gabriel0x0.netlify.app/).
 
-AI enrichment runs inside the frontend app (no local API server, no `.env` required).
+## What You Can Do
 
-Use the `AI keys` button in the top bar to store provider keys in browser **local storage**:
+- Create and edit ORBAT-oriented map projects.
+- Draw and link geometries to entities.
+- Use MIL-STD-2525 symbols for military visualization.
+- Link entities to OSM relations and open-source context.
+- Save/load projects as `.gpkg` (portable GeoPackage files).
 
-- OpenAI API key  
-- Tavily API key  
+## Current Project Scale (`public/project.gpkg`)
 
-Notes:
+Snapshot of the bundled reference dataset:
 
-- Keys are persisted per browser/domain and survive page changes and multi-day sessions (Netlify compatible).
-- If keys are missing, enrichment runs in degraded mode with deterministic fallback behavior.
-- Retrieval providers can fail due to CORS/rate limits. The UI shows explicit errors and unresolved fields.
-- Accepting proposals updates session overlay state only; authoritative GeoPackage data changes only when you use the existing Save flow.
+- `1010` units/entities
+- `15` layers
+- `286` geometries
+- `148` units linked to an OSM relation
+- `999` units attached to a parent (hierarchical ORBAT structure)
+- `5` research source records
 
-## Build and quality
+## AI Enrichment (Optional)
 
-```bash
-npm run build
-npm run verify    # lint + test (with coverage) + build — same as CI
-npm run test
-npm run lint
-```
+Enrichment is assistive. It proposes, you decide.
 
-Output in `dist/`. Serve with any static host.
+1. Open `AI keys` in the top bar.
+2. Add:
+   - OpenAI API key
+   - Tavily API key
 
-## Features
+Accepted proposals affect the current session state, and become authoritative only through the normal save flow.
 
-- Load/save project as GeoPackage; explicit IndexedDB session persistence and restore.
-- Echelon + custom + OSM layers; draw points, lines, polygons.
-- Units (entities) with hierarchy; MIL-STD-2525 symbols; link to OSM relations.
-- Read-only hierarchy tree; search (Nominatim) and Overpass OSM layer.
+## CI / Pipeline
 
-## Project layout
+The repository includes a GitHub Actions pipeline in `.github/workflows/ci.yml`.
 
-- `src/components/` — map, inspector, tree, shared, ui (shadcn).
-- `src/services/` — geopackage, symbol, overpass, nominatim, projectStorage, enrichment, research.
-- `src/types/` — domain and symbol types (including echelon options).
-- `src/lib/` — `cn()` and tooling; `src/utils/` — pure helpers (e.g. geometry).
+On pushes and pull requests to `main` / `master`, it runs:
+
+- `npm ci`
+- `npm run verify`
+- coverage artifact upload
+
+
+## Contributing
+
+- Keep changes simple and focused.
+- Run `npm run verify` before opening a PR.
+- Update docs when behavior or architecture changes.
+
+## License
+
+There is currently **no explicit `LICENSE` file** in this repository.
+
+If you plan to distribute or reuse Gabriel publicly, add a license first (for example MIT or Apache-2.0).
+
+## Technical Documentation
+
+For architecture and implementation details:
+
+- `docs/ARCHITECTURE.md`
+- `docs/CONSTRAINTS.md`
+- `docs/TIMELINE.md`
+- `AGENTS.md`

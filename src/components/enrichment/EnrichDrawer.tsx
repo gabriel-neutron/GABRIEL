@@ -67,6 +67,90 @@ function renderConflictValue(value: unknown): string {
   return String(value)
 }
 
+type EnrichDrawerSidebarProps = {
+  entity: MapEntity
+  context: EnrichmentContext | null
+  prompt: string
+  status: EnrichDrawerProps["status"]
+  queryTrace: string[]
+  depthUsed: number
+  errorMessage: string | null
+  onPromptChange: (value: string) => void
+  onRun: () => void
+}
+
+function EnrichDrawerSidebar({
+  entity,
+  context,
+  prompt,
+  status,
+  queryTrace,
+  depthUsed,
+  errorMessage,
+  onPromptChange,
+  onRun,
+}: EnrichDrawerSidebarProps) {
+  return (
+    <div className="min-h-0 space-y-2 overflow-y-auto pr-1">
+      <Card className="p-2.5">
+        <div className="space-y-1 text-sm">
+          <div className="rounded-md border bg-muted/30 px-2 py-1 font-medium">Entity: {entity.name}</div>
+          <div className="rounded-md border bg-muted/30 px-2 py-1 font-medium">
+            Parent: {context?.parent?.name ?? "None"}
+          </div>
+          <div className="rounded-md border bg-muted/30 px-2 py-1 font-medium">
+            Children: {renderChildren(context)}
+          </div>
+          <div className="rounded-md border bg-muted/30 px-2 py-1 font-medium">
+            Last analyzed: {formatAnalyzedAt(entity.analyzedAt)}
+          </div>
+        </div>
+      </Card>
+
+      <Card className="p-2.5">
+        <div>
+          <label htmlFor="enrichment-prompt" className="text-sm font-medium">
+            Research prompt
+          </label>
+        </div>
+        <Textarea
+          id="enrichment-prompt"
+          value={prompt}
+          onChange={(event) => onPromptChange(event.target.value)}
+          rows={5}
+          className="text-sm leading-relaxed"
+        />
+        <Button type="button" onClick={onRun} disabled={status === "running"} className="h-8 w-full sm:w-auto">
+          {status === "running" ? "Running enrichment..." : "Run enrichment"}
+        </Button>
+      </Card>
+
+      {(status === "running" || queryTrace.length > 0 || errorMessage) && (
+        <Card className="space-y-2 p-2.5">
+          {status === "running" && (
+            <p className="text-sm font-medium text-muted-foreground">
+              Processing hop {depthUsed || 1} in auto-depth mode
+            </p>
+          )}
+          {queryTrace.length > 0 && (
+            <div className="rounded-md border bg-muted/30 p-2.5 text-xs">
+              <p className="font-medium">Query trace</p>
+              <ul className="mt-1.5 list-disc space-y-0.5 pl-4">
+                {queryTrace.map((query, index) => (
+                  <li key={`${query}-${index}`} className="break-words">
+                    {query}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {errorMessage && <p className="text-xs text-muted-foreground">Error details shown in header.</p>}
+        </Card>
+      )}
+    </div>
+  )
+}
+
 export function EnrichDrawer({
   open,
   entity,
@@ -143,65 +227,17 @@ export function EnrichDrawer({
 
           <div className="min-h-0 flex-1 overflow-hidden p-2 sm:p-2.5">
             <div className="grid h-full min-h-0 gap-2 lg:grid-cols-[320px_minmax(0,1fr)]">
-              <div className="min-h-0 space-y-2 overflow-y-auto pr-1">
-                <Card className="p-2.5">
-                  <div className="space-y-1 text-sm">
-                    <div className="rounded-md border bg-muted/30 px-2 py-1 font-medium">
-                      Entity: {entity.name}
-                    </div>
-                    <div className="rounded-md border bg-muted/30 px-2 py-1 font-medium">
-                      Parent: {context?.parent?.name ?? "None"}
-                    </div>
-                    <div className="rounded-md border bg-muted/30 px-2 py-1 font-medium">
-                      Children: {renderChildren(context)}
-                    </div>
-                    <div className="rounded-md border bg-muted/30 px-2 py-1 font-medium">
-                      Last analyzed: {formatAnalyzedAt(entity.analyzedAt)}
-                    </div>
-                  </div>
-                </Card>
-
-                <Card className="p-2.5">
-                  <div>
-                    <label htmlFor="enrichment-prompt" className="text-sm font-medium">
-                      Research prompt
-                    </label>
-                  </div>
-                  <Textarea
-                    id="enrichment-prompt"
-                    value={prompt}
-                    onChange={(event) => onPromptChange(event.target.value)}
-                    rows={5}
-                    className="text-sm leading-relaxed"
-                  />
-                  <Button type="button" onClick={onRun} disabled={status === "running"} className="h-8 w-full sm:w-auto">
-                    {status === "running" ? "Running enrichment..." : "Run enrichment"}
-                  </Button>
-                </Card>
-
-                {(status === "running" || queryTrace.length > 0 || errorMessage) && (
-                  <Card className="space-y-2 p-2.5">
-                    {status === "running" && (
-                      <p className="text-sm font-medium text-muted-foreground">
-                        Processing hop {depthUsed || 1} in auto-depth mode
-                      </p>
-                    )}
-                    {queryTrace.length > 0 && (
-                      <div className="rounded-md border bg-muted/30 p-2.5 text-xs">
-                        <p className="font-medium">Query trace</p>
-                        <ul className="mt-1.5 list-disc space-y-0.5 pl-4">
-                          {queryTrace.map((query, index) => (
-                            <li key={`${query}-${index}`} className="break-words">
-                              {query}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                    {errorMessage && <p className="text-xs text-muted-foreground">Error details shown in header.</p>}
-                  </Card>
-                )}
-              </div>
+              <EnrichDrawerSidebar
+                entity={entity}
+                context={context}
+                prompt={prompt}
+                status={status}
+                queryTrace={queryTrace}
+                depthUsed={depthUsed}
+                errorMessage={errorMessage}
+                onPromptChange={onPromptChange}
+                onRun={onRun}
+              />
 
               <div className="h-full space-y-2 overflow-x-hidden overflow-y-auto">
                 {hasProposals ? (

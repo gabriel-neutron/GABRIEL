@@ -31,9 +31,7 @@ export function FilterableSelect({
   placeholder = "No parent",
   className,
 }: FilterableSelectProps) {
-  const [selectedEchelon, setSelectedEchelon] = React.useState<string | null>(
-    null,
-  )
+  const [selectedEchelon, setSelectedEchelon] = React.useState<string | null>(null)
 
   const availableEchelons = React.useMemo(() => {
     const present = new Set(
@@ -74,10 +72,8 @@ export function FilterableSelect({
     const sorted = [...options].sort((a, b) =>
       a.name.localeCompare(b.name, undefined, { sensitivity: "base" }),
     )
-    return sorted.filter((opt) => {
-      if (selectedEchelon == null) return true
-      return opt.echelon === selectedEchelon
-    })
+    if (selectedEchelon == null) return sorted
+    return sorted.filter((opt) => opt.echelon === selectedEchelon)
   }, [options, selectedEchelon])
 
   return (
@@ -96,7 +92,7 @@ export function FilterableSelect({
           <div className="-mx-1 mb-1 border-b px-1 pb-2 pt-1">
             <div className="mb-1 flex items-center justify-between gap-2 px-1">
               <div className="text-[11px] font-medium text-muted-foreground">Filter by echelon</div>
-              {selectedEchelon != null ? (
+              {selectedEchelon ? (
                 <button
                   type="button"
                   onClick={(e) => {

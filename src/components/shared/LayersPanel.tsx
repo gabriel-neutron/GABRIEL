@@ -14,6 +14,59 @@ function getLayerTitle(isOsmLayer: boolean, expanded: boolean, readOnly: boolean
   return "Expand. Right-click to rename or delete."
 }
 
+type LayersContextMenuProps = {
+  x: number
+  y: number
+  canRename: boolean
+  canRemove: boolean
+  isOsmContext: boolean
+  isEchelonLayer: boolean
+  onRename: () => void
+  onRemove: () => void
+}
+
+function LayersContextMenu({
+  x,
+  y,
+  canRename,
+  canRemove,
+  isOsmContext,
+  isEchelonLayer,
+  onRename,
+  onRemove,
+}: LayersContextMenuProps) {
+  return (
+    <div
+      className="fixed z-50 min-w-32 rounded-md border bg-popover py-1 shadow-md"
+      style={{ left: x, top: y }}
+    >
+      {canRename && (
+        <button
+          type="button"
+          className="w-full px-3 py-1.5 text-left text-sm hover:bg-accent"
+          onClick={onRename}
+        >
+          Rename
+        </button>
+      )}
+      {canRemove && (
+        <button
+          type="button"
+          className="w-full px-3 py-1.5 text-left text-sm text-destructive hover:bg-destructive/10"
+          onClick={onRemove}
+        >
+          {isOsmContext ? "Remove layer" : "Delete layer"}
+        </button>
+      )}
+      {isEchelonLayer && (
+        <div className="px-3 py-1.5 text-xs text-muted-foreground">
+          Echelon layers cannot be renamed or deleted.
+        </div>
+      )}
+    </div>
+  )
+}
+
 export function LayersPanel({ readOnly = false }: Props) {
   const layers = useProjectStore((s) => s.layers)
   const entities = useProjectStore((s) => s.entities)
@@ -230,42 +283,25 @@ export function LayersPanel({ readOnly = false }: Props) {
       </div>
 
       {!readOnly && contextMenu && (
-        <div
-          ref={menuRef}
-          className="fixed z-50 min-w-32 rounded-md border bg-popover py-1 shadow-md"
-          style={{ left: contextMenu.x, top: contextMenu.y }}
-        >
-          {canRename && (
-            <button
-              type="button"
-              className="w-full px-3 py-1.5 text-left text-sm hover:bg-accent"
-              onClick={() => {
-                if (!contextLayer) return
-                const name = window.prompt("Layer name", contextLayer.name)
-                if (name != null) useProjectStore.getState().renameLayer(contextMenu.layerId, name)
-                setContextMenu(null)
-              }}
-            >
-              Rename
-            </button>
-          )}
-          {canRemove && (
-            <button
-              type="button"
-              className="w-full px-3 py-1.5 text-left text-sm text-destructive hover:bg-destructive/10"
-              onClick={() => {
-                handleRemoveLayer(contextMenu.layerId)
-                setContextMenu(null)
-              }}
-            >
-              {isOsmContext ? "Remove layer" : "Delete layer"}
-            </button>
-          )}
-          {isEchelonLayer && (
-            <div className="px-3 py-1.5 text-xs text-muted-foreground">
-              Echelon layers cannot be renamed or deleted.
-            </div>
-          )}
+        <div ref={menuRef}>
+          <LayersContextMenu
+            x={contextMenu.x}
+            y={contextMenu.y}
+            canRename={canRename}
+            canRemove={canRemove}
+            isOsmContext={isOsmContext}
+            isEchelonLayer={isEchelonLayer}
+            onRename={() => {
+              if (!contextLayer) return
+              const name = window.prompt("Layer name", contextLayer.name)
+              if (name != null) useProjectStore.getState().renameLayer(contextMenu.layerId, name)
+              setContextMenu(null)
+            }}
+            onRemove={() => {
+              handleRemoveLayer(contextMenu.layerId)
+              setContextMenu(null)
+            }}
+          />
         </div>
       )}
     </div>

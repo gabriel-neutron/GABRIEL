@@ -326,7 +326,6 @@ export function ResearchDialog({
           </div>
         </div>
 
-        {/* Footer */}
         <div className="flex shrink-0 items-center justify-between border-t px-4 py-3">
           <div className="flex gap-2">
             {isRunning ? (

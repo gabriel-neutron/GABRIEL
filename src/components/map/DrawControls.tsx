@@ -15,6 +15,16 @@ type Props = {
   onCreated: (geom: DrawnGeometry) => void
 }
 
+function useDrawOnCreatedHandler(onCreated: (geom: DrawnGeometry) => void) {
+  const onCreatedRef = useRef(onCreated)
+
+  useEffect(() => {
+    onCreatedRef.current = onCreated
+  }, [onCreated])
+
+  return onCreatedRef
+}
+
 function geoJsonToDrawnGeometry(
   geometry: Geometry,
   layerId: string,
@@ -45,11 +55,7 @@ export function DrawControls({
 }: Props) {
   const map = useMap()
   const drawHandlerRef = useRef<L.Draw.Marker | L.Draw.Polyline | L.Draw.Polygon | null>(null)
-  const onCreatedRef = useRef(onCreated)
-
-  useEffect(() => {
-    onCreatedRef.current = onCreated
-  }, [onCreated])
+  const onCreatedRef = useDrawOnCreatedHandler(onCreated)
 
   useEffect(() => {
     if (!enabled) {
@@ -109,7 +115,7 @@ export function DrawControls({
       map.removeLayer(drawnItems)
       drawHandlerRef.current = null
     }
-  }, [enabled, geometryType, map, defaultLayerId])
+  }, [enabled, geometryType, map, defaultLayerId, onCreatedRef])
 
   return null
 }

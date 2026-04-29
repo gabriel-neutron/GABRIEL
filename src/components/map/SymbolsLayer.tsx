@@ -4,6 +4,7 @@ import { Marker, Popup } from "react-leaflet"
 import { getRenderedSymbolForEntity } from "@/services/symbol.service"
 import { useProjectStore } from "@/store/useProjectStore"
 import type { LatLng } from "@/types/coordinates"
+import type { MapEntity } from "@/types/domain.types"
 import type { MapBounds } from "./MapBoundsReporter"
 
 const BOUNDS_BUFFER = 0.5
@@ -14,6 +15,41 @@ type Props = {
   hiddenEntityIds?: Set<string>
   onSelectEntity: (id: string | null) => void
   mapBounds?: MapBounds | null
+}
+
+type SymbolsMarkersViewProps = {
+  markerItems: Array<{
+    entity: MapEntity
+    position: LatLng
+    cacheKey: string
+    opacity: number
+  }>
+  icons: Map<string, L.Icon>
+  onSelectEntity: (id: string | null) => void
+}
+
+function SymbolsMarkersView({ markerItems, icons, onSelectEntity }: SymbolsMarkersViewProps) {
+  return (
+    <>
+      {markerItems.map((item) => {
+        const icon = icons.get(item.cacheKey)
+        if (!icon) return null
+        return (
+          <Marker
+            key={item.entity.id}
+            position={item.position}
+            icon={icon}
+            opacity={item.opacity}
+            eventHandlers={{
+              click: () => onSelectEntity(item.entity.id),
+            }}
+          >
+            <Popup>{item.entity.name}</Popup>
+          </Marker>
+        )
+      })}
+    </>
+  )
 }
 
 function makeSymbolIcon(
@@ -90,25 +126,5 @@ export function SymbolsLayer({
     })
   }, [markerItems])
 
-  return (
-    <>
-      {markerItems.map((item) => {
-        const icon = icons.get(item.cacheKey)
-        if (!icon) return null
-        return (
-          <Marker
-            key={item.entity.id}
-            position={item.position}
-            icon={icon}
-            opacity={item.opacity}
-            eventHandlers={{
-              click: () => onSelectEntity(item.entity.id),
-            }}
-          >
-            <Popup>{item.entity.name}</Popup>
-          </Marker>
-        )
-      })}
-    </>
-  )
+  return <SymbolsMarkersView markerItems={markerItems} icons={icons} onSelectEntity={onSelectEntity} />
 }

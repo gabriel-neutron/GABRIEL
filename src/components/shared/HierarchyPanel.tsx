@@ -21,6 +21,11 @@ type NodeProps = {
   onToggleExpanded: (id: string) => void
 }
 
+type HierarchyPanelHeaderProps = {
+  anyVisible: boolean
+  onToggleAllVisibility: () => void
+}
+
 function hasChildren(entityId: string, entities: MapEntity[]): boolean {
   return entities.some((e) => e.parentId === entityId)
 }
@@ -42,6 +47,19 @@ function isAncestorHidden(entity: MapEntity, entities: MapEntity[], hiddenEntity
   const parent = entities.find((e) => e.id === entity.parentId)
   if (!parent) return false
   return isAncestorHidden(parent, entities, hiddenEntityIds)
+}
+
+function HierarchyPanelHeader({ anyVisible, onToggleAllVisibility }: HierarchyPanelHeaderProps) {
+  return (
+    <div className="shrink-0 border-b border-border px-4 py-3">
+      <div className="flex items-center justify-between gap-2">
+        <h2 className="text-sm font-semibold">Hierarchy</h2>
+        <Button type="button" variant="outline" size="xs" onClick={onToggleAllVisibility}>
+          {anyVisible ? "Hide all" : "Show all"}
+        </Button>
+      </div>
+    </div>
+  )
 }
 
 function EntityNode({
@@ -167,14 +185,7 @@ export function HierarchyPanel({ hiddenEntityIds, onToggleEntityVisible }: Props
 
   return (
     <div className="flex min-w-0 flex-col">
-      <div className="shrink-0 border-b border-border px-4 py-3">
-        <div className="flex items-center justify-between gap-2">
-          <h2 className="text-sm font-semibold">Hierarchy</h2>
-          <Button type="button" variant="outline" size="xs" onClick={handleToggleAllVisibility}>
-            {anyVisible ? "Hide all" : "Show all"}
-          </Button>
-        </div>
-      </div>
+      <HierarchyPanelHeader anyVisible={anyVisible} onToggleAllVisibility={handleToggleAllVisibility} />
       <div className="min-h-0 flex-1 space-y-px overflow-y-auto p-2">
         {roots.length === 0 ? (
           <div className="px-2 py-4 text-center text-xs text-muted-foreground">

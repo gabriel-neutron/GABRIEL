@@ -39,7 +39,9 @@ export function CenterOnSelection({ selectedEntityId, entities, getEntityPositio
       map.setView(pos, map.getZoom(), { animate: false })
     }
     map.on("resize", handleResize)
-    return () => { map.off("resize", handleResize) }
+    return () => {
+      map.off("resize", handleResize)
+    }
   }, [map])
 
   return null

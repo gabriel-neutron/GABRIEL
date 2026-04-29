@@ -239,6 +239,79 @@ type Props = {
   enrichedOverlay?: Record<string, unknown>
 }
 
+type EntityInspectorReadOnlyViewProps = {
+  entity: MapEntity
+  layerName: string
+  parentName: string | null
+  linkedGeometries: DrawnGeometry[]
+  sources: string[]
+  enrichedOverlay: Record<string, unknown>
+}
+
+function EntityInspectorReadOnlyView({
+  entity,
+  layerName,
+  parentName,
+  linkedGeometries,
+  sources,
+  enrichedOverlay,
+}: EntityInspectorReadOnlyViewProps) {
+  return (
+    <div className="space-y-3 p-4">
+      <ReadOnlyField label="Name">
+        <span className="truncate">{entity.name}</span>
+      </ReadOnlyField>
+      {entity.militaryUnitId != null && entity.militaryUnitId !== "" && (
+        <ReadOnlyField label="Military unit ID">
+          <span className="truncate">{entity.militaryUnitId}</span>
+        </ReadOnlyField>
+      )}
+      {entity.notes != null && entity.notes !== "" && (
+        <ReadOnlyField label="Notes">
+          <span className="whitespace-pre-wrap">{entity.notes}</span>
+        </ReadOnlyField>
+      )}
+      {sources.length > 0 && (
+        <ReadOnlyField label="Sources">
+          <SourcesList sources={sources} readOnly />
+        </ReadOnlyField>
+      )}
+      <EnrichedSessionBlock overlay={enrichedOverlay} variant="readonly" />
+      <div className="grid grid-cols-2 gap-2">
+        <ReadOnlyField label="Echelon">{entity.echelon ?? "—"}</ReadOnlyField>
+        <ReadOnlyField label="Type">{entity.type ? capitalizeFirst(entity.type) : "—"}</ReadOnlyField>
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <ReadOnlyField label="Affiliation">{entity.affiliation ?? "—"}</ReadOnlyField>
+        <ReadOnlyField label="Domain">{entity.domain ?? "—"}</ReadOnlyField>
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <ReadOnlyField label="Position">
+          <span>{positionModeLabel(entity.positionMode)}</span>
+        </ReadOnlyField>
+        <ReadOnlyField label="Exact position">
+          <span>{entity.isExactPosition ? "Yes" : "No"}</span>
+        </ReadOnlyField>
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <ReadOnlyField label="OSM relation">
+          {entity.osmRelationId != null ? entity.osmRelationId : "—"}
+        </ReadOnlyField>
+      </div>
+      <ReadOnlyField label="Layer">
+        <span className="truncate">{layerName}</span>
+      </ReadOnlyField>
+      <ReadOnlyField label="Parent">
+        <span className="truncate">{parentName ?? "—"}</span>
+      </ReadOnlyField>
+      <div>
+        <div className="text-xs font-medium text-muted-foreground">Linked geometries</div>
+        <LinkedGeometriesList linkedGeometries={linkedGeometries} />
+      </div>
+    </div>
+  )
+}
+
 export function EntityInspector({ readOnly = false, enrichedOverlay = {} }: Props) {
   const { layers, updateEntity, deleteGeometry } = useProjectStore()
   const assignableLayers = layers.filter((l) => l.osmData == null)
@@ -292,60 +365,14 @@ export function EntityInspector({ readOnly = false, enrichedOverlay = {} }: Prop
 
   if (readOnly) {
     return (
-      <div className="space-y-3 p-4">
-        <ReadOnlyField label="Name">
-          <span className="truncate">{entity.name}</span>
-        </ReadOnlyField>
-        {entity.militaryUnitId != null && entity.militaryUnitId !== "" && (
-          <ReadOnlyField label="Military unit ID">
-            <span className="truncate">{entity.militaryUnitId}</span>
-          </ReadOnlyField>
-        )}
-        {entity.notes != null && entity.notes !== "" && (
-          <ReadOnlyField label="Notes">
-            <span className="whitespace-pre-wrap">{entity.notes}</span>
-          </ReadOnlyField>
-        )}
-        {sources.length > 0 && (
-          <ReadOnlyField label="Sources">
-            <SourcesList sources={sources} readOnly />
-          </ReadOnlyField>
-        )}
-        <EnrichedSessionBlock overlay={enrichedOverlay} variant="readonly" />
-        <div className="grid grid-cols-2 gap-2">
-          <ReadOnlyField label="Echelon">{entity.echelon ?? "—"}</ReadOnlyField>
-          <ReadOnlyField label="Type">
-            {entity.type ? capitalizeFirst(entity.type) : "—"}
-          </ReadOnlyField>
-        </div>
-        <div className="grid grid-cols-2 gap-2">
-          <ReadOnlyField label="Affiliation">{entity.affiliation ?? "—"}</ReadOnlyField>
-          <ReadOnlyField label="Domain">{entity.domain ?? "—"}</ReadOnlyField>
-        </div>
-        <div className="grid grid-cols-2 gap-2">
-          <ReadOnlyField label="Position">
-            <span>{positionModeLabel(entity.positionMode)}</span>
-          </ReadOnlyField>
-          <ReadOnlyField label="Exact position">
-            <span>{entity.isExactPosition ? "Yes" : "No"}</span>
-          </ReadOnlyField>
-        </div>
-        <div className="grid grid-cols-2 gap-2">
-          <ReadOnlyField label="OSM relation">
-            {entity.osmRelationId != null ? entity.osmRelationId : "—"}
-          </ReadOnlyField>
-        </div>
-        <ReadOnlyField label="Layer">
-          <span className="truncate">{layerName}</span>
-        </ReadOnlyField>
-        <ReadOnlyField label="Parent">
-          <span className="truncate">{parentName ?? "—"}</span>
-        </ReadOnlyField>
-        <div>
-          <div className="text-xs font-medium text-muted-foreground">Linked geometries</div>
-          <LinkedGeometriesList linkedGeometries={linkedGeometries} />
-        </div>
-      </div>
+      <EntityInspectorReadOnlyView
+        entity={entity}
+        layerName={layerName}
+        parentName={parentName}
+        linkedGeometries={linkedGeometries}
+        sources={sources}
+        enrichedOverlay={enrichedOverlay}
+      />
     )
   }
 

@@ -80,11 +80,7 @@ export function NetworkLinksLayer({ positionMap }: Props): React.ReactElement | 
   return (
     <>
       {links.map(({ key, positions }) => (
-        <Polyline
-          key={key}
-          positions={positions}
-          pathOptions={NETWORK_LINE_OPTIONS}
-        />
+        <Polyline key={key} positions={positions} pathOptions={NETWORK_LINE_OPTIONS} />
       ))}
     </>
   )
