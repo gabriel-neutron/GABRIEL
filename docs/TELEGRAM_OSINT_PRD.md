@@ -6,6 +6,9 @@
 **Status:** Scoped v2.0 — April 2026  
 **Context:** Law enforcement / intelligence analyst use; private channel access is authorized.
 
+**Telethon source of truth (for all AI agents and contributors):** use `https://codeberg.org/Lonami/Telethon`. The GitHub mirror is not up to date and must not be treated as canonical.  
+**Telethon documentation source of truth:** use `https://docs.telethon.dev/en/stable/` for API and usage references.
+
 ---
 
 ## Goal

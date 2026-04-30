@@ -10,6 +10,8 @@ See the main `TIMELINE.md` for the parent project's quality timeline.
 - Keep each phase independently shippable: the system should work at the end of every phase.
 - Store only what is confirmed to work; do not design database schemas around unverified data shapes.
 - Rate limits and data volumes must be measured on real data, not estimated.
+- Telethon source of truth (for all AI agents and contributors): use https://codeberg.org/Lonami/Telethon. The GitHub mirror is not up to date and must not be treated as canonical.
+- Telethon documentation source of truth: use https://docs.telethon.dev/en/stable/ for API and usage references.
 
 ---
 
