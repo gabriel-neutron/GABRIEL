@@ -50,7 +50,7 @@ function StandaloneSidebarToggle() {
   if (open && !isMobile) return null
 
   return (
-    <div className="absolute top-2 left-2 z-[1200]">
+    <div className="absolute top-2 left-2 z-[5200]">
       <SidebarTrigger
         className="h-8 w-8 rounded border border-border bg-background text-foreground shadow-md hover:bg-accent hover:text-foreground [&>svg]:size-5"
       />
@@ -105,6 +105,59 @@ export function AppShell({
     onCloseDetail()
   }
 
+  const headerActionButtons = readOnly ? (
+    <>
+      {onSwitchToEdit && (
+        <Button type="button" size="sm" variant="outline" onClick={onSwitchToEdit} title="Switch to edit mode">
+          Edit
+        </Button>
+      )}
+      {onOpenAbout && (
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          onClick={onOpenAbout}
+          title="About"
+        >
+          About
+        </Button>
+      )}
+    </>
+  ) : (
+    <>
+      <Button
+        type="button"
+        size="sm"
+        variant="outline"
+        disabled={busy}
+        onClick={projectFileActions?.onNewProject}
+        title="New project"
+      >
+        New
+      </Button>
+      <Button
+        size="sm"
+        variant="outline"
+        disabled={busy}
+        onClick={() => fileInputRef.current?.click()}
+        title="Open project"
+      >
+        Open
+      </Button>
+      <Button
+        type="button"
+        size="sm"
+        variant="outline"
+        disabled={busy}
+        onClick={projectFileActions?.onSaveProject}
+        title="Save project"
+      >
+        Save
+      </Button>
+    </>
+  )
+
   return (
     <SidebarProvider defaultOpen className="h-dvh flex-col bg-background text-foreground [--app-header-height:56px]">
       <header className="relative z-[100] border-b border-border">
@@ -116,7 +169,7 @@ export function AppShell({
               className={cn("h-8 w-8 shrink-0", theme === "dark" && "invert")}
               aria-hidden
             />
-            <Tabs value={activeView} onValueChange={handleViewChange}>
+            <Tabs value={activeView} onValueChange={handleViewChange} className="hidden sm:block">
               <TabsList>
                 <TabsTrigger value="map">Map</TabsTrigger>
                 <TabsTrigger value="tree">Hierarchy</TabsTrigger>
@@ -124,62 +177,11 @@ export function AppShell({
             </Tabs>
           </div>
 
-          <div className="min-w-0 flex-1">{headerPrimarySlot}</div>
+          <div className="hidden min-w-0 flex-1 sm:block">{headerPrimarySlot}</div>
 
-          <div className="flex shrink-0 items-center gap-2">
+          <div className="hidden shrink-0 items-center gap-2 sm:flex">
             {headerSecondarySlot}
-            {readOnly ? (
-              <>
-                {onSwitchToEdit && (
-                  <Button type="button" size="sm" variant="outline" onClick={onSwitchToEdit} title="Switch to edit mode">
-                    Edit
-                  </Button>
-                )}
-                {onOpenAbout && (
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    onClick={onOpenAbout}
-                    title="About"
-                  >
-                    About
-                  </Button>
-                )}
-              </>
-            ) : (
-              <>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  disabled={busy}
-                  onClick={projectFileActions?.onNewProject}
-                  title="New project"
-                >
-                  New
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  disabled={busy}
-                  onClick={() => fileInputRef.current?.click()}
-                  title="Open project"
-                >
-                  Open
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  disabled={busy}
-                  onClick={projectFileActions?.onSaveProject}
-                  title="Save project"
-                >
-                  Save
-                </Button>
-              </>
-            )}
+            {headerActionButtons}
             {headerMenuSlot && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -239,6 +241,87 @@ export function AppShell({
               </DropdownMenu>
             )}
           </div>
+
+          <div className="flex shrink-0 items-center sm:hidden">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button type="button" size="icon" variant="outline" title="Open mobile actions">
+                  <Ellipsis className="h-4 w-4" />
+                  <span className="sr-only">Open mobile actions</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="z-[10000] w-[320px]">
+                <div className="space-y-2 p-2">
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={activeView === "map" ? "default" : "outline"}
+                      onClick={() => setActiveView("map")}
+                    >
+                      Map
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={activeView === "tree" ? "default" : "outline"}
+                      onClick={() => setActiveView("tree")}
+                    >
+                      Hierarchy
+                    </Button>
+                  </div>
+                  {headerPrimarySlot}
+                  {headerSecondarySlot}
+                  <div className="flex flex-wrap gap-2">{headerActionButtons}</div>
+                  {headerMenuSlot && (
+                    <>
+                      <DropdownMenuSeparator />
+                      <div>{headerMenuSlot}</div>
+                    </>
+                  )}
+                  {!readOnly && (
+                    <>
+                      <DropdownMenuSeparator />
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="w-full justify-start"
+                        onClick={() => setAiSettingsOpen(true)}
+                        title="Configure AI provider keys"
+                      >
+                        AI keys
+                      </Button>
+                    </>
+                  )}
+                  {!readOnly && onSwitchToView && (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="w-full justify-start"
+                      onClick={onSwitchToView}
+                      title="Switch to view mode"
+                    >
+                      View mode
+                    </Button>
+                  )}
+                  {!readOnly && onOpenAbout && (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="w-full justify-start"
+                      onClick={onOpenAbout}
+                      title="About"
+                    >
+                      About
+                    </Button>
+                  )}
+                </div>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
 
         {error && (
@@ -278,7 +361,7 @@ export function AppShell({
 
         <aside
           className={cn(
-            "hidden min-h-0 shrink-0 flex-col overflow-hidden bg-sidebar text-sidebar-foreground transition-[width,transform] duration-200 ease-linear md:flex",
+            "hidden min-h-0 shrink-0 flex-col overflow-hidden bg-sidebar text-sidebar-foreground transition-[width,transform] duration-200 ease-linear xl:flex",
             rightPanelOpen
               ? "w-[clamp(320px,24vw,460px)] min-w-[320px] max-w-[460px] translate-x-0 border-l border-border"
               : "w-0 min-w-0 max-w-0 translate-x-full border-l-0",
@@ -299,7 +382,7 @@ export function AppShell({
       </div>
 
       <Sheet open={isMobile && rightPanelOpen && mobileDetailOpen} onOpenChange={(open) => !open && handleCloseDetail()}>
-        <SheetContent side="right" className="h-dvh w-dvw max-w-none rounded-none p-0 md:hidden">
+        <SheetContent side="right" showCloseButton={false} className="z-[5200] !h-dvh !w-dvw !max-w-none rounded-none p-0 xl:hidden">
           <SheetTitle className="sr-only">Detail</SheetTitle>
           <div className="flex h-full min-h-0 flex-col bg-sidebar text-sidebar-foreground">
             <div className="flex shrink-0 items-center justify-between gap-2 border-b border-border px-2 py-1">
