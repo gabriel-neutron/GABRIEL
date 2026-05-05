@@ -104,6 +104,11 @@ body {
   outline-offset: -2px;
 }
 
+/* Dark-mode map shader: invert only tile raster layers, keep overlays/icons untouched */
+.dark .leaflet-container .leaflet-tile-pane {
+  filter: invert(1) hue-rotate(180deg) saturate(0.82) brightness(0.9) contrast(1.05);
+}
+
 /* Keep reopen button aligned under Leaflet zoom stack */
 .app-map-sidebar-toggle {
   top: calc(10px + 62px + 6px);

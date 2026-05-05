@@ -130,7 +130,7 @@ function SourcesList({
 }) {
   if (sources.length === 0) return null
 
-  const listClass = readOnly ? "mt-1 space-y-1 text-xs" : "mb-2 space-y-1 text-xs"
+  const listClass = readOnly ? "mt-1 space-y-1 text-sm" : "mb-2 space-y-1 text-sm"
   const linkClass = readOnly
     ? "min-w-0 flex-1 truncate text-blue-600 hover:underline"
     : "block truncate text-blue-600 hover:underline"
@@ -441,7 +441,7 @@ export function EntityInspector({ readOnly = false, enrichedOverlay = {} }: Prop
           <Field>
             <FieldLabel>Echelon</FieldLabel>
             <Select value={echelonValue} onValueChange={handleEchelonChange}>
-              <SelectTrigger className="h-8 text-xs">
+              <SelectTrigger className="h-8 text-sm">
                 <SelectValue placeholder="Echelon" />
               </SelectTrigger>
               <SelectContent>
@@ -456,7 +456,7 @@ export function EntityInspector({ readOnly = false, enrichedOverlay = {} }: Prop
           <Field>
             <FieldLabel>Type</FieldLabel>
             <Select value={typeValue} onValueChange={(v) => updateEntity(entity.id, { type: v })}>
-              <SelectTrigger className="h-8 text-xs">
+              <SelectTrigger className="h-8 text-sm">
                 <SelectValue placeholder="Type" />
               </SelectTrigger>
               <SelectContent>
@@ -481,7 +481,7 @@ export function EntityInspector({ readOnly = false, enrichedOverlay = {} }: Prop
               value={affiliationValue}
               onValueChange={(v) => updateEntity(entity.id, { affiliation: v as SymbolAffiliation })}
             >
-              <SelectTrigger className="h-8 text-xs">
+              <SelectTrigger className="h-8 text-sm">
                 <SelectValue placeholder="Affiliation" />
               </SelectTrigger>
               <SelectContent>
@@ -499,7 +499,7 @@ export function EntityInspector({ readOnly = false, enrichedOverlay = {} }: Prop
               value={domainValue}
               onValueChange={(v) => updateEntity(entity.id, { domain: v as SymbolDomain })}
             >
-              <SelectTrigger className="h-8 text-xs">
+              <SelectTrigger className="h-8 text-sm">
                 <SelectValue placeholder="Domain" />
               </SelectTrigger>
               <SelectContent>
@@ -516,7 +516,7 @@ export function EntityInspector({ readOnly = false, enrichedOverlay = {} }: Prop
           <Field>
             <FieldLabel>Layer</FieldLabel>
             <Select value={entity.layerId} onValueChange={(v) => updateEntity(entity.id, { layerId: v })}>
-              <SelectTrigger className="h-8 text-xs">
+              <SelectTrigger className="h-8 text-sm">
                 <SelectValue placeholder="Select layer" />
               </SelectTrigger>
               <SelectContent>
@@ -541,7 +541,7 @@ export function EntityInspector({ readOnly = false, enrichedOverlay = {} }: Prop
           <Field>
             <FieldLabel>Position</FieldLabel>
             <Select value={positionModeValue} onValueChange={(v) => handlePositionModeChange(v as PositionMode)}>
-              <SelectTrigger className="h-8 text-xs">
+              <SelectTrigger className="h-8 text-sm">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -557,7 +557,7 @@ export function EntityInspector({ readOnly = false, enrichedOverlay = {} }: Prop
               </SelectContent>
             </Select>
             {positionModeValue === "own" && (
-              <label className="mt-2 inline-flex items-center gap-2 text-xs text-muted-foreground">
+              <label className="mt-2 inline-flex items-center gap-2 text-sm text-muted-foreground">
                 <Switch
                   checked={isExactPositionValue}
                   onCheckedChange={handleIsExactPositionChange}
