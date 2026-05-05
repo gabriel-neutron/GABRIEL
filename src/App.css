@@ -68,3 +68,60 @@ body {
   opacity: 0;
   pointer-events: none;
 }
+
+/* Leaflet controls styled with app theme tokens */
+.leaflet-container .leaflet-control-zoom {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  box-shadow: var(--shadow-xs);
+}
+
+.leaflet-container .leaflet-control-zoom a {
+  background: var(--card);
+  color: var(--foreground);
+  border-bottom: 1px solid var(--border);
+  width: 30px;
+  height: 30px;
+  line-height: 30px;
+  font-weight: 600;
+  text-align: center;
+  cursor: pointer;
+  transition: background-color 120ms ease, color 120ms ease;
+}
+
+.leaflet-container .leaflet-control-zoom a:last-child {
+  border-bottom: none;
+}
+
+.leaflet-container .leaflet-control-zoom a:hover {
+  background: var(--accent);
+  color: var(--accent-foreground);
+}
+
+.leaflet-container .leaflet-control-zoom a:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: -2px;
+}
+
+/* Keep reopen button aligned under Leaflet zoom stack */
+.app-map-sidebar-toggle {
+  top: calc(10px + 62px + 6px);
+  left: 10px;
+}
+
+.app-map-sidebar-toggle [data-sidebar="trigger"] {
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--card);
+  color: var(--foreground);
+  box-shadow: var(--shadow-xs);
+  cursor: pointer;
+}
+
+.app-map-sidebar-toggle [data-sidebar="trigger"]:hover {
+  background: var(--accent);
+  color: var(--accent-foreground);
+}
