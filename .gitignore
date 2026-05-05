@@ -31,3 +31,8 @@ storybook-static
 .env
 .env.local
 .env.production
+
+# AI agent local/project guidance (keep CLAUDE.md only)
+.claude/
+.agents/
+AGENTS.md
