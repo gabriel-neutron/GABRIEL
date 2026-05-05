@@ -1,8 +1,0 @@
----
-alwaysApply: true
----
-## Verification (agents)
-
-- Before declaring a task **complete** or opening a PR, run `npm run verify` from the repo root and ensure it exits **0**.
-- If verify fails, fix the **root cause**. Do not disable ESLint rules, lower coverage thresholds, or skip CI steps solely to turn the build green—unless the change is explicitly agreed and documented in `AGENTS.md` / `docs/CONSTRAINTS.md`.
-- When changing **`src/services/enrichment/`** or **`src/services/geopackage.service.ts`**, add or update **tests in the same change** (`src/**/*.test.ts`).

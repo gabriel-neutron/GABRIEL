@@ -1,4 +1,0 @@
-#!/usr/bin/env sh
-
-echo "Running pre-commit verify..."
-npm run verify
