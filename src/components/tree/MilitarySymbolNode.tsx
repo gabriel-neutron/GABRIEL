@@ -13,11 +13,10 @@ export type MilitarySymbolNodeData = {
 export const MilitarySymbolNode = memo(function MilitarySymbolNode({
   data,
 }: NodeProps<MilitarySymbolNodeData>) {
-  const entity = data.entity
   const { svg, width, height } = useMemo(
-    () => getRenderedSymbolForEntity(entity, TREE_SYMBOL_SIZE),
+    () => getRenderedSymbolForEntity(data.entity, TREE_SYMBOL_SIZE),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [entity.natoSymbolCode, entity.echelon, entity.affiliation, entity.domain],
+    [data.entity.natoSymbolCode, data.entity.echelon, data.entity.affiliation, data.entity.domain],
   )
 
   return (

@@ -15,6 +15,7 @@ import { ModeToggle } from "@/components/shared/ModeToggle"
 import { UnifiedSearch, type FlyToFn } from "@/components/shared/UnifiedSearch"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { SidebarGroup, SidebarGroupContent, SidebarTrigger } from "@/components/ui/sidebar"
 import { FlaskConical } from "lucide-react"
 import type { MapEntity, DrawnGeometry } from "@/types/domain.types"
 import { getDefaultEntityLayerId } from "@/utils/entityLayer"
@@ -144,23 +145,26 @@ export function MainLayout({
         }
         treeSlot={<TreeView />}
         leftSlot={
-          <div className="flex h-full flex-col">
+          <SidebarGroup className="h-full gap-2 p-0">
             <div className="shrink-0 border-b border-border px-3 py-2">
               <Tabs value={leftMode} onValueChange={(value) => setLeftMode(value as typeof leftMode)}>
-                <TabsList className="w-full">
-                  <TabsTrigger value="layers" className="flex-1 text-xs">Layers</TabsTrigger>
-                  <TabsTrigger value="hierarchy" className="flex-1 text-xs">Army</TabsTrigger>
-                </TabsList>
+                <div className="flex items-center gap-2">
+                  <TabsList className="w-full">
+                    <TabsTrigger value="layers" className="flex-1 text-xs">Layers</TabsTrigger>
+                    <TabsTrigger value="hierarchy" className="flex-1 text-xs">Army</TabsTrigger>
+                  </TabsList>
+                  <SidebarTrigger className="h-8 w-8 shrink-0 [&>svg]:size-5" />
+                </div>
               </Tabs>
             </div>
-            <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
+            <SidebarGroupContent className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-2 pb-2">
               {leftMode === "layers" ? (
                 <LayersPanel readOnly={readOnly} />
               ) : (
                 <HierarchyPanel hiddenEntityIds={hiddenEntityIds} onToggleEntityVisible={handleToggleEntityVisible} />
               )}
-            </div>
-          </div>
+            </SidebarGroupContent>
+          </SidebarGroup>
         }
         headerPrimarySlot={
           <div className="flex min-w-0 items-center gap-2">
@@ -192,7 +196,7 @@ export function MainLayout({
                       : "Research all entities"
                 }
               >
-                <FlaskConical className="h-4 w-4" />
+                <FlaskConical />
                 <span className="sr-only">
                   {layeredResearch.status === "running" ? "Researching entities" : "Research all entities"}
                 </span>

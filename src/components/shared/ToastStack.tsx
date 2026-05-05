@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react"
+import { useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { AlertTriangle, X } from "lucide-react"
 
@@ -49,7 +49,7 @@ function ToastCard({ item, onDismiss }: ToastCardProps) {
 }
 
 export function ToastStack({ items, onDismiss }: ToastStackProps) {
-  const visibleItems = useMemo(() => items.slice(-3), [items])
+  const visibleItems = items.slice(-3)
 
   useEffect(() => {
     if (visibleItems.length === 0) return

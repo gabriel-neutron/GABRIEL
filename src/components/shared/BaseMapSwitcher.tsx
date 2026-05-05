@@ -33,7 +33,7 @@ export function BaseMapSwitcher() {
             className="flex items-center justify-between"
           >
             {LABELS[id]}
-            {baseMap === id ? <span className="text-xs text-muted-foreground">Active</span> : null}
+            {baseMap === id && <span className="text-xs text-muted-foreground">Active</span>}
           </DropdownMenuItem>
         ))}
       </DropdownMenuContent>

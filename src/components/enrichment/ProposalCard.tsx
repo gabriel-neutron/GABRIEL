@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import type { EnrichmentProposal } from "@/types/enrichment.types"
+import { formatValue } from "./formatValue"
 import { SourceTag } from "./SourceTag"
 
 type ProposalCardProps = {
@@ -8,13 +9,6 @@ type ProposalCardProps = {
   decision: "accepted" | "rejected" | "pending"
   onAccept: () => void
   onReject: () => void
-}
-
-function renderValue(value: unknown): string {
-  if (value === null || value === undefined || value === "") return "(empty)"
-  if (Array.isArray(value)) return value.join(", ")
-  if (typeof value === "object") return JSON.stringify(value)
-  return String(value)
 }
 
 type ValueBlockProps = {
@@ -28,18 +22,15 @@ type ValueBlockProps = {
 
 function ValueBlock({ label, value, tone, actionLabel, onAction, disabled }: ValueBlockProps) {
   const isCurrent = tone === "current"
+  const containerClass = isCurrent
+    ? "flex h-full flex-col rounded-md border border-destructive/30 bg-destructive/10 p-2.5"
+    : "flex h-full flex-col rounded-md border border-primary/30 bg-primary/10 p-2.5"
 
   return (
-    <section
-      className={
-        isCurrent
-          ? "flex h-full flex-col rounded-md border border-destructive/30 bg-destructive/10 p-2.5"
-          : "flex h-full flex-col rounded-md border border-primary/30 bg-primary/10 p-2.5"
-      }
-    >
+    <section className={containerClass}>
       <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
       <p className="mt-1 min-h-12 break-words whitespace-pre-wrap text-base font-medium leading-6 text-foreground">
-        {renderValue(value)}
+        {formatValue(value)}
       </p>
       <Button
         type="button"
@@ -51,30 +42,6 @@ function ValueBlock({ label, value, tone, actionLabel, onAction, disabled }: Val
       >
         {actionLabel}
       </Button>
-    </section>
-  )
-}
-
-function ProposalReasoning({ text }: { text: string }) {
-  return (
-    <section>
-      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Reasoning</p>
-      <p className="break-words text-sm leading-6 text-foreground">{text}</p>
-    </section>
-  )
-}
-
-function ProposalSources({ proposal }: { proposal: EnrichmentProposal }) {
-  return (
-    <section className="space-y-1">
-      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Sources</p>
-      <ul className="space-y-1">
-        {proposal.sources.map((source) => (
-          <li key={`${proposal.field}-${source.url}`}>
-            <SourceTag source={source} />
-          </li>
-        ))}
-      </ul>
     </section>
   )
 }
@@ -111,8 +78,22 @@ export function ProposalCard({
         />
       </div>
 
-      <ProposalReasoning text={proposal.reasoning} />
-      {proposal.sources.length > 0 && <ProposalSources proposal={proposal} />}
+      <section>
+        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Reasoning</p>
+        <p className="break-words text-sm leading-6 text-foreground">{proposal.reasoning}</p>
+      </section>
+      {proposal.sources.length > 0 && (
+        <section className="space-y-1">
+          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Sources</p>
+          <ul className="space-y-1">
+            {proposal.sources.map((source) => (
+              <li key={`${proposal.field}-${source.url}`}>
+                <SourceTag source={source} />
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
     </Card>
   )
 }

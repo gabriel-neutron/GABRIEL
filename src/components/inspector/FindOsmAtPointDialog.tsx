@@ -1,6 +1,5 @@
 import type { KeyboardEvent } from "react"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import type { OsmElementCandidate } from "@/components/inspector/useFindOsmAtPoint"
 import { useFindOsmAtPoint } from "@/components/inspector/useFindOsmAtPoint"
 
@@ -14,12 +13,9 @@ function getLanduseTypeLabel(tags: Record<string, string>): string | null {
 }
 
 function candidateLabel(el: OsmElementCandidate): string {
-  const name = el.tags?.name
-  if (name && typeof name === "string") return name
-  return `${el.type} ${el.id}`
+  return typeof el.tags?.name === "string" ? el.tags.name : `${el.type} ${el.id}`
 }
 
-/** Props for the presentational dialog (used in app via main component, and in Storybook for all states). */
 export type FindOsmAtPointDialogContentProps = {
   open: boolean
   onClose: () => void
@@ -29,7 +25,6 @@ export type FindOsmAtPointDialogContentProps = {
   onSelectRelation: (relationId: number) => void
 }
 
-/** Presentational dialog: shows loading / error / empty / list. No fetch logic. */
 export function FindOsmAtPointDialogContent({
   open,
   onClose,
@@ -47,35 +42,32 @@ export function FindOsmAtPointDialogContent({
     onSelectRelation(relationId)
   }
 
-  if (!open) return null
-
   return (
-    <div
-      className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/50"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="find-relations-dialog-title"
-    >
-      <Card className="w-full max-w-md">
-        <CardHeader className="flex flex-row items-center justify-between space-y-0">
-          <CardTitle id="find-relations-dialog-title">
+    <Dialog open={open} onOpenChange={(nextOpen) => !nextOpen && onClose()}>
+      <DialogContent className="z-[10000] max-w-md" showCloseButton>
+        <DialogHeader className="text-left">
+          <DialogTitle id="find-relations-dialog-title" className="text-base font-semibold">
             OSM at point (intersection + 100 m)
-          </CardTitle>
-          <Button size="sm" variant="ghost" onClick={onClose} aria-label="Close">
-            Close
-          </Button>
-        </CardHeader>
-        <CardContent>
+          </DialogTitle>
+        </DialogHeader>
+        <div className="max-h-[70vh] overflow-y-auto">
           {loading ? (
             <p className="text-sm text-muted-foreground">
               Searching intersection and nearby (100 m)…
             </p>
           ) : error ? (
-            <p className="text-sm text-destructive">{error}</p>
+            <div
+              role="alert"
+              className="space-y-1 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2"
+            >
+              <p className="text-sm font-medium text-destructive">Unable to search OSM elements</p>
+              <p className="text-xs text-destructive/90">{error}</p>
+              <p className="text-xs text-muted-foreground">Try again or select another point.</p>
+            </div>
           ) : candidates.length === 0 ? (
             <p className="text-sm text-muted-foreground">No OSM elements found.</p>
           ) : (
-            <ul className="m-0 flex list-none flex-col gap-2 p-0">
+            <ul className="m-0 flex max-h-[50vh] list-none flex-col gap-2 overflow-y-auto p-0 pr-1">
               {candidates.map((el) => {
                 const label = candidateLabel(el)
                 const landuseType = getLanduseTypeLabel(el.tags ?? {})
@@ -107,13 +99,12 @@ export function FindOsmAtPointDialogContent({
               })}
             </ul>
           )}
-        </CardContent>
-      </Card>
-    </div>
+        </div>
+      </DialogContent>
+    </Dialog>
   )
 }
 
-/** Main component: opens when user clicks "Find OSM at point", fetches at (lat, lng), shows loading then list. Use in app. */
 export function FindOsmAtPointDialog({
   open,
   onClose,

@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
-import { Card } from "@/components/ui/card"
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { shouldSkipEntity } from "@/services/research/entity-richness"
 import type { MapEntity } from "@/types/domain.types"
 import type { EntityResearchStatus } from "@/hooks/useLayeredResearch"
@@ -132,18 +132,6 @@ export function ResearchDialog({
     el?.scrollIntoView({ block: "nearest", behavior: "smooth" })
   }, [progress])
 
-  // Close on Escape
-  useEffect(() => {
-    if (!open) return
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape" && runStatus !== "running") onClose()
-    }
-    window.addEventListener("keydown", onKey)
-    return () => window.removeEventListener("keydown", onKey)
-  }, [open, onClose, runStatus])
-
-  if (!open) return null
-
   const isRunning = runStatus === "running"
   const totalTokens = totalUsage.inputTokens + totalUsage.outputTokens
   const progressPct = progress ? Math.round(((progress.done + 1) / progress.total) * 100) : 0
@@ -159,23 +147,25 @@ export function ResearchDialog({
     : `Start research (${Math.min(batchSize, eligibleEntities.length)} entities)`
 
   return (
-    <div className="fixed inset-0 z-[11000] flex items-center justify-center bg-black/50 p-4">
-      <Card className="flex w-full max-w-2xl flex-col overflow-hidden shadow-2xl">
-        {/* Header */}
-        <div className="flex shrink-0 items-center justify-between border-b px-4 py-3">
-          <h2 className="text-base font-semibold">Research all entities</h2>
-          <Button
-            type="button"
-            size="sm"
-            variant="ghost"
-            onClick={onClose}
-            disabled={isRunning}
-            className="h-7 px-2"
-          >
-            Close
-          </Button>
-        </div>
-
+    <Dialog
+      open={open}
+      onOpenChange={(nextOpen) => {
+        if (nextOpen) return
+        if (!isRunning) onClose()
+      }}
+    >
+      <DialogContent
+        className="z-[11000] max-w-2xl overflow-hidden p-0 shadow-2xl"
+        onInteractOutside={(event) => {
+          if (isRunning) event.preventDefault()
+        }}
+        onEscapeKeyDown={(event) => {
+          if (isRunning) event.preventDefault()
+        }}
+      >
+        <DialogHeader className="border-b px-4 py-3 text-left">
+          <DialogTitle className="text-base font-semibold">Research all entities</DialogTitle>
+        </DialogHeader>
         <div className="flex min-h-0 flex-col gap-3 overflow-y-auto p-4">
           {/* Config row — hidden while running */}
           {!isRunning && (
@@ -326,7 +316,7 @@ export function ResearchDialog({
           </div>
         </div>
 
-        <div className="flex shrink-0 items-center justify-between border-t px-4 py-3">
+        <DialogFooter className="flex shrink-0 items-center justify-between border-t px-4 py-3 sm:justify-between">
           <div className="flex gap-2">
             {isRunning ? (
               <Button type="button" size="sm" variant="outline" onClick={onCancel}>
@@ -348,8 +338,8 @@ export function ResearchDialog({
           >
             {isRunning ? "Running…" : startLabel}
           </Button>
-        </div>
-      </Card>
-    </div>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }

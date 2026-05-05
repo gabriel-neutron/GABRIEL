@@ -4,7 +4,6 @@ import { Marker, Popup } from "react-leaflet"
 import { getRenderedSymbolForEntity } from "@/services/symbol.service"
 import { useProjectStore } from "@/store/useProjectStore"
 import type { LatLng } from "@/types/coordinates"
-import type { MapEntity } from "@/types/domain.types"
 import type { MapBounds } from "./MapBoundsReporter"
 
 const BOUNDS_BUFFER = 0.5
@@ -15,41 +14,7 @@ type Props = {
   hiddenEntityIds?: Set<string>
   onSelectEntity: (id: string | null) => void
   mapBounds?: MapBounds | null
-}
-
-type SymbolsMarkersViewProps = {
-  markerItems: Array<{
-    entity: MapEntity
-    position: LatLng
-    cacheKey: string
-    opacity: number
-  }>
-  icons: Map<string, L.Icon>
-  onSelectEntity: (id: string | null) => void
-}
-
-function SymbolsMarkersView({ markerItems, icons, onSelectEntity }: SymbolsMarkersViewProps) {
-  return (
-    <>
-      {markerItems.map((item) => {
-        const icon = icons.get(item.cacheKey)
-        if (!icon) return null
-        return (
-          <Marker
-            key={item.entity.id}
-            position={item.position}
-            icon={icon}
-            opacity={item.opacity}
-            eventHandlers={{
-              click: () => onSelectEntity(item.entity.id),
-            }}
-          >
-            <Popup>{item.entity.name}</Popup>
-          </Marker>
-        )
-      })}
-    </>
-  )
+  interactive?: boolean
 }
 
 function makeSymbolIcon(
@@ -72,6 +37,7 @@ export function SymbolsLayer({
   hiddenEntityIds,
   onSelectEntity,
   mapBounds,
+  interactive = true,
 }: Props): React.ReactElement {
   const entities = useProjectStore((s) => s.entities)
 
@@ -126,5 +92,30 @@ export function SymbolsLayer({
     })
   }, [markerItems])
 
-  return <SymbolsMarkersView markerItems={markerItems} icons={icons} onSelectEntity={onSelectEntity} />
+  return (
+    <>
+      {markerItems.map((item) => {
+        const icon = icons.get(item.cacheKey)
+        if (!icon) return null
+        return (
+          <Marker
+            key={item.entity.id}
+            position={item.position}
+            icon={icon}
+            opacity={item.opacity}
+            interactive={interactive}
+            eventHandlers={
+              interactive
+                ? {
+                    click: () => onSelectEntity(item.entity.id),
+                  }
+                : undefined
+            }
+          >
+            <Popup>{item.entity.name}</Popup>
+          </Marker>
+        )
+      })}
+    </>
+  )
 }

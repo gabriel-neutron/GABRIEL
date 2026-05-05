@@ -13,6 +13,7 @@ const NETWORK_LINE_OPTIONS = {
 
 type Props = {
   positionMap: Map<string, LatLng>
+  interactive?: boolean
 }
 
 const MAX_DEGREE = 3
@@ -22,6 +23,17 @@ function visibleNetworkIds(
   entities: MapEntity[]
 ): Set<string> {
   const byId = new Map(entities.map((e) => [e.id, e]))
+  const childrenByParent = new Map<string, string[]>()
+  for (const entity of entities) {
+    if (!entity.parentId) continue
+    const children = childrenByParent.get(entity.parentId)
+    if (children) {
+      children.push(entity.id)
+    } else {
+      childrenByParent.set(entity.parentId, [entity.id])
+    }
+  }
+
   const visible = new Set<string>([selectedId])
 
   let current: MapEntity | undefined = byId.get(selectedId)
@@ -34,11 +46,11 @@ function visibleNetworkIds(
   for (let depth = 0; depth < MAX_DEGREE && frontier.length > 0; depth++) {
     const next: string[] = []
     for (const id of frontier) {
-      for (const e of entities) {
-        if (e.parentId === id) {
-          visible.add(e.id)
-          next.push(e.id)
-        }
+      const children = childrenByParent.get(id)
+      if (!children) continue
+      for (const childId of children) {
+        visible.add(childId)
+        next.push(childId)
       }
     }
     frontier = next
@@ -47,7 +59,10 @@ function visibleNetworkIds(
   return visible
 }
 
-export function NetworkLinksLayer({ positionMap }: Props): React.ReactElement | null {
+export function NetworkLinksLayer({
+  positionMap,
+  interactive = true,
+}: Props): React.ReactElement | null {
   const entities = useProjectStore((s) => s.entities)
   const selectedEntityId = useProjectStore((s) => s.selectedEntityId)
   const showNetworks = useProjectStore((s) => s.showNetworks)
@@ -80,7 +95,11 @@ export function NetworkLinksLayer({ positionMap }: Props): React.ReactElement | 
   return (
     <>
       {links.map(({ key, positions }) => (
-        <Polyline key={key} positions={positions} pathOptions={NETWORK_LINE_OPTIONS} />
+        <Polyline
+          key={key}
+          positions={positions}
+          pathOptions={{ ...NETWORK_LINE_OPTIONS, interactive }}
+        />
       ))}
     </>
   )

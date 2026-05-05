@@ -72,6 +72,7 @@ function EntityNode({
   onToggleEntityVisible,
   onToggleExpanded,
 }: NodeProps) {
+  const isRoot = depth === 0
   const children = getOrderedEntities(
     entities.filter((e) => e.parentId === entity.id),
     entities,
@@ -90,64 +91,79 @@ function EntityNode({
   }
 
   return (
-    <div>
+    <div className={isRoot ? "rounded-md border" : undefined}>
       <div
-        className="flex items-center gap-1 rounded px-2 py-0.5"
-        style={{ paddingLeft: `${8 + depth * 16}px` }}
+        className="flex items-center justify-between gap-2 px-3 py-2 transition-colors duration-150 hover:bg-muted/40 focus-within:bg-muted/40"
+        style={{ paddingLeft: `${12 + depth * 16}px` }}
       >
-        <button
-          type="button"
-          className="flex h-5 w-5 shrink-0 items-center justify-center text-muted-foreground"
-          onClick={() => onToggleExpanded(entity.id)}
-          aria-label={expanded ? "Collapse" : "Expand"}
-          disabled={!hasKids}
-        >
-          {hasKids ? (expanded ? "▾" : "▸") : ""}
-        </button>
+        <div className="flex min-w-0 flex-1 items-center gap-2">
+          <button
+            type="button"
+            className="flex shrink-0 items-center justify-center text-muted-foreground transition-transform duration-150 active:scale-95 disabled:opacity-0"
+            onClick={() => onToggleExpanded(entity.id)}
+            aria-label={expanded ? "Collapse" : "Expand"}
+            disabled={!hasKids}
+          >
+            {hasKids ? (expanded ? "▾" : "▸") : ""}
+          </button>
 
-        <button
-          type="button"
-          onClick={handleSelectEntity}
-          className={`min-w-0 flex-1 truncate rounded px-1 py-0.5 text-left text-xs transition-colors hover:bg-muted ${
-            isSelected ? "bg-primary/15 font-medium text-primary" : ""
-          } ${effectivelyHidden ? "opacity-40" : ""}`}
-          title={entity.name}
-        >
-          {entity.name}
-        </button>
+          <button
+            type="button"
+            onClick={handleSelectEntity}
+            className={`min-w-0 flex-1 truncate text-left text-sm font-medium transition-colors ${
+              isSelected ? "text-foreground" : ""
+            } ${effectivelyHidden ? "opacity-40" : ""}`}
+            title={entity.name}
+          >
+            {entity.name}
+          </button>
+        </div>
 
         <Button
           type="button"
           variant="ghost"
           size="icon-xs"
-          className="h-5 w-5 shrink-0 text-muted-foreground"
+          className="h-5 w-5 shrink-0 text-muted-foreground transition-transform duration-150 active:scale-95"
           onClick={() => onToggleEntityVisible(entity.id, isHidden)}
           title={isHidden ? "Show" : "Hide"}
           disabled={ancestorHidden}
         >
-          {isHidden || ancestorHidden ? (
-            <EyeOff className="h-3 w-3" />
-          ) : (
-            <Eye className="h-3 w-3" />
-          )}
+          <span className="relative h-3 w-3">
+            <Eye
+              className={`absolute inset-0 h-3 w-3 transition-all duration-150 ${
+                isHidden || ancestorHidden ? "scale-75 opacity-0" : "scale-100 opacity-100"
+              }`}
+            />
+            <EyeOff
+              className={`absolute inset-0 h-3 w-3 transition-all duration-150 ${
+                isHidden || ancestorHidden ? "scale-100 opacity-100" : "scale-75 opacity-0"
+              }`}
+            />
+          </span>
         </Button>
       </div>
 
-      {expanded && children.length > 0 && (
-        <div>
-          {children.map((child) => (
-            <EntityNode
-              key={child.id}
-              entity={child}
-              depth={depth + 1}
-              entities={entities}
-              selectedEntityId={selectedEntityId}
-              hiddenEntityIds={hiddenEntityIds}
-              expandedIds={expandedIds}
-              onToggleEntityVisible={onToggleEntityVisible}
-              onToggleExpanded={onToggleExpanded}
-            />
-          ))}
+      {hasKids && (
+        <div
+          className={`grid overflow-hidden transition-[grid-template-rows,opacity] duration-150 ease-out ${
+            expanded ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"
+          }`}
+        >
+          <div className={`min-h-0 overflow-hidden ${isRoot ? "border-t bg-muted/30" : ""}`}>
+            {children.map((child) => (
+              <EntityNode
+                key={child.id}
+                entity={child}
+                depth={depth + 1}
+                entities={entities}
+                selectedEntityId={selectedEntityId}
+                hiddenEntityIds={hiddenEntityIds}
+                expandedIds={expandedIds}
+                onToggleEntityVisible={onToggleEntityVisible}
+                onToggleExpanded={onToggleExpanded}
+              />
+            ))}
+          </div>
         </div>
       )}
     </div>
@@ -180,33 +196,33 @@ export function HierarchyPanel({ hiddenEntityIds, onToggleEntityVisible }: Props
     for (const entity of entities) onToggleEntityVisible(entity.id, visible)
   }
 
-  const roots = entities.filter((e) => e.parentId == null)
-  const orderedRoots = getOrderedEntities(roots, entities)
+  const orderedRoots = getOrderedEntities(
+    entities.filter((e) => e.parentId == null),
+    entities,
+  )
 
   return (
     <div className="flex min-w-0 flex-col">
       <HierarchyPanelHeader anyVisible={anyVisible} onToggleAllVisibility={handleToggleAllVisibility} />
-      <div className="min-h-0 flex-1 space-y-px overflow-y-auto p-2">
-        {roots.length === 0 ? (
+      <div className="min-h-0 flex-1 space-y-1 overflow-y-auto p-4">
+        {orderedRoots.length === 0 ? (
           <div className="px-2 py-4 text-center text-xs text-muted-foreground">
             No units without a parent
           </div>
         ) : (
-          <>
-            {orderedRoots.map((root) => (
-              <EntityNode
-                key={root.id}
-                entity={root}
-                depth={0}
-                entities={entities}
-                selectedEntityId={selectedEntityId}
-                hiddenEntityIds={hiddenEntityIds}
-                expandedIds={expandedIds}
-                onToggleEntityVisible={onToggleEntityVisible}
-                onToggleExpanded={handleToggleExpanded}
-              />
-            ))}
-          </>
+          orderedRoots.map((root) => (
+            <EntityNode
+              key={root.id}
+              entity={root}
+              depth={0}
+              entities={entities}
+              selectedEntityId={selectedEntityId}
+              hiddenEntityIds={hiddenEntityIds}
+              expandedIds={expandedIds}
+              onToggleEntityVisible={onToggleEntityVisible}
+              onToggleExpanded={handleToggleExpanded}
+            />
+          ))
         )}
       </div>
     </div>

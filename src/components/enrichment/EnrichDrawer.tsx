@@ -1,6 +1,13 @@
-import { useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogOverlay,
+  DialogPortal,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { Textarea } from "@/components/ui/textarea"
 import type { MapEntity } from "@/types/domain.types"
 import type {
@@ -9,6 +16,7 @@ import type {
   EnrichmentProposal,
   UnresolvedReason,
 } from "@/types/enrichment.types"
+import { formatValue } from "./formatValue"
 import { ProposalCard } from "./ProposalCard"
 import { SourceTag } from "./SourceTag"
 
@@ -48,23 +56,13 @@ function formatAnalyzedAt(value: string | null | undefined): string {
 }
 
 function reasonBadgeLabel(reason: UnresolvedReason): string {
-  switch (reason) {
-    case "conflict":
-      return "Conflict"
-    case "stale":
-      return "Stale"
-    case "no-evidence":
-      return "No evidence"
-    default:
-      return "Other"
+  const labels: Record<UnresolvedReason, string> = {
+    conflict: "Conflict",
+    stale: "Stale",
+    "no-evidence": "No evidence",
+    other: "Other",
   }
-}
-
-function renderConflictValue(value: unknown): string {
-  if (value === null || value === undefined || value === "") return "(empty)"
-  if (Array.isArray(value)) return value.join(", ")
-  if (typeof value === "object") return JSON.stringify(value)
-  return String(value)
+  return labels[reason]
 }
 
 type EnrichDrawerSidebarProps = {
@@ -90,26 +88,28 @@ function EnrichDrawerSidebar({
   onPromptChange,
   onRun,
 }: EnrichDrawerSidebarProps) {
+  const entityRows = [
+    ["Entity", entity.name],
+    ["Parent", context?.parent?.name ?? "None"],
+    ["Children", renderChildren(context)],
+    ["Last analyzed", formatAnalyzedAt(entity.analyzedAt)],
+  ] as const
+
   return (
     <div className="min-h-0 space-y-2 overflow-y-auto pr-1">
       <Card className="p-2.5">
         <div className="space-y-1 text-sm">
-          <div className="rounded-md border bg-muted/30 px-2 py-1 font-medium">Entity: {entity.name}</div>
-          <div className="rounded-md border bg-muted/30 px-2 py-1 font-medium">
-            Parent: {context?.parent?.name ?? "None"}
-          </div>
-          <div className="rounded-md border bg-muted/30 px-2 py-1 font-medium">
-            Children: {renderChildren(context)}
-          </div>
-          <div className="rounded-md border bg-muted/30 px-2 py-1 font-medium">
-            Last analyzed: {formatAnalyzedAt(entity.analyzedAt)}
-          </div>
+          {entityRows.map(([label, value]) => (
+            <div key={label} className="rounded-md border bg-muted/30 px-2 py-1 font-medium">
+              {label}: {value}
+            </div>
+          ))}
         </div>
       </Card>
 
       <Card className="p-2.5">
         <div>
-          <label htmlFor="enrichment-prompt" className="text-sm font-medium">
+          <label htmlFor="enrichment-prompt" className="font-medium">
             Research prompt
           </label>
         </div>
@@ -126,23 +126,23 @@ function EnrichDrawerSidebar({
       </Card>
 
       {(status === "running" || queryTrace.length > 0 || errorMessage) && (
-        <Card className="space-y-2 p-2.5">
+        <Card className="p-2.5">
           {status === "running" && (
             <p className="text-sm font-medium text-muted-foreground">
               Processing hop {depthUsed || 1} in auto-depth mode
             </p>
           )}
           {queryTrace.length > 0 && (
-            <div className="rounded-md border bg-muted/30 p-2.5 text-xs">
-              <p className="font-medium">Query trace</p>
-              <ul className="mt-1.5 list-disc space-y-0.5 pl-4">
-                {queryTrace.map((query, index) => (
-                  <li key={`${query}-${index}`} className="break-words">
-                    {query}
-                  </li>
-                ))}
-              </ul>
-            </div>
+            <>
+            <p className="font-medium">Query trace</p>
+            <ul className="list-disc space-y-0.5 pl-4">
+              {queryTrace.map((query, index) => (
+                <li key={`${query}-${index}`} className="break-words">
+                  {query}
+                </li>
+              ))}
+            </ul>
+            </>
           )}
           {errorMessage && <p className="text-xs text-muted-foreground">Error details shown in header.</p>}
         </Card>
@@ -173,41 +173,31 @@ export function EnrichDrawer({
   onAccept,
   onReject,
 }: EnrichDrawerProps) {
-  useEffect(() => {
-    if (!open) return
-    function handleEscape(event: KeyboardEvent) {
-      if (event.key === "Escape") onClose()
-    }
-    window.addEventListener("keydown", handleEscape)
-    return () => window.removeEventListener("keydown", handleEscape)
-  }, [onClose, open])
+  if (!entity) return null
 
-  if (!open || !entity) return null
-
+  const isRunning = status === "running"
   const visibleProposals = proposals.filter(
     (proposal) => (decisions[proposal.field] ?? "pending") === "pending",
   )
   const hasProposals = visibleProposals.length > 0
 
   return (
-    <div className="fixed inset-0 z-[11000] bg-black/50 backdrop-blur-sm">
-      <div className="flex h-full items-end sm:items-center sm:justify-center sm:p-4">
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="enrich-dialog-title"
+    <Dialog open={open} onOpenChange={(nextOpen) => !nextOpen && onClose()}>
+      <DialogPortal>
+        <DialogOverlay className="z-[10990]" />
+        <DialogContent
           aria-describedby="enrich-dialog-status"
-          className="flex h-[100dvh] w-full flex-col overflow-hidden border bg-card shadow-2xl sm:h-[92vh] sm:max-w-6xl sm:rounded-xl"
+          showCloseButton={false}
+          className="z-[11000] h-dvh w-dvw max-w-none overflow-hidden rounded-none border-0 bg-card p-0 md:h-[92vh] md:w-[92vw] md:max-w-6xl md:rounded-lg md:border"
         >
-          <div className="sticky top-0 z-20 shrink-0 border-b bg-card/95 px-3 py-2 backdrop-blur supports-[backdrop-filter]:bg-card/80 sm:px-4">
+        <div className="flex h-full min-h-0 flex-col">
+          <DialogHeader className="sticky top-0 z-20 shrink-0 border-b bg-card/95 px-3 py-2 text-left backdrop-blur supports-[backdrop-filter]:bg-card/80 sm:px-4">
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0">
-                <h3 id="enrich-dialog-title" className="truncate text-base font-semibold tracking-tight sm:text-lg">
+                <DialogTitle id="enrich-dialog-title" className="truncate text-base font-semibold tracking-tight sm:text-lg">
                   Enrich: {entity.name}
-                </h3>
-                <p className="text-xs text-muted-foreground">
-                  Last analyzed: {formatAnalyzedAt(entity.analyzedAt)}
-                </p>
+                </DialogTitle>
+                <p className="text-xs text-muted-foreground">Last analyzed: {formatAnalyzedAt(entity.analyzedAt)}</p>
               </div>
               <Button type="button" variant="ghost" onClick={onClose} className="h-8 px-2.5">
                 Close
@@ -223,7 +213,7 @@ export function EnrichDrawer({
                 {closeNotice}
               </p>
             )}
-          </div>
+          </DialogHeader>
 
           <div className="min-h-0 flex-1 overflow-hidden p-2 sm:p-2.5">
             <div className="grid h-full min-h-0 gap-2 lg:grid-cols-[320px_minmax(0,1fr)]">
@@ -252,15 +242,13 @@ export function EnrichDrawer({
                   ))
                 ) : (
                   <Card className="border-dashed text-center">
-                    <p className="text-sm font-medium">
-                      {status === "running" ? "Enrichment is running..." : "No proposals"}
-                    </p>
+                    <p className="text-sm font-medium">{isRunning ? "Enrichment is running..." : "No proposals"}</p>
                   </Card>
                 )}
 
                 {unresolvedFields.length > 0 && (
-                  <Card className="text-sm">
-                    <p className="font-medium px-2.5 pt-2.5">Unresolved fields</p>
+                  <Card className="text-sm py-2">
+                    <p className="font-medium px-2.5">Unresolved fields</p>
                     <ul className="mt-2 space-y-3 px-2.5 pb-2.5">
                       {unresolvedFields.map((field) => {
                         const reason = unresolvedReasons[field] ?? "no-evidence"
@@ -278,7 +266,7 @@ export function EnrichDrawer({
                                 {rows.map((row, index) => (
                                   <div key={`${field}-c-${index}`} className="space-y-1">
                                     <p className="text-xs text-muted-foreground">Candidate</p>
-                                    <p className="break-words text-sm font-medium">{renderConflictValue(row.value)}</p>
+                                    <p className="break-words text-sm font-medium">{formatValue(row.value)}</p>
                                     <ul className="flex flex-wrap gap-1">
                                       {row.sources.map((source) => (
                                         <li key={`${field}-c-${index}-${source.url}`}>
@@ -297,7 +285,7 @@ export function EnrichDrawer({
                   </Card>
                 )}
                 {notes !== "" && (
-                  <Card className="text-sm">
+                  <Card className="text-sm py-2">
                     <p className="font-medium px-2.5">Notes</p>
                     <p className="mt-0.5 break-words text-muted-foreground px-2.5">{notes}</p>
                   </Card>
@@ -306,7 +294,8 @@ export function EnrichDrawer({
             </div>
           </div>
         </div>
-      </div>
-    </div>
+        </DialogContent>
+      </DialogPortal>
+    </Dialog>
   )
 }

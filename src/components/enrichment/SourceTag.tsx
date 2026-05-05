@@ -21,17 +21,16 @@ function formatPublished(iso: string): string {
 
 export function SourceTag({ source }: SourceTagProps) {
   const title = source.title.trim()
-  let sourceName = title
-  if (sourceName === "") {
+  const sourceName = title || (() => {
     try {
-      sourceName = new URL(source.url).hostname.replace(/^www\./, "")
+      return new URL(source.url).hostname.replace(/^www\./, "")
     } catch {
-      sourceName = source.url
+      return source.url
     }
-  }
-
-  const published = source.publishedAt?.trim()
-  const stale = published != null && published.length > 0 && isPublishedStale(published)
+  })()
+  const published = source.publishedAt?.trim() ?? ""
+  const hasPublished = published !== ""
+  const stale = hasPublished && isPublishedStale(published)
 
   return (
     <span className="inline-flex max-w-full flex-col gap-0.5">
@@ -45,7 +44,7 @@ export function SourceTag({ source }: SourceTagProps) {
       >
         <span className="truncate">{sourceName}</span>
       </a>
-      {published != null && published.length > 0 && (
+      {hasPublished && (
         <span className="flex flex-wrap items-center gap-1 pl-0.5 text-[10px] text-muted-foreground">
           <span>{formatPublished(published)}</span>
           {stale && (

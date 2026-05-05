@@ -16,8 +16,9 @@ export function TreeView() {
   )
 
   const { nodes, edges } = useMemo(() => {
-    const nodeMap = new Map<string, Node>()
+    const nodeList: Node[] = []
     const edgeList: Edge[] = []
+    const entitiesById = new Map(entities.map((entity) => [entity.id, entity]))
 
     const childrenByParent = new Map<string | null, MapEntity[]>()
     for (const entity of entities) {
@@ -61,32 +62,42 @@ export function TreeView() {
       layoutEntity(root)
     }
 
+    const depthById = new Map<string, number>()
+    function getDepth(entity: MapEntity): number {
+      const cachedDepth = depthById.get(entity.id)
+      if (cachedDepth != null) return cachedDepth
+      if (entity.parentId == null) {
+        depthById.set(entity.id, 0)
+        return 0
+      }
+      const parent = entitiesById.get(entity.parentId)
+      if (!parent) {
+        depthById.set(entity.id, 0)
+        return 0
+      }
+      const depth = getDepth(parent) + 1
+      depthById.set(entity.id, depth)
+      return depth
+    }
+
     for (const entity of entities) {
       const nodeId = String(entity.id)
       const xIndex = xIndexById.get(entity.id)
 
       if (xIndex == null) continue
 
-      let depth = 0
-      let currentParentId = entity.parentId
-      while (currentParentId != null) {
-        const parent = entities.find((e) => e.id === currentParentId)
-        if (!parent) break
-        depth += 1
-        currentParentId = parent.parentId
-      }
-
       const position = {
         x: xIndex * H_SPACING,
-        y: depth * V_SPACING,
+        y: getDepth(entity) * V_SPACING,
       }
 
-      nodeMap.set(nodeId, {
+      nodeList.push({
         id: nodeId,
         type: "militarySymbol",
         className: "tree-symbol-node",
         position,
         data: { label: entity.name, entity },
+        selected: nodeId === selectedEntityId,
         sourcePosition: Position.Bottom,
         targetPosition: Position.Top,
       })
@@ -100,15 +111,8 @@ export function TreeView() {
       }
     }
 
-    return { nodes: Array.from(nodeMap.values()), edges: edgeList }
-  }, [entities])
-
-  const nodesWithSelection = useMemo(() => {
-    return nodes.map((node) => ({
-      ...node,
-      selected: node.id === selectedEntityId,
-    }))
-  }, [nodes, selectedEntityId])
+    return { nodes: nodeList, edges: edgeList }
+  }, [entities, selectedEntityId])
 
   const handleNodeClick = useCallback((_: React.MouseEvent, node: Node) => {
     const s = useProjectStore.getState()
@@ -125,7 +129,7 @@ export function TreeView() {
   return (
     <div className="h-full w-full">
       <ReactFlow
-        nodes={nodesWithSelection}
+        nodes={nodes}
         edges={edges}
         nodeTypes={nodeTypes}
         defaultEdgeOptions={{ type: "smoothstep" }}

@@ -1,10 +1,19 @@
-import { useRef, useState, type ChangeEvent, type ReactNode } from "react"
-import { Ellipsis } from "lucide-react"
+import { useEffect, useRef, useState, type ChangeEvent, type ReactNode } from "react"
+import { Ellipsis, X } from "lucide-react"
 
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarProvider,
+  SidebarTrigger,
+  useSidebar,
+} from "@/components/ui/sidebar"
+import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet"
+import { useIsMobile } from "@/hooks/use-mobile"
 import { cn } from "@/lib/utils"
 import { useTheme } from "@/provider/theme-provider"
 import { AiProviderSettingsDialog } from "./AiProviderSettingsDialog"
@@ -36,6 +45,19 @@ type Props = {
   onSwitchToView?: () => void
 }
 
+function StandaloneSidebarToggle() {
+  const { open, isMobile } = useSidebar()
+  if (open && !isMobile) return null
+
+  return (
+    <div className="absolute top-2 left-2 z-[1200]">
+      <SidebarTrigger
+        className="h-8 w-8 rounded border border-border bg-background text-foreground shadow-md hover:bg-accent hover:text-foreground [&>svg]:size-5"
+      />
+    </div>
+  )
+}
+
 export function AppShell({
   mapSlot,
   treeSlot,
@@ -58,10 +80,15 @@ export function AppShell({
 }: Props) {
   const [activeView, setActiveView] = useState<"map" | "tree">("map")
   const [aiSettingsOpen, setAiSettingsOpen] = useState(false)
+  const [mobileDetailOpen, setMobileDetailOpen] = useState(false)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const { theme } = useTheme()
-  const isDark = theme === "dark"
+  const isMobile = useIsMobile()
   const rightPanelOpen = selectedEntityId !== null || selectedOsmObject !== null
+
+  useEffect(() => {
+    if (rightPanelOpen) setMobileDetailOpen(true)
+  }, [rightPanelOpen])
 
   function handleViewChange(value: string) {
     setActiveView(value as "map" | "tree")
@@ -73,15 +100,20 @@ export function AppShell({
     event.currentTarget.value = ""
   }
 
+  function handleCloseDetail() {
+    setMobileDetailOpen(false)
+    onCloseDetail()
+  }
+
   return (
-    <div className="flex h-dvh w-dvw min-w-0 flex-col bg-background text-foreground">
+    <SidebarProvider defaultOpen className="h-dvh flex-col bg-background text-foreground [--app-header-height:56px]">
       <header className="relative z-[100] border-b border-border">
         <div className="flex min-h-14 items-center justify-between gap-3 px-5 py-2">
           <div className="flex shrink-0 items-center gap-3">
             <img
               src="/favicon.svg"
               alt="Gabriel"
-              className={cn("h-8 w-8 shrink-0", isDark && "invert")}
+              className={cn("h-8 w-8 shrink-0", theme === "dark" && "invert")}
               aria-hidden
             />
             <Tabs value={activeView} onValueChange={handleViewChange}>
@@ -122,7 +154,7 @@ export function AppShell({
                   size="sm"
                   variant="outline"
                   disabled={busy}
-                  onClick={() => projectFileActions?.onNewProject()}
+                  onClick={projectFileActions?.onNewProject}
                   title="New project"
                 >
                   New
@@ -137,17 +169,18 @@ export function AppShell({
                   Open
                 </Button>
                 <Button
+                  type="button"
                   size="sm"
-                  variant="secondary"
+                  variant="outline"
                   disabled={busy}
-                  onClick={() => projectFileActions?.onSaveProject()}
+                  onClick={projectFileActions?.onSaveProject}
                   title="Save project"
                 >
                   Save
                 </Button>
               </>
             )}
-            {headerMenuSlot ? (
+            {headerMenuSlot && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button type="button" size="icon" variant="outline" title="More actions">
@@ -204,7 +237,7 @@ export function AppShell({
                   )}
                 </DropdownMenuContent>
               </DropdownMenu>
-            ) : null}
+            )}
           </div>
         </div>
 
@@ -227,37 +260,60 @@ export function AppShell({
         )}
       </header>
 
-      <div
-        className="grid min-h-0 min-w-0 flex-1"
-        style={{
-          gridTemplateColumns: `320px 1fr ${rightPanelOpen ? "360px" : "0px"}`,
-        }}
-      >
-        <aside className="flex min-h-0 min-w-0 flex-col overflow-hidden border-r border-border">
-          <div className="min-h-0 w-full flex-1 overflow-y-auto overflow-x-hidden">{leftSlot}</div>
-        </aside>
+      <div className="flex min-h-0 min-w-0 flex-1">
+        <Sidebar
+          collapsible="offcanvas"
+          variant="sidebar"
+          className="z-[90] top-[var(--app-header-height)] h-[calc(100dvh-var(--app-header-height))]"
+        >
+          <SidebarContent className="min-h-0 w-full flex-1 overflow-y-auto overflow-x-hidden px-2 pb-2">
+            {leftSlot}
+          </SidebarContent>
+        </Sidebar>
 
-        <main className="min-w-0">
+        <main className="relative min-h-0 min-w-0 flex-1">
+          <StandaloneSidebarToggle />
           <div className="h-full min-w-0">{activeView === "map" ? mapSlot : treeSlot}</div>
         </main>
 
         <aside
-          className={
+          className={cn(
+            "hidden min-h-0 shrink-0 flex-col overflow-hidden bg-sidebar text-sidebar-foreground transition-[width,transform] duration-200 ease-linear md:flex",
             rightPanelOpen
-              ? "flex min-h-0 min-w-0 flex-col overflow-hidden border-l border-border bg-sidebar text-sidebar-foreground"
-              : "hidden"
-          }
+              ? "w-[clamp(320px,24vw,460px)] min-w-[320px] max-w-[460px] translate-x-0 border-l border-border"
+              : "w-0 min-w-0 max-w-0 translate-x-full border-l-0",
+          )}
+          aria-hidden={!rightPanelOpen}
         >
-          <div className="flex shrink-0 items-center justify-between gap-2 border-b border-border px-2 py-1">
-            <div className="flex min-w-0 items-center gap-2">{detailHeaderActions}</div>
-            <Button size="sm" variant="ghost" onClick={onCloseDetail} title="Close detail">
-              Close
-            </Button>
-          </div>
-          <div className="min-h-0 w-full flex-1 overflow-y-auto overflow-x-hidden">{rightSlot}</div>
+          {rightPanelOpen && (
+            <div className="flex shrink-0 items-center justify-between gap-2 border-b border-border px-2 py-1">
+              <div className="flex min-w-0 items-center gap-2">{detailHeaderActions}</div>
+              <Button type="button" size="icon" variant="ghost" onClick={handleCloseDetail} title="Close detail">
+                <X className="h-4 w-4" />
+                <span className="sr-only">Close detail</span>
+              </Button>
+            </div>
+          )}
+          {rightPanelOpen && <div className="min-h-0 w-full flex-1 overflow-y-auto overflow-x-hidden">{rightSlot}</div>}
         </aside>
       </div>
+
+      <Sheet open={isMobile && rightPanelOpen && mobileDetailOpen} onOpenChange={(open) => !open && handleCloseDetail()}>
+        <SheetContent side="right" className="h-dvh w-dvw max-w-none rounded-none p-0 md:hidden">
+          <SheetTitle className="sr-only">Detail</SheetTitle>
+          <div className="flex h-full min-h-0 flex-col bg-sidebar text-sidebar-foreground">
+            <div className="flex shrink-0 items-center justify-between gap-2 border-b border-border px-2 py-1">
+              <div className="flex min-w-0 items-center gap-2">{detailHeaderActions}</div>
+              <Button type="button" size="icon" variant="ghost" onClick={handleCloseDetail} title="Close detail">
+                <X className="h-4 w-4" />
+                <span className="sr-only">Close detail</span>
+              </Button>
+            </div>
+            <div className="min-h-0 w-full flex-1 overflow-y-auto overflow-x-hidden">{rightSlot}</div>
+          </div>
+        </SheetContent>
+      </Sheet>
       <AiProviderSettingsDialog open={aiSettingsOpen} onClose={() => setAiSettingsOpen(false)} />
-    </div>
+    </SidebarProvider>
   )
 }

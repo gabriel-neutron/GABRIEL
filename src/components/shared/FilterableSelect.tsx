@@ -32,41 +32,37 @@ export function FilterableSelect({
   className,
 }: FilterableSelectProps) {
   const [selectedEchelon, setSelectedEchelon] = React.useState<string | null>(null)
+  const echelonOrder = React.useMemo(
+    () => ECHELON_OPTIONS.map((option) => option.value),
+    [],
+  )
 
   const availableEchelons = React.useMemo(() => {
-    const present = new Set(
+    const present = Array.from(
+      new Set(
       options
         .map((o) => o.echelon)
         .filter((echelon): echelon is string => echelon != null && echelon !== ""),
+      ),
+    )
+    const orderMap = new Map<string, number>(
+      echelonOrder.map((value, index) => [value, index] as const),
     )
 
-    // NATO “size” order (largest to smallest). Keep only values that exist in options.
-    // Falls back to the shared echelon list for labels/compatibility.
-    const natoSizeOrder: string[] = [
-      "Region/Theater",
-      "Army Group/front",
-      "Army",
-      "Corps/MEF",
-      "Division",
-      "Brigade",
-      "Regiment/group",
-      "Battalion/squadron",
-      "Company/battery/troop",
-      "Platoon/detachment",
-      "Section",
-      "Squad",
-      "Team/Crew",
-      "Command",
-    ]
+    return present.sort((a, b) => {
+      const indexA = orderMap.get(a)
+      const indexB = orderMap.get(b)
 
-    const known = new Set<string>(ECHELON_OPTIONS.map((o) => o.value))
-    const orderedKnown = natoSizeOrder.filter((v) => known.has(v))
-    const extras = [...present].filter((v) => !orderedKnown.includes(v)).sort((a, b) =>
-      a.localeCompare(b, undefined, { sensitivity: "base" }),
-    )
+      if (indexA != null && indexB != null) {
+        return indexA - indexB
+      }
 
-    return [...orderedKnown, ...extras].filter((v) => present.has(v))
-  }, [options])
+      if (indexA != null) return -1
+      if (indexB != null) return 1
+
+      return a.localeCompare(b, undefined, { sensitivity: "base" })
+    })
+  }, [options, echelonOrder])
 
   const filteredOptions = React.useMemo(() => {
     const sorted = [...options].sort((a, b) =>

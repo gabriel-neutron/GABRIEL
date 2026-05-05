@@ -10,8 +10,7 @@ export function ShowNetworksToggle() {
     <Button
       type="button"
       size="icon"
-      variant={showNetworks ? "secondary" : "outline"}
-      className={showNetworks ? "text-emerald-600 dark:text-emerald-400" : ""}
+      variant="outline"
       onClick={() => setShowNetworks(!showNetworks)}
       aria-pressed={showNetworks}
       title={showNetworks ? "Networks enabled" : "Networks disabled"}

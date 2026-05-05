@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import {
   clearAiProviderKeys,
@@ -27,8 +27,6 @@ export function AiProviderSettingsDialog({ open, onClose }: Props) {
     setSavedMessage("")
   }, [open])
 
-  if (!open) return null
-
   function handleSave() {
     saveAiProviderKeys(draft)
     setSavedMessage("Saved locally in this browser.")
@@ -44,20 +42,14 @@ export function AiProviderSettingsDialog({ open, onClose }: Props) {
   }
 
   return (
-    <div
-      className="fixed inset-0 z-[11000] flex items-center justify-center bg-black/50 p-4"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="ai-settings-title"
-    >
-      <Card className="w-full max-w-lg border bg-card shadow-lg">
-        <CardHeader className="flex flex-row items-center justify-between space-y-0">
-          <CardTitle id="ai-settings-title">AI Provider Keys</CardTitle>
-          <Button type="button" size="sm" variant="ghost" onClick={onClose}>
-            Close
-          </Button>
-        </CardHeader>
-        <CardContent className="space-y-3">
+    <Dialog open={open} onOpenChange={(nextOpen) => !nextOpen && onClose()}>
+      <DialogContent className="z-[11000] max-w-lg" showCloseButton>
+        <DialogHeader className="text-left">
+          <DialogTitle id="ai-settings-title" className="text-base font-semibold">
+            AI Provider Keys
+          </DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3">
           <div className="space-y-2">
             <label className="text-xs font-medium" htmlFor="openai-key">
               OpenAI API Key
@@ -93,9 +85,9 @@ export function AiProviderSettingsDialog({ open, onClose }: Props) {
             </Button>
             {savedMessage !== "" && <span className="text-xs text-muted-foreground">{savedMessage}</span>}
           </div>
-        </CardContent>
-      </Card>
-    </div>
+        </div>
+      </DialogContent>
+    </Dialog>
   )
 }
 

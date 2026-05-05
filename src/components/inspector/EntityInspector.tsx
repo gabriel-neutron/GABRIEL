@@ -131,6 +131,12 @@ function SourcesList({
   if (sources.length === 0) return null
 
   const listClass = readOnly ? "mt-1 space-y-1 text-xs" : "mb-2 space-y-1 text-xs"
+  const linkClass = readOnly
+    ? "min-w-0 flex-1 truncate text-blue-600 hover:underline"
+    : "block truncate text-blue-600 hover:underline"
+  const textClass = readOnly
+    ? "min-w-0 flex-1 whitespace-pre-wrap break-words"
+    : "block whitespace-pre-wrap break-words"
 
   return (
     <ul className={listClass}>
@@ -143,22 +149,12 @@ function SourcesList({
                 target="_blank"
                 rel="noreferrer"
                 title={src}
-                className={
-                  readOnly
-                    ? "min-w-0 flex-1 truncate text-blue-600 hover:underline"
-                    : "block truncate text-blue-600 hover:underline"
-                }
+                className={linkClass}
               >
                 {src}
               </a>
             ) : (
-              <span
-                className={
-                  readOnly
-                    ? "min-w-0 flex-1 whitespace-pre-wrap break-words"
-                    : "block whitespace-pre-wrap break-words"
-                }
-              >
+              <span className={textClass}>
                 {src}
               </span>
             )}

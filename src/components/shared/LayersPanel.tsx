@@ -76,14 +76,10 @@ export function LayersPanel({ readOnly = false }: Props) {
   const [contextMenu, setContextMenu] = useState<{ layerId: string; x: number; y: number } | null>(null)
   const menuRef = useRef<HTMLDivElement>(null)
 
-  function isLayerRowExpanded(layerId: string): boolean {
-    return expandedByLayerId[layerId] === true
-  }
-
   function handleToggleLayerRowExpanded(layerId: string): void {
     setExpandedByLayerId((prev) => {
-      const cur = prev[layerId] === true
-      return { ...prev, [layerId]: !cur }
+      const isExpanded = prev[layerId] === true
+      return { ...prev, [layerId]: !isExpanded }
     })
   }
 
@@ -154,7 +150,7 @@ export function LayersPanel({ readOnly = false }: Props) {
         {visibleLayers.map((layer, index) => {
           const isOsmLayer = layer.osmData != null
           const isCustomLayer = layer.kind === "custom"
-          const rowExpanded = isLayerRowExpanded(layer.id)
+          const rowExpanded = expandedByLayerId[layer.id] === true
           const layerEntities = entities
             .filter((e) => e.layerId === layer.id)
             .sort((a, b) => {
@@ -171,7 +167,7 @@ export function LayersPanel({ readOnly = false }: Props) {
           return (
             <div key={layer.id} className="rounded-md border">
               <div
-                className="flex items-center justify-between gap-2 px-3 py-2"
+                className="flex items-center justify-between gap-2 px-3 py-2 transition-colors duration-150 hover:bg-muted/40 focus-within:bg-muted/40"
                 onContextMenu={
                   readOnly
                     ? undefined
@@ -192,9 +188,9 @@ export function LayersPanel({ readOnly = false }: Props) {
                       {rowExpanded ? "▾" : "▸"}
                     </span>
                   )}
-                  <div className="min-w-0">
-                    <div className="truncate text-sm font-medium">{layer.name} ({layerEntities.length})</div>
-                  </div>
+                  <span className="min-w-0 truncate text-sm font-medium">
+                    {layer.name} ({layerEntities.length})
+                  </span>
                 </button>
                 <div className="flex shrink-0 items-center gap-1">
                   {!readOnly && isCustomLayer && (
@@ -227,53 +223,70 @@ export function LayersPanel({ readOnly = false }: Props) {
                     type="button"
                     variant="ghost"
                     size="icon-xs"
-                    className="h-5 w-5 shrink-0 text-muted-foreground"
+                    className="h-5 w-5 shrink-0 text-muted-foreground transition-transform duration-150 active:scale-95"
                     onClick={() => useProjectStore.getState().setLayerVisible(layer.id, !layer.visible)}
                     title={layer.visible ? "Hide" : "Show"}
                   >
-                    {layer.visible ? (
-                      <Eye className="h-3 w-3" />
-                    ) : (
-                      <EyeOff className="h-3 w-3" />
-                    )}
+                    <span className="relative h-3 w-3">
+                      <Eye
+                        className={`absolute inset-0 h-3 w-3 transition-all duration-150 ${
+                          layer.visible ? "scale-100 opacity-100" : "scale-75 opacity-0"
+                        }`}
+                      />
+                      <EyeOff
+                        className={`absolute inset-0 h-3 w-3 transition-all duration-150 ${
+                          layer.visible ? "scale-75 opacity-0" : "scale-100 opacity-100"
+                        }`}
+                      />
+                    </span>
                   </Button>
                 </div>
               </div>
-              {!isOsmLayer && rowExpanded && layerEntities.length > 0 && (
-                <div className="border-t bg-muted/30 px-3 py-2">
-                  <div className="flex flex-col gap-1">
-                    {layerEntities.map((entity) => (
-                      <div key={entity.id} className="flex items-center gap-1">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const s = useProjectStore.getState()
-                            s.setSelectedEntityId(entity.id)
-                            s.setSelectedOsmObject(null)
-                          }}
-                          className={`min-w-0 flex-1 truncate rounded px-2 py-1 text-left text-xs transition-colors hover:bg-muted ${
-                            selectedEntityId === entity.id ? "bg-primary/15 text-primary" : ""
-                          }`}
-                        >
-                          {entity.name}
-                        </button>
-                        {!readOnly && (
-                          <Button
+              {!isOsmLayer && layerEntities.length > 0 && (
+                <div
+                  className={`grid overflow-hidden border-t bg-muted/30 transition-[grid-template-rows,opacity] duration-150 ease-out ${
+                    rowExpanded ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"
+                  }`}
+                >
+                  <div
+                    className={`min-h-0 overflow-hidden px-3 transition-[padding] duration-150 ease-out ${
+                      rowExpanded ? "py-2" : "py-0"
+                    }`}
+                  >
+                    <div className="flex flex-col gap-1">
+                      {layerEntities.map((entity) => (
+                        <div key={entity.id} className="flex items-center gap-1">
+                          <button
                             type="button"
-                            variant="ghost"
-                            size="icon-xs"
-                            className="h-5 w-5 shrink-0 text-muted-foreground hover:bg-destructive/15 hover:text-destructive"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              handleDeleteEntity(entity.id)
+                            onClick={() => {
+                              const s = useProjectStore.getState()
+                              s.setSelectedEntityId(entity.id)
+                              s.setSelectedOsmObject(null)
                             }}
-                            title="Remove entity"
+                            className={`min-w-0 flex-1 truncate rounded px-2 py-1 text-left text-xs transition-colors hover:bg-muted ${
+                              selectedEntityId === entity.id ? "bg-muted font-medium text-foreground" : ""
+                            }`}
                           >
-                            ×
-                          </Button>
-                        )}
-                      </div>
-                    ))}
+                            {entity.name}
+                          </button>
+                          {!readOnly && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon-xs"
+                              className="h-5 w-5 shrink-0 text-muted-foreground hover:bg-destructive/15 hover:text-destructive"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleDeleteEntity(entity.id)
+                              }}
+                              title="Remove entity"
+                            >
+                              ×
+                            </Button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 </div>
               )}

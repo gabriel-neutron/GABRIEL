@@ -17,6 +17,20 @@ import { useOsmRelationGeometries } from "@/hooks/useOsmRelationGeometries"
 
 type FlyToFn = (lat: number, lng: number, zoom?: number) => void
 
+function selectEntity(id: string | null) {
+  const { setSelectedEntityId, setSelectedOsmObject } = useProjectStore.getState()
+  setSelectedEntityId(id)
+  setSelectedOsmObject(null)
+}
+
+function selectOsmObject(feature: GeoJSON.Feature & { id?: string }) {
+  const parsed = getOsmTypeAndId(feature)
+  if (!parsed) return
+  const { setSelectedOsmObject, setSelectedEntityId } = useProjectStore.getState()
+  setSelectedOsmObject({ ...parsed, cachedFeature: feature })
+  setSelectedEntityId(null)
+}
+
 function MapInstanceBridge({ flyToRef }: { flyToRef: React.RefObject<FlyToFn | null> }) {
   const map = useMap()
   useEffect(() => {
@@ -30,12 +44,32 @@ function MapSizeSync() {
   const map = useMap()
   useEffect(() => {
     const container = map.getContainer()
-    const observer = new ResizeObserver(() => {
-      map.stop()
+    let resizeTimer: number | null = null
+    const RESIZE_SETTLE_MS = 140
+    const flushResize = () => {
+      resizeTimer = null
       map.invalidateSize({ animate: false })
+    }
+    const observer = new ResizeObserver(() => {
+      if (resizeTimer !== null) window.clearTimeout(resizeTimer)
+      resizeTimer = window.setTimeout(flushResize, RESIZE_SETTLE_MS)
     })
     observer.observe(container)
-    return () => observer.disconnect()
+    return () => {
+      observer.disconnect()
+      if (resizeTimer !== null) window.clearTimeout(resizeTimer)
+    }
+  }, [map])
+  return null
+}
+
+function BottomLeftZoomControl() {
+  const map = useMap()
+  useEffect(() => {
+    const zoom = L.control.zoom({ position: "bottomleft" }).addTo(map)
+    return () => {
+      zoom.remove()
+    }
   }, [map])
   return null
 }
@@ -130,8 +164,7 @@ export function MapView({
   const [mapBounds, setMapBounds] = useState<MapBounds | null>(null)
 
   const handleSelectEntity = useCallback((id: string | null) => {
-    useProjectStore.getState().setSelectedEntityId(id)
-    useProjectStore.getState().setSelectedOsmObject(null)
+    selectEntity(id)
   }, [])
 
   // Deselect entity when entering draw mode
@@ -179,14 +212,29 @@ export function MapView({
     function onEachOsmFeature(feature: GeoJSON.Feature & { id?: string }, layer: L.Layer) {
       layer.on("click", () => {
         if (mapToolRef.current !== "pan") return
-        const parsed = getOsmTypeAndId(feature)
-        if (!parsed) return
-        useProjectStore.getState().setSelectedOsmObject({ ...parsed, cachedFeature: feature })
-        useProjectStore.getState().setSelectedEntityId(null)
+        selectOsmObject(feature)
       })
     },
     [],
   )
+
+  const renderDrawnGeometry = useCallback((g: DrawnGeometry) => {
+    switch (g.type) {
+      case "point":
+        if (g.entityId != null) return null
+        return (
+          <Marker key={g.id} position={[g.lat, g.lng]} icon={markerIcon} interactive={!isDrawing}>
+            <Popup>Unlinked point</Popup>
+          </Marker>
+        )
+      case "line":
+        return <Polyline key={g.id} positions={g.positions} pathOptions={{ interactive: !isDrawing }} />
+      case "polygon":
+        return <Polygon key={g.id} positions={g.rings[0] ?? []} pathOptions={{ interactive: !isDrawing }} />
+      default:
+        return null
+    }
+  }, [isDrawing])
 
   return (
     <div className="relative h-full w-full">
@@ -202,8 +250,9 @@ export function MapView({
         className="h-full w-full"
         center={[55.751244, 37.618423]}
         zoom={5}
-        zoomControl
+        zoomControl={false}
       >
+        <BottomLeftZoomControl />
         <MapSizeSync />
         <MapBoundsReporter onBoundsChange={setMapBounds} />
         <CenterOnSelection
@@ -229,14 +278,16 @@ export function MapView({
           hiddenEntityIds={hiddenEntityIds}
           onSelectEntity={handleSelectEntity}
           mapBounds={mapBounds}
+          interactive={!isDrawing}
         />
-        <NetworkLinksLayer positionMap={positionMap} />
+        <NetworkLinksLayer positionMap={positionMap} interactive={!isDrawing} />
 
         {visibleLayersInOrder.map((layer) =>
           layer.osmData ? (
             <GeoJSON
               key={layer.id}
               data={layer.osmData}
+              interactive={!isDrawing}
               pointToLayer={osmPointToLayer}
               onEachFeature={onEachOsmFeature}
             />
@@ -248,6 +299,7 @@ export function MapView({
             <GeoJSON
               key={`osm-${entityId}`}
               data={fc}
+              interactive={!isDrawing}
               pathOptions={linkedOsmStyle}
               pointToLayer={osmPointToLayer}
               onEachFeature={onEachOsmFeature}
@@ -257,33 +309,7 @@ export function MapView({
 
         {visibleLayersInOrder.flatMap((layer) => {
           if (layer.osmData) return []
-          return (drawnByLayerId.get(layer.id) ?? []).map((g) => {
-            if (g.type === "point") {
-              if (g.entityId != null) return null
-              return (
-                <Marker key={g.id} position={[g.lat, g.lng]} icon={markerIcon}>
-                  <Popup>Unlinked point</Popup>
-                </Marker>
-              )
-            }
-            if (g.type === "line") {
-              return (
-                <Polyline
-                  key={g.id}
-                  positions={g.positions}
-                />
-              )
-            }
-            if (g.type === "polygon") {
-              return (
-                <Polygon
-                  key={g.id}
-                  positions={g.rings[0] ?? []}
-                />
-              )
-            }
-            return null
-          })
+          return (drawnByLayerId.get(layer.id) ?? []).map(renderDrawnGeometry)
         })}
 
         {!readOnly && isDrawing && defaultLayerId && (
