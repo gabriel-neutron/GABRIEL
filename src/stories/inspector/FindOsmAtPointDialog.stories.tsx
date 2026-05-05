@@ -1,58 +1,68 @@
 import type { Meta, StoryObj } from "@storybook/react-vite"
 import {
+  FindOsmAtPointDialog,
   FindOsmAtPointDialogContent,
-  type FindOsmAtPointDialogContentProps,
-} from "../../components/inspector/FindOsmAtPointDialog"
-import type { OsmElementCandidate } from "../../components/inspector/useFindOsmAtPoint"
+} from "@/components/inspector/FindOsmAtPointDialog"
+import type { OsmElementCandidate } from "@/components/inspector/useFindOsmAtPoint"
 
-const mockCandidates: OsmElementCandidate[] = [
-  { type: "relation", id: 12345, tags: { name: "Camp de la base", landuse: "military" } },
-  { type: "way", id: 67890, tags: { name: "Main road", highway: "primary" } },
-  { type: "node", id: 11111, tags: { name: "HQ Building", amenity: "place" } },
-  { type: "relation", id: 99999, tags: { boundary: "administrative" } },
+const sampleCandidates: OsmElementCandidate[] = [
+  { type: "relation", id: 123456, tags: { name: "Camp Alpha", military: "base" } },
+  { type: "way", id: 456789, tags: { name: "Perimeter", landuse: "military" } },
+  { type: "relation", id: 987654, tags: { name: "Depot Sector", boundary: "administrative" } },
+  { type: "node", id: 222333, tags: { amenity: "bunker" } },
+  { type: "relation", id: 111222, tags: { name: "Training Area", military: "range" } },
+  { type: "way", id: 333444, tags: { building: "yes", name: "Hangar 3" } },
 ]
 
-const baseProps: FindOsmAtPointDialogContentProps = {
-  open: true,
-  onClose: () => {},
-  loading: false,
-  error: null,
-  candidates: [],
-  onSelectRelation: () => {},
-}
-
-const meta: Meta<typeof FindOsmAtPointDialogContent> = {
-  component: FindOsmAtPointDialogContent,
+const meta = {
   title: "Inspector/FindOsmAtPointDialog",
-  argTypes: {
-    open: { control: "boolean" },
-    loading: { control: "boolean" },
-    error: { control: "text" },
-  },
-}
-export default meta
-
-type Story = StoryObj<typeof FindOsmAtPointDialogContent>
-
-export const Closed: Story = {
-  args: { ...baseProps, open: false },
-}
-
-export const Loading: Story = {
-  args: { ...baseProps, loading: true },
-}
-
-export const Error: Story = {
+  component: FindOsmAtPointDialog,
   args: {
-    ...baseProps,
-    error: "Overpass API request failed. Please try again.",
+    open: true,
+    lat: 48.8566,
+    lng: 2.3522,
+    onClose: () => undefined,
+    onSelectRelation: () => undefined,
+  },
+} satisfies Meta<typeof FindOsmAtPointDialog>
+
+export default meta
+type Story = StoryObj<typeof meta>
+
+export const Open: Story = {}
+
+export const Searching: StoryObj<typeof FindOsmAtPointDialogContent> = {
+  render: (args) => <FindOsmAtPointDialogContent {...args} />,
+  args: {
+    open: true,
+    onClose: () => undefined,
+    loading: true,
+    error: null,
+    candidates: [],
+    onSelectRelation: () => undefined,
   },
 }
 
-export const Empty: Story = {
-  args: baseProps,
+export const WithResults: StoryObj<typeof FindOsmAtPointDialogContent> = {
+  render: (args) => <FindOsmAtPointDialogContent {...args} />,
+  args: {
+    open: true,
+    onClose: () => undefined,
+    loading: false,
+    error: null,
+    candidates: sampleCandidates,
+    onSelectRelation: () => undefined,
+  },
 }
 
-export const WithCandidates: Story = {
-  args: { ...baseProps, candidates: mockCandidates },
+export const Error: StoryObj<typeof FindOsmAtPointDialogContent> = {
+  render: (args) => <FindOsmAtPointDialogContent {...args} />,
+  args: {
+    open: true,
+    onClose: () => undefined,
+    loading: false,
+    error: "Overpass request timed out after 25s.",
+    candidates: [],
+    onSelectRelation: () => undefined,
+  },
 }
