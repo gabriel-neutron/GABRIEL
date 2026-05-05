@@ -1,39 +1,34 @@
-# Gabriel - Local ORBAT Mapping Workstation
+# Gabriel - OSINT Mapping Workstation
 
 ![Gabriel icon](public/image.png)
 
-Gabriel is a local-first web app to build, inspect, and maintain military map projects from a structured Order of Battle (ORBAT) point of view.
+Gabriel is a local-first web app to build, inspect, and maintain geospatial OSINT projects with an ORBAT-oriented workflow.
 
-Made  with 🍷, 🥖 and 🧀 in France.
+Current investigation context: mapping the industrial, logistic, and financial infrastructure that sustains Russia's war effort.
 
-The current project context is a **Russian ORBAT research workflow**: identify units, place geometries, connect open-source evidence, and keep a coherent operational picture over time.  
-The software is still generic: you can use the same workflow for any country, coalition, or historical theater.
+## Project Scope
 
-## Project Goal
+Turn fragmented evidence into one auditable project file:
 
-Turn fragmented military information into one clean, reusable project file:
-
-- entities (units) with hierarchy and metadata,
+- entities with hierarchy and metadata,
 - map geometries (points, lines, polygons),
 - layers (custom, echelon, OSM overlay),
-- optional enrichment suggestions before human validation.
+- optional AI enrichment suggestions before human validation.
 
-Everything is designed around one principle: **your GeoPackage is the source of truth**.
+Core principle: **GeoPackage is the source of truth**.
 
-## Site Access
-
-Gabriel runs locally in the browser.
+## Run Locally
 
 ```bash
 npm install
 npm run dev
 ```
 
-Then open the URL shown by Vite (usually `http://localhost:5173`).
+Open the URL shown by Vite (usually `http://localhost:5173`).
 
-Public deployed version: [https://gabriel0x0.netlify.app/](https://gabriel0x0.netlify.app/).
+Public access: [https://gabriel0x0.netlify.app/](https://gabriel0x0.netlify.app/).
 
-## What You Can Do
+## Current Capabilities
 
 - Create and edit ORBAT-oriented map projects.
 - Draw and link geometries to entities.
@@ -41,9 +36,7 @@ Public deployed version: [https://gabriel0x0.netlify.app/](https://gabriel0x0.ne
 - Link entities to OSM relations and open-source context.
 - Save/load projects as `.gpkg` (portable GeoPackage files).
 
-## Current Project Scale (`public/project.gpkg`)
-
-Snapshot of the bundled reference dataset:
+## Current Project Snapshot (`public/project.gpkg`)
 
 - `1010` units/entities
 - `15` layers
@@ -54,8 +47,6 @@ Snapshot of the bundled reference dataset:
 
 ## AI Enrichment (Optional)
 
-Enrichment is assistive. It proposes, you decide.
-
 1. Open `AI keys` in the top bar.
 2. Add:
    - OpenAI API key
@@ -63,18 +54,7 @@ Enrichment is assistive. It proposes, you decide.
 
 Accepted proposals affect the current session state, and become authoritative only through the normal save flow.
 
-## CI / Pipeline
-
-The repository includes a GitHub Actions pipeline in `.github/workflows/ci.yml`.
-
-On pushes and pull requests to `main` / `master`, it runs:
-
-- `npm ci`
-- `npm run verify`
-- coverage artifact upload
-
-
-## Contributing
+## Contributing / Verification
 
 - Keep changes simple and focused.
 - Run `npm run verify` before opening a PR.
@@ -82,9 +62,8 @@ On pushes and pull requests to `main` / `master`, it runs:
 
 ## License
 
-There is currently **no explicit `LICENSE` file** in this repository.
-
-If you plan to distribute or reuse Gabriel publicly, add a license first (for example MIT or Apache-2.0).
+Code in this repository is licensed under the [MIT License](LICENSE).
+Dataset artifacts can be released separately under `CC-BY 4.0` when published.
 
 ## Technical Documentation
 
