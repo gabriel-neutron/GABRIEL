@@ -1,55 +1,65 @@
 # CLAUDE.md
 
-This file provides guidance to **Claude Code** (claude.ai/code) when working in this repository.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-**Start here for commands, CI gates, and agent workflow:** [AGENTS.md](AGENTS.md)  
-**For planning-doc scope:** use [docs/README.md](docs/README.md) as the canonical index (Telegram PRD is opt-in only).
+## Identity
 
-## Commands
+**Gabriel** — local-first, browser-only ORBAT (Order of Battle) editor. Military analysts build and annotate hierarchical unit structures on a map; all data stays on-device in `.gpkg` files.
 
-```bash
-npm run dev          # Start Vite dev server
-npm run verify       # lint + test (with coverage) + build — use before claiming done
-npm run build        # Type-check + production build
-npm run lint         # ESLint
-npm run test         # Vitest, single pass
-npm run test:coverage # Vitest with coverage (thresholds in vitest.config.ts)
-npm run test:watch   # Vitest in watch mode
-npm run storybook    # Storybook on port 6006
+## WHY
+
+Military researchers and OSINT analysts need to build hierarchical military unit maps without leaking data to third-party servers or requiring GIS licences. Gabriel runs entirely in the browser: project data lives in a GeoPackage file on disk (plus an IndexedDB cache), and AI enrichment calls go directly from the browser to OpenAI/Tavily using user-supplied API keys — no Gabriel server ever touches the data.
+
+## WHAT
+
+```
+src/
+  pages/        EditPage (full I/O), ViewPage (read-only demo)
+  components/   UI components — map/, inspector/, enrichment/, shared/, tree/, ui/
+  store/        useProjectStore (Zustand), enrichment.store (pure reducer)
+  services/     GeoPackage I/O, enrichment pipeline, Overpass/Tavily/OpenAI adapters
+  hooks/        Custom React hooks (useEnrichment, useLayeredResearch, …)
+  types/        Domain type definitions (MapEntity, LatLng/LngLat, …)
+  utils/        Pure functions — no React imports
+docs/           Architecture, constraints, PRD, tech stack, timeline
 ```
 
-Path alias `@/` maps to `src/` (configured in `vite.config.ts`).
+## HOW
 
-## Architecture (summary)
+```bash
+npm install
+npm run dev           # Vite dev server (localhost:5173)
+npm run build         # tsc + Vite production build
+npm run test          # Vitest single pass
+npx vitest run src/services/enrichment/enrichment.service.test.ts  # single file
+npm run test:coverage # Vitest with coverage (thresholds in vitest.config.ts)
+npm run lint          # ESLint
+npm run verify        # lint + test:coverage + build  ← run before claiming done
+npm run storybook     # Storybook on port 6006
+```
 
-This is a React + Vite SPA for military map editing (ORBAT). Projects are stored as **GeoPackage** (`.gpkg`) files, loaded and saved in-browser using `@ngageoint/geopackage` (WASM-backed SQLite).
+Path alias `@/` → `src/`. CI runs `npm run verify` on push/PR to `main` (`.github/workflows/ci.yml`).
 
-### Data model
+## Doc index
 
-Three persisted tables inside every GeoPackage:
+| File | Covers |
+|---|---|
+| `docs/PRD.md` | Product requirements, user stories, success criteria |
+| `docs/ARCHITECTURE.md` | Component tree, data flows, coordinate contract, enrichment pipeline |
+| `docs/CONSTRAINTS.md` | Naming, file structure, code style, testing, error handling, git conventions |
+| `docs/TECH_STACK.md` | Approved libraries, versions, and rationale |
+| `docs/TIMELINE.md` | Phase roadmap and acceptance criteria |
+| `docs/TELEGRAM_OSINT_PRD.md` | Telegram OSINT module PRD — WIP, exclude from generic phase commands |
 
-| Table | Type alias | Description |
-|---|---|---|
-| `units` | `MapEntity` / `GpkgEntity` | Entities (military units) with symbol, affiliation, notes, sources |
-| `layers` | `Layer` / `GpkgLayer` | Display layers (echelon, custom, or OSM overlay) |
-| `geometries` | `DrawnGeometry` / `GpkgGeometry` | Points, lines, polygons linked to a layer and optionally an entity |
+## Workflow
 
-`MapEntity` uses camelCase (UI), `GpkgEntity` uses snake_case (DB). `sources` is a newline-delimited string of URLs. `osmRelationId` links to an OSM multipolygon; `militaryUnitId` stores a military unit number/code.
+- `/phase-start` — read PRD + CONSTRAINTS + ARCHITECTURE + TIMELINE, then plan the next phase
+- `/phase-review` — verify `npm run verify` passes, check acceptance criteria in TIMELINE.md
 
-### State management
+## Operating rules
 
-Runtime project state (layers, entities, drawn geometries, selection, OSM overlays, etc.) lives in the Zustand store **`useProjectStore`** ([`src/store/useProjectStore.ts`](src/store/useProjectStore.ts)). GeoPackage load/save and IndexedDB session persistence stay in [`src/pages/EditPage.tsx`](src/pages/EditPage.tsx) and [`src/pages/ViewPage.tsx`](src/pages/ViewPage.tsx); components read/write the store directly per [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
-
-Enrichment UI state uses a pure reducer in [`src/store/enrichment.store.ts`](src/store/enrichment.store.ts) with [`src/hooks/useEnrichment.ts`](src/hooks/useEnrichment.ts).
-
-### Enrichment pipeline
-
-See [AGENTS.md](AGENTS.md) for paths. Implemented providers: **OpenAI** (queries + synthesis), **Tavily** (web search), **CachedContentAdapter** (layered research), **Overpass** (OSM lookup from layered research). Default bundle wiring: [`src/services/enrichment/providers/index.ts`](src/services/enrichment/providers/index.ts).
-
-### Map rendering
-
-`react-leaflet` with `leaflet.markercluster`. Military symbols via milsymbol (NATO SIDC). `SymbolsLayer` and `NetworkLinksLayer` consume a `positionMap` from `drawnGeometries`. Coordinate order: internal [`LatLng`](src/types/coordinates.ts); GeoPackage storage [`LngLat`](src/types/coordinates.ts); conversion in [`src/services/geopackage.service.ts`](src/services/geopackage.service.ts). OSM relation geometries: [`src/hooks/useOsmRelationGeometries.ts`](src/hooks/useOsmRelationGeometries.ts).
-
-### Terminology
-
-Use **entity** in UI code, not **unit**. **Unit** appears only in GeoPackage schema (`units` table, `GpkgEntity`).
+1. Read `docs/CONSTRAINTS.md` before writing any new file or refactoring existing structure.
+2. Never modify files in `docs/` without confirming the change is in scope for the current task.
+3. Only `EditPage` and `ViewPage` may call `loadGeoPackage` / `saveGeoPackage`.
+4. `services/` and `utils/` must not import from React.
+5. Commit messages: imperative mood, present tense. Each phase ends with `npm run verify` passing.
