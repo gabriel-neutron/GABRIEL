@@ -1,17 +1,10 @@
-import { useState, useCallback, useEffect, useRef } from "react"
+import { useState, useCallback, useEffect, useLayoutEffect, useRef } from "react"
 import { MainLayout } from "@/components/shared/MainLayout"
 import { ToastStack, type ToastItem } from "@/components/shared/ToastStack"
-import {
-  loadGeoPackage,
-  saveGeoPackage,
-  getDefaultEchelonLayers,
-  applyGeoPackageResult,
-  type GpkgLayer,
-} from "@/services/geopackage.service"
-import { loadProject, saveProject, clearProject } from "@/services/projectStorage.service"
 import { useProjectStore } from "@/store/useProjectStore"
 import { useEnrichment } from "@/hooks/useEnrichment"
 import { useLayeredResearch } from "@/hooks/useLayeredResearch"
+import { useProjectIO } from "@/hooks/useProjectIO"
 
 export type EditPageProps = {
   onViewMode?: () => void
@@ -19,20 +12,11 @@ export type EditPageProps = {
 }
 
 export function EditPage({ onViewMode, onOpenAbout }: EditPageProps): React.ReactElement {
-  const {
-    entities,
-    drawnGeometries,
-    selectedEntityId,
-    sourceCache,
-    updateEntity,
-    mergeSourceCache,
-    setProject,
-    resetProject,
-  } = useProjectStore()
+  const { entities, drawnGeometries, selectedEntityId, sourceCache, updateEntity, mergeSourceCache } =
+    useProjectStore()
 
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [restoredFromSession, setRestoredFromSession] = useState(false)
+  const { busy, error, restoredFromSession, handleNew, handleOpen, handleSave } = useProjectIO()
+
   const [toasts, setToasts] = useState<ToastItem[]>([])
 
   const handleDismissToast = useCallback((id: string) => {
@@ -81,145 +65,6 @@ export function EditPage({ onViewMode, onOpenAbout }: EditPageProps): React.Reac
 
   const isBatchReviewRef = useRef(false)
 
-  useEffect(function restoreSession() {
-    let mounted = true
-    loadProject()
-      .then((stored) => {
-        if (!stored || !mounted) return
-        return loadGeoPackage(stored.buffer).then((result) => {
-          if (!mounted) return
-          const next = applyGeoPackageResult(result, null)
-          setProject({
-            layers: next.layers,
-            entities: next.entities,
-            drawnGeometries: next.drawnGeometries,
-            selectedEntityId: next.selectedEntityId,
-            sourceCache: result.sourceCache,
-          })
-          setRestoredFromSession(true)
-        })
-      })
-      .catch((e) => {
-        if (!mounted) return
-        setError(e instanceof Error ? e.message : "Failed to restore previous session")
-        console.error("restoreSession failed", e)
-      })
-    return () => { mounted = false }
-  }, [setProject])
-
-  useEffect(
-    function clearRestoredBanner() {
-      if (!restoredFromSession) return
-      const t = setTimeout(() => setRestoredFromSession(false), 4000)
-      return () => clearTimeout(t)
-    },
-    [restoredFromSession],
-  )
-
-  const writeGeoPackageToFile = useCallback(async (bytes: Uint8Array): Promise<void> => {
-    const showSave = (window as Window & { showSaveFilePicker?: (opts?: unknown) => Promise<FileSystemFileHandle> })
-      .showSaveFilePicker
-    if (typeof showSave !== "function") throw new Error("This browser does not support the File System Access API.")
-    const handle = await showSave.call(window, {
-      suggestedName: "project.gpkg",
-      types: [{ description: "GeoPackage", accept: { "application/octet-stream": [".gpkg"] } }],
-    })
-    const writable = await handle.createWritable()
-    const buffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer
-    await writable.write(new Uint8Array(buffer))
-    await writable.close()
-  }, [])
-
-  const handleNewProject = useCallback(async (): Promise<void> => {
-    resetProject()
-    setError(null)
-    setRestoredFromSession(false)
-    try {
-      await clearProject()
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to clear persisted session")
-      console.error("clearProject failed", e)
-    }
-    setBusy(true)
-    try {
-      const defaultLayers = getDefaultEchelonLayers()
-      const gpkgLayers: GpkgLayer[] = defaultLayers.map((l) => ({
-        id: l.id,
-        name: l.name,
-        visible: l.visible,
-        kind: l.kind,
-      }))
-      const bytes = await saveGeoPackage(gpkgLayers, [], [])
-      await writeGeoPackageToFile(bytes)
-      window.alert("New project created.")
-    } catch (e) {
-      if (e instanceof Error && e.name === "AbortError") return
-      setError(e instanceof Error ? e.message : "Failed to create project")
-      console.error("handleNewProject failed", e)
-    } finally {
-      setBusy(false)
-    }
-  }, [resetProject, writeGeoPackageToFile])
-
-  const handleOpenProject = useCallback(async (file: File): Promise<void> => {
-    setBusy(true)
-    setError(null)
-    try {
-      const buffer = await file.arrayBuffer()
-      const result = await loadGeoPackage(buffer)
-      const next = applyGeoPackageResult(result, null)
-      useProjectStore.getState().setProject({
-        layers: next.layers,
-        entities: next.entities,
-        drawnGeometries: next.drawnGeometries,
-        selectedEntityId: next.selectedEntityId,
-        sourceCache: result.sourceCache,
-      })
-      await saveProject(buffer)
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to load GeoPackage")
-      console.error("loadGeoPackage failed", e)
-    } finally {
-      setBusy(false)
-    }
-  }, [])
-
-  const handleSaveProject = useCallback(async (): Promise<void> => {
-    const { layers, entities, drawnGeometries, sourceCache } = useProjectStore.getState()
-    const nonOsmLayerIds = new Set(layers.filter((l) => l.osmData == null).map((l) => l.id))
-    const persistedEntities = entities
-      .filter((e) => nonOsmLayerIds.has(e.layerId))
-      .map((e) => {
-        const trimmedName = e.name.trim()
-        return { ...e, name: trimmedName === "" ? "Untitled" : trimmedName }
-      })
-    const persistedGeometries = drawnGeometries.filter((g) => nonOsmLayerIds.has(g.layerId))
-    const gpkgLayers: GpkgLayer[] = layers.map((l) => ({
-      id: l.id,
-      name: l.name,
-      visible: l.visible,
-      kind: l.kind ?? (l.osmData != null ? ("osm" as const) : undefined),
-      sourceQuery: l.sourceQuery,
-      osmData: l.osmData,
-    }))
-    setBusy(true)
-    setError(null)
-    try {
-      const bytes = await saveGeoPackage(gpkgLayers, persistedEntities, persistedGeometries, sourceCache)
-      await writeGeoPackageToFile(bytes)
-      const buffer = new ArrayBuffer(bytes.length)
-      new Uint8Array(buffer).set(bytes)
-      await saveProject(buffer)
-      window.alert("Saved successfully")
-    } catch (e) {
-      if (e instanceof Error && e.name === "AbortError") return
-      setError(e instanceof Error ? e.message : "Save failed")
-      console.error("saveGeoPackage failed", e)
-    } finally {
-      setBusy(false)
-    }
-  }, [writeGeoPackageToFile])
-
   const handleReviewNext = useCallback(() => {
     const entityId = layeredResearch.nextInQueue
     if (!entityId) return
@@ -239,7 +84,9 @@ export function EditPage({ onViewMode, onOpenAbout }: EditPageProps): React.Reac
   }, [enrichment, layeredResearch])
 
   const enrichmentRef = useRef(enrichment)
-  enrichmentRef.current = enrichment
+  useLayoutEffect(() => {
+    enrichmentRef.current = enrichment
+  })
 
   useEffect(() => {
     if (!enrichment.allProposalsResolved || !isBatchReviewRef.current) return
@@ -283,9 +130,9 @@ export function EditPage({ onViewMode, onOpenAbout }: EditPageProps): React.Reac
         busy={busy}
         error={error}
         projectFileActions={{
-          onNewProject: handleNewProject,
-          onOpenProject: handleOpenProject,
-          onSaveProject: handleSaveProject,
+          onNewProject: handleNew,
+          onOpenProject: handleOpen,
+          onSaveProject: handleSave,
         }}
         onOverpassUnavailable={() =>
           setToasts((prev) =>
@@ -294,8 +141,7 @@ export function EditPage({ onViewMode, onOpenAbout }: EditPageProps): React.Reac
               {
                 id: `overpass-unavailable-${Date.now()}`,
                 title: "OSM endpoint unavailable",
-                description:
-                  "Overpass API could not be reached. OSM relation boundaries are unavailable.",
+                description: "Overpass API could not be reached. OSM relation boundaries are unavailable.",
               },
             ].slice(-4),
           )
@@ -306,19 +152,16 @@ export function EditPage({ onViewMode, onOpenAbout }: EditPageProps): React.Reac
           context: enrichment.context,
           overlay: enrichment.overlay,
           prompt: enrichment.draftPrompt,
-          status: enrichment.state.run.status,
-          queryTrace: enrichment.state.run.queryTrace,
-          depthUsed: enrichment.state.run.depthUsed,
-          unresolvedFields: enrichment.state.run.unresolvedFields,
-          unresolvedReasons: enrichment.state.run.unresolvedReasons,
-          conflicts: enrichment.state.run.conflicts,
-          notes: enrichment.state.run.notes,
-          proposals: enrichment.state.run.proposals,
-          decisions:
-            enrichment.selectedEntityId == null
-              ? {}
-              : enrichment.state.decisions[enrichment.selectedEntityId] ?? {},
-          errorMessage: enrichment.state.run.error?.details ?? null,
+          status: enrichment.runStatus,
+          queryTrace: enrichment.queryTrace,
+          depthUsed: enrichment.depthUsed,
+          unresolvedFields: enrichment.unresolvedFields,
+          unresolvedReasons: enrichment.unresolvedReasons,
+          conflicts: enrichment.conflicts,
+          notes: enrichment.notes,
+          proposals: enrichment.proposals,
+          decisions: enrichment.decisions,
+          errorMessage: enrichment.runError,
           closeNotice: enrichment.closeNotice,
           setPrompt: enrichment.setDraftPrompt,
           openDrawer: enrichment.openDrawer,
@@ -352,10 +195,7 @@ export function EditPage({ onViewMode, onOpenAbout }: EditPageProps): React.Reac
           onReviewNext: handleReviewNext,
         }}
       />
-      <ToastStack
-        items={toasts}
-        onDismiss={handleDismissToast}
-      />
+      <ToastStack items={toasts} onDismiss={handleDismissToast} />
     </>
   )
 }

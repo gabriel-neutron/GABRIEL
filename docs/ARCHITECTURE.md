@@ -59,22 +59,26 @@ Child components subscribe directly to store slices:
 
 ```
 File on disk (.gpkg)
-  ↓  EditPage.handleOpenProject()  →  loadGeoPackage(ArrayBuffer)
+  ↓  useProjectIO.handleOpen()     →  loadGeoPackage(ArrayBuffer)
   ↓  applyGeoPackageResult(result) →  { layers, entities, drawnGeometries }
   ↓  store.setProject(...)         →  Zustand project store
 
-  ↑  EditPage.handleSaveProject()  →  reads store via getState()
+  ↑  useProjectIO.handleSave()     →  selectPersistableSnapshot(store) → reads non-OSM data
   ↑  saveGeoPackage(layers, entities, geometries, sourceCache)
   ↑  writeGeoPackageToFile(bytes)  →  File System Access API / <a download>
 
 Session cache (IndexedDB)
-  ↓  loadProject()                 →  ArrayBuffer  →  same load path as above
+  ↓  loadProject()                 →  ArrayBuffer  →  same load path as above (restoreSession)
   ↑  saveProject(buffer)           →  called after every successful save
   ↑  clearProject()                →  called on "New project"
 ```
 
-Only `EditPage` and `ViewPage` call `loadGeoPackage` / `saveGeoPackage`. No component below
-the page level may trigger GeoPackage I/O.
+GeoPackage I/O lives only in `useProjectIO` (used by `EditPage`) and inline in `ViewPage`
+(read-only fetch of `/project.gpkg`). No component or hook below these may trigger
+GeoPackage I/O.
+
+`selectPersistableSnapshot` (in `useProjectStore.ts`) is the single source of truth for what
+data gets written to disk: non-OSM entities and geometries, with names trimmed.
 
 ---
 
@@ -167,7 +171,7 @@ User clicks "Research all" → ResearchDialog → run()
 
 ## Key Invariants
 
-1. No GeoPackage I/O inside any component below `EditPage` / `ViewPage`.
+1. GeoPackage I/O lives only in `useProjectIO` (called by `EditPage`) and inline in `ViewPage`. No component or hook below these may trigger GeoPackage I/O.
 2. API keys (OpenAI, Tavily) never appear in logs, error messages, or thrown strings.
 3. `enrichment.store.ts` pure reducer functions have no React imports.
 4. `computeAllEntityPositions` is always inside a `useMemo`.

@@ -34,6 +34,35 @@ type UseLayeredResearchOptions = {
   onEntityAnalyzed?: (entityId: string, analyzedAt: string) => void
 }
 
+function buildInitialEntityStatuses(
+  orderedIds: string[],
+  processedIds: ReadonlySet<string>,
+  recentAnalyzedIds: ReadonlySet<string>,
+  prev: Record<string, EntityResearchStatus>,
+): Record<string, EntityResearchStatus> {
+  const next: Record<string, EntityResearchStatus> = {}
+  for (const id of orderedIds) {
+    if (processedIds.has(id)) next[id] = prev[id] ?? "done-empty"
+    else if (recentAnalyzedIds.has(id)) next[id] = "skipped-recent"
+    else next[id] = "pending"
+  }
+  return next
+}
+
+function applyFinalEntityStatuses(
+  prev: Record<string, EntityResearchStatus>,
+  result: LayeredResearchResult,
+  processedIds: ReadonlySet<string>,
+): Record<string, EntityResearchStatus> {
+  const next = { ...prev }
+  for (const id of result.failedEntityIds) next[id] = "failed"
+  for (const id of result.skippedRichEntityIds) next[id] = "skipped-rich"
+  for (const id of result.skippedEntityIds) {
+    if (!processedIds.has(id)) next[id] = "skipped-abort"
+  }
+  return next
+}
+
 export function useLayeredResearch(
   entities: MapEntity[],
   drawnGeometries: DrawnGeometry[],
@@ -91,19 +120,9 @@ export function useLayeredResearch(
       ])
 
       // Initialise statuses: already-processed keep their status, rest become pending
-      setEntityStatuses((prev) => {
-        const next: Record<string, EntityResearchStatus> = {}
-        for (const id of orderedIds) {
-          if (processedEntityIdsRef.current.has(id)) {
-            next[id] = prev[id] ?? "done-empty"
-          } else if (recentAnalyzedEntityIds.has(id)) {
-            next[id] = "skipped-recent"
-          } else {
-            next[id] = "pending"
-          }
-        }
-        return next
-      })
+      setEntityStatuses((prev) =>
+        buildInitialEntityStatuses(orderedIds, processedEntityIdsRef.current, recentAnalyzedEntityIds, prev)
+      )
 
       setStatus("running")
       setProgress(null)
@@ -150,23 +169,13 @@ export function useLayeredResearch(
         // Merge cache additions from the final result (authoritative, de-duped by service)
         setCacheAdditions(result.cacheAdditions)
 
-        // Apply final statuses for entities the service marked as skipped
-        setEntityStatuses((prev) => {
-          const next = { ...prev }
-          for (const id of result.failedEntityIds) {
-            next[id] = "failed"
-            processedEntityIdsRef.current.add(id)
-          }
-          for (const id of result.skippedRichEntityIds) {
-            next[id] = "skipped-rich"
-          }
-          for (const id of result.skippedEntityIds) {
-            if (!processedEntityIdsRef.current.has(id)) {
-              next[id] = "skipped-abort"
-            }
-          }
-          return next
-        })
+        // Apply final statuses for entities the service marked as skipped/failed
+        for (const id of result.failedEntityIds) {
+          processedEntityIdsRef.current.add(id)
+        }
+        setEntityStatuses((prev) =>
+          applyFinalEntityStatuses(prev, result, processedEntityIdsRef.current)
+        )
 
         setLastStats(result.stats)
         setLastWarnings(result.warnings)

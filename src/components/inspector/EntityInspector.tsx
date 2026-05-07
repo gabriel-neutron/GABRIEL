@@ -334,12 +334,10 @@ export function EntityInspector({ readOnly = false, enrichedOverlay = {} }: Prop
     handleIsExactPositionChange,
     handleParentChange,
     handleSelectOsmRelation,
-    sources,
-    newSource,
-    setNewSource,
-    handleAddSource,
-    handleRemoveSource,
+    sourceEditor,
   } = useEntityInspector()
+  const { sources, draft: newSource, setDraft: setNewSource, add: handleAddSource, remove: handleRemoveSource } =
+    sourceEditor
 
   const [draft, setDraft] = useState<FieldDraft>(() =>
     entity != null ? draftFromEntity(entity) : { name: "", militaryUnitId: "", notes: "", osmRelationId: "" },

@@ -86,6 +86,18 @@ export interface ProjectActions {
 // Store
 // ---------------------------------------------------------------------------
 
+export function selectPersistableSnapshot(state: ProjectState) {
+  const nonOsmLayerIds = new Set(state.layers.filter((l) => l.osmData == null).map((l) => l.id))
+  return {
+    layers: state.layers,
+    entities: state.entities
+      .filter((e) => nonOsmLayerIds.has(e.layerId))
+      .map((e) => ({ ...e, name: e.name.trim() || "Untitled" })),
+    geometries: state.drawnGeometries.filter((g) => nonOsmLayerIds.has(g.layerId)),
+    sourceCache: state.sourceCache,
+  }
+}
+
 export const useProjectStore = create<ProjectState & ProjectActions>()(
   devtools(
     (set, get) => ({

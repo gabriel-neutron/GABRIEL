@@ -38,8 +38,13 @@ export type EntityInspectorState = {
   parentOptions: MapEntity[]
   firstPoint: DrawnGeometry | undefined
   isEchelonLayerSelected: boolean
-  sources: string[]
-  newSource: string
+  sourceEditor: {
+    sources: string[]
+    draft: string
+    setDraft: (value: string) => void
+    add: () => void
+    remove: (index: number) => void
+  }
   findDialogOpen: boolean
   setFindDialogOpen: (open: boolean) => void
   handleNameChange: (name: string) => void
@@ -48,9 +53,6 @@ export type EntityInspectorState = {
   handleIsExactPositionChange: (value: boolean) => void
   handleParentChange: (parentId: string | null) => void
   handleSelectOsmRelation: (relationId: number) => void
-  setNewSource: (value: string) => void
-  handleAddSource: () => void
-  handleRemoveSource: (index: number) => void
 }
 
 export function useEntityInspector(): EntityInspectorState {
@@ -198,8 +200,13 @@ export function useEntityInspector(): EntityInspectorState {
     parentOptions,
     firstPoint,
     isEchelonLayerSelected,
-    sources,
-    newSource,
+    sourceEditor: {
+      sources,
+      draft: newSource,
+      setDraft: setNewSource,
+      add: handleAddSource,
+      remove: handleRemoveSource,
+    },
     findDialogOpen,
     setFindDialogOpen,
     handleNameChange,
@@ -208,8 +215,5 @@ export function useEntityInspector(): EntityInspectorState {
     handleIsExactPositionChange,
     handleParentChange,
     handleSelectOsmRelation,
-    setNewSource,
-    handleAddSource,
-    handleRemoveSource,
   }
 }

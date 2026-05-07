@@ -223,7 +223,6 @@ export function useEnrichment({
     feature,
     context,
     overlay,
-    state,
     isDrawerOpen,
     draftPrompt,
     setDraftPrompt,
@@ -238,6 +237,16 @@ export function useEnrichment({
     allProposalsResolved,
     advanceBatchReview,
     forceCloseDrawer,
+    runStatus: state.run.status,
+    proposals: state.run.proposals,
+    queryTrace: state.run.queryTrace,
+    depthUsed: state.run.depthUsed,
+    unresolvedFields: state.run.unresolvedFields,
+    unresolvedReasons: state.run.unresolvedReasons,
+    conflicts: state.run.conflicts,
+    notes: state.run.notes,
+    runError: state.run.error?.details ?? null,
+    decisions: selectedEntityId ? (state.decisions[selectedEntityId] ?? {}) : {},
   }
 }
 
