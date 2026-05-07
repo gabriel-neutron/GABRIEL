@@ -1,4 +1,7 @@
 import { useState, useCallback, useEffect, useLayoutEffect, useRef } from "react"
+import type { DrawnGeometry } from "@/types/domain.types"
+import type { Organisation } from "@/types/organisation.types"
+import { INDUSTRY_LAYER_ID } from "@/types/organisation.types"
 import { MainLayout } from "@/components/shared/MainLayout"
 import { ToastStack, type ToastItem } from "@/components/shared/ToastStack"
 import { useProjectStore } from "@/store/useProjectStore"
@@ -12,10 +15,28 @@ export type EditPageProps = {
 }
 
 export function EditPage({ onViewMode, onOpenAbout }: EditPageProps): React.ReactElement {
-  const { entities, drawnGeometries, selectedEntityId, sourceCache, updateEntity, mergeSourceCache } =
+  const { entities, drawnGeometries, selectedEntityId, sourceCache, updateEntity, mergeSourceCache, addOrganisation, addGeometry, setSelectedOrganisationId, setSelectedEntityId } =
     useProjectStore()
 
   const { busy, error, restoredFromSession, handleNew, handleOpen, handleSave } = useProjectIO()
+
+  const handleCreateNewOrganisation = useCallback((geom: DrawnGeometry) => {
+    const org: Organisation = {
+      id: crypto.randomUUID(),
+      name: "New organisation",
+      type: "company",
+      parentId: null,
+      notes: null,
+      sources: null,
+      osmRelationId: null,
+      positionMode: "own",
+      isExactPosition: false,
+    }
+    addOrganisation(org)
+    addGeometry({ ...geom, layerId: INDUSTRY_LAYER_ID, entityId: org.id })
+    setSelectedOrganisationId(org.id)
+    setSelectedEntityId(null)
+  }, [addOrganisation, addGeometry, setSelectedOrganisationId, setSelectedEntityId])
 
   const [toasts, setToasts] = useState<ToastItem[]>([])
 
@@ -134,6 +155,7 @@ export function EditPage({ onViewMode, onOpenAbout }: EditPageProps): React.Reac
           onOpenProject: handleOpen,
           onSaveProject: handleSave,
         }}
+        onCreateNewOrganisation={handleCreateNewOrganisation}
         onOverpassUnavailable={() =>
           setToasts((prev) =>
             [

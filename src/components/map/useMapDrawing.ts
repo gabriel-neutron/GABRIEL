@@ -3,12 +3,13 @@ import type { DrawnGeometry } from "@/types/domain.types"
 
 type Options = {
   onCreateNewEntity: (geom: DrawnGeometry) => void
+  onCreateNewOrganisation?: (geom: DrawnGeometry) => void
   onLinkGeometryToEntity: (geom: DrawnGeometry, entityId: string) => void
 }
 
 export type MapTool = "pan" | "point" | "line" | "polygon"
 
-export function useMapDrawing({ onCreateNewEntity, onLinkGeometryToEntity }: Options) {
+export function useMapDrawing({ onCreateNewEntity, onCreateNewOrganisation, onLinkGeometryToEntity }: Options) {
   const [mapTool, setMapTool] = useState<MapTool>("pan")
   const [pendingGeometry, setPendingGeometry] = useState<DrawnGeometry | null>(null)
 
@@ -20,6 +21,12 @@ export function useMapDrawing({ onCreateNewEntity, onLinkGeometryToEntity }: Opt
   function handleCreateNew() {
     if (!pendingGeometry) return
     onCreateNewEntity(pendingGeometry)
+    setPendingGeometry(null)
+  }
+
+  function handleCreateNewOrganisation() {
+    if (!pendingGeometry || !onCreateNewOrganisation) return
+    onCreateNewOrganisation(pendingGeometry)
     setPendingGeometry(null)
   }
 
@@ -40,6 +47,7 @@ export function useMapDrawing({ onCreateNewEntity, onLinkGeometryToEntity }: Opt
     isDrawing: mapTool !== "pan",
     handleGeometryCreated,
     handleCreateNew,
+    handleCreateNewOrganisation,
     handleLinkToExisting,
     handleCancel,
   }

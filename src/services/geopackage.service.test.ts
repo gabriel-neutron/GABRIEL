@@ -51,7 +51,7 @@ describe("coordinate round-trip", () => {
         ["https://example.org/source-b", "cached snippet B"],
       ])
 
-      const bytes = await saveGeoPackage(layers, entities, geometries, sourceCache)
+      const bytes = await saveGeoPackage(layers, entities, [], geometries, sourceCache)
       const persistedBuffer = Uint8Array.from(bytes).buffer
       const loaded = await loadGeoPackage(persistedBuffer)
 

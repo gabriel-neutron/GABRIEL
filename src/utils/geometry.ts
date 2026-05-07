@@ -1,4 +1,5 @@
-import type { DrawnGeometry, MapEntity } from "@/types/domain.types"
+import type { DrawnGeometry, MapEntity, PositionMode } from "@/types/domain.types"
+import type { Organisation } from "@/types/organisation.types"
 import { type LatLng, asLatLng } from "@/types/coordinates"
 
 /**
@@ -36,81 +37,77 @@ export interface PositionedEntity {
   position: LatLng
 }
 
+export interface PositionedOrganisation {
+  organisation: Organisation
+  position: LatLng
+}
+
+type Positionable = { id: string; parentId: string | null; positionMode?: PositionMode }
+
 /**
- * Computes display positions for all entities, handling nested parent-linked
- * hierarchies without inter-circle overlap.
+ * Generic BFS position resolver shared by military entities and organisations.
  *
- * Algorithm (BFS from entities with own geometry):
- * 1. Seed the position map with all "own"-mode entities that have a geometry.
- * 2. Wave-by-wave, resolve non-own entities whose parent position is already known.
- *    Track each entity's BFS depth (distance from the nearest "own" ancestor).
+ * Algorithm:
+ * 1. Seed the position map with all "own"-mode items that have a geometry.
+ * 2. Wave-by-wave, resolve non-own items whose parent position is already known.
  * 3. Orbit radius = BASE_RADIUS * CHILD_SCALE^(depth-1).
- *    This shrinks each nested ring so sibling subtrees remain separate.
  *
  * The lng offset is divided by cos(lat) to produce circular rings in geographic
  * space (corrects the elliptical distortion caused by equal lat/lng increments).
  */
-export function computeAllEntityPositions(
-  entities: MapEntity[],
+function computePositions<T extends Positionable>(
+  items: T[],
   drawnGeometries: DrawnGeometry[],
-): PositionedEntity[] {
+): Map<string, LatLng> {
   const positionById = new Map<string, LatLng>()
   const depthById = new Map<string, number>()
 
-  // Step 1: seed with entities that have their own geometry (depth 0)
-  for (const entity of entities) {
-    if ((entity.positionMode ?? "own") === "own") {
-      const pos = getEntityDisplayPosition(entity.id, drawnGeometries)
+  for (const item of items) {
+    if ((item.positionMode ?? "own") === "own") {
+      const pos = getEntityDisplayPosition(item.id, drawnGeometries)
       if (pos) {
-        positionById.set(entity.id, pos)
-        depthById.set(entity.id, 0)
+        positionById.set(item.id, pos)
+        depthById.set(item.id, 0)
       }
     }
   }
 
-  // Step 2: sibling groups — for each parent ID, which non-own entities orbit it
-  const siblingGroups = new Map<string, MapEntity[]>()
-  for (const e of entities) {
-    if ((e.positionMode ?? "own") !== "own" && e.parentId != null) {
-      const group = siblingGroups.get(e.parentId) ?? []
-      group.push(e)
-      siblingGroups.set(e.parentId, group)
+  const siblingGroups = new Map<string, T[]>()
+  for (const item of items) {
+    if ((item.positionMode ?? "own") !== "own" && item.parentId != null) {
+      const group = siblingGroups.get(item.parentId) ?? []
+      group.push(item)
+      siblingGroups.set(item.parentId, group)
     }
   }
 
-  // Step 3: BFS — each wave resolves entities whose immediate parent is now known
-  let remaining = entities.filter(
-    (e) => (e.positionMode ?? "own") !== "own" && e.parentId != null,
-  )
+  let remaining = items.filter((item) => (item.positionMode ?? "own") !== "own" && item.parentId != null)
 
   while (remaining.length > 0) {
-    const nextRemaining: MapEntity[] = []
+    const nextRemaining: T[] = []
     let progress = false
 
-    for (const entity of remaining) {
-      const parentPos = positionById.get(entity.parentId!)
+    for (const item of remaining) {
+      const parentPos = positionById.get(item.parentId!)
       if (parentPos == null) {
-        nextRemaining.push(entity)
+        nextRemaining.push(item)
         continue
       }
       progress = true
 
-      const parentDepth = depthById.get(entity.parentId!) ?? 0
+      const parentDepth = depthById.get(item.parentId!) ?? 0
       const myDepth = parentDepth + 1
-      depthById.set(entity.id, myDepth)
+      depthById.set(item.id, myDepth)
 
-      const siblings = siblingGroups.get(entity.parentId!) ?? [entity]
-      const idx = siblings.indexOf(entity)
+      const siblings = siblingGroups.get(item.parentId!) ?? [item]
+      const idx = siblings.indexOf(item)
       const count = Math.max(siblings.length, 1)
       const angle = (2 * Math.PI * idx) / count
 
-      // Shrink orbit radius per depth so nested circles don't overlap siblings
       const radius = BASE_RADIUS * Math.pow(CHILD_SCALE, myDepth - 1)
-
-      // Divide lng offset by cos(lat) for a circular ring, not an ellipse
       const cosLat = Math.cos((parentPos[0] * Math.PI) / 180)
       positionById.set(
-        entity.id,
+        item.id,
         asLatLng(
           parentPos[0] + radius * Math.cos(angle),
           parentPos[1] + (radius / cosLat) * Math.sin(angle),
@@ -118,11 +115,29 @@ export function computeAllEntityPositions(
       )
     }
 
-    if (!progress) break // remaining entities have no resolvable parent
+    if (!progress) break
     remaining = nextRemaining
   }
 
+  return positionById
+}
+
+export function computeAllEntityPositions(
+  entities: MapEntity[],
+  drawnGeometries: DrawnGeometry[],
+): PositionedEntity[] {
+  const positionById = computePositions(entities, drawnGeometries)
   return entities
     .filter((e) => positionById.has(e.id))
     .map((e) => ({ entity: e, position: positionById.get(e.id)! }))
+}
+
+export function computeAllOrganisationPositions(
+  organisations: Organisation[],
+  drawnGeometries: DrawnGeometry[],
+): PositionedOrganisation[] {
+  const positionById = computePositions(organisations, drawnGeometries)
+  return organisations
+    .filter((o) => positionById.has(o.id))
+    .map((o) => ({ organisation: o, position: positionById.get(o.id)! }))
 }

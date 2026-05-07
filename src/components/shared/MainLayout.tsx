@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef } from "react"
 import { MapView } from "@/components/map/MapView"
 import { EntityInspector } from "@/components/inspector/EntityInspector"
+import { OrganisationInspector } from "@/components/inspector/OrganisationInspector"
 import { EnrichDrawer } from "@/components/enrichment/EnrichDrawer"
 import { OsmObjectInspector } from "@/components/inspector/OsmObjectInspector"
 import { ResearchDialog } from "@/components/shared/ResearchDialog"
@@ -68,6 +69,7 @@ export type MainLayoutProps = {
   layeredResearch?: LayeredResearchControls
   restoredFromSession?: boolean
   onOverpassUnavailable?: () => void
+  onCreateNewOrganisation?: (geom: DrawnGeometry) => void
 }
 
 export function MainLayout({
@@ -82,11 +84,13 @@ export function MainLayout({
   layeredResearch,
   restoredFromSession = false,
   onOverpassUnavailable,
+  onCreateNewOrganisation,
 }: MainLayoutProps): React.ReactElement {
   const {
     layers,
     entities,
     selectedEntityId,
+    selectedOrganisationId,
     selectedOsmObject,
     addLayer,
     closeDetail,
@@ -120,7 +124,15 @@ export function MainLayout({
     const s = useProjectStore.getState()
     s.addGeometry({ ...geom, entityId })
     s.setSelectedOsmObject(null)
-    s.setSelectedEntityId(entityId)
+    const isOrg = s.organisations.some((o) => o.id === entityId)
+    if (isOrg) {
+      s.updateOrganisation(entityId, { positionMode: "own" })
+      s.setSelectedOrganisationId(entityId)
+      s.setSelectedEntityId(null)
+    } else {
+      s.updateEntity(entityId, { positionMode: "own" })
+      s.setSelectedEntityId(entityId)
+    }
   }, [])
 
   const defaultLayerId = getDefaultEntityLayerId(layers)
@@ -136,6 +148,7 @@ export function MainLayout({
           <MapView
             readOnly={readOnly}
             onCreateNewEntity={handleCreateNewEntity}
+            onCreateNewOrganisation={onCreateNewOrganisation}
             onLinkGeometryToEntity={handleLinkGeometryToEntity}
             defaultLayerId={defaultLayerId}
             hiddenEntityIds={hiddenEntityIds}
@@ -207,6 +220,7 @@ export function MainLayout({
         }
         headerMenuSlot={!readOnly ? <OsmQueryMenu layers={layers} onAddLayer={addLayer} /> : null}
         selectedEntityId={selectedEntityId}
+        selectedOrganisationId={selectedOrganisationId}
         selectedOsmObject={selectedOsmObject}
         onCloseDetail={closeDetail}
         detailHeaderActions={
@@ -228,6 +242,8 @@ export function MainLayout({
               id={selectedOsmObject.id}
               cachedFeature={selectedOsmObject.cachedFeature}
             />
+          ) : selectedOrganisationId != null ? (
+            <OrganisationInspector key={selectedOrganisationId} readOnly={readOnly} />
           ) : (
             <EntityInspector
               key={selectedEntityId ?? "none"}

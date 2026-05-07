@@ -5,7 +5,9 @@ import {
   getDefaultEchelonLayers,
   applyGeoPackageResult,
   type GpkgLayer,
+  type GpkgOrganisation,
 } from "@/services/geopackage.service"
+import { INDUSTRY_LAYER_ID } from "@/types/organisation.types"
 import { loadProject, saveProject, clearProject } from "@/services/projectStorage.service"
 import { useProjectStore, selectPersistableSnapshot } from "@/store/useProjectStore"
 
@@ -25,6 +27,17 @@ async function writeGeoPackageToFile(bytes: Uint8Array): Promise<void> {
   await writable.close()
 }
 
+async function loadSeedGeoPackageBuffer(): Promise<ArrayBuffer | null> {
+  try {
+    const response = await fetch("/project.gpkg", { cache: "no-store" })
+    if (!response.ok) return null
+    const buffer = await response.arrayBuffer()
+    return buffer.byteLength > 0 ? buffer : null
+  } catch {
+    return null
+  }
+}
+
 export function useProjectIO() {
   const { resetProject } = useProjectStore()
   const [busy, setBusy] = useState(false)
@@ -42,8 +55,10 @@ export function useProjectIO() {
           useProjectStore.getState().setProject({
             layers: next.layers,
             entities: next.entities,
+            organisations: next.organisations,
             drawnGeometries: next.drawnGeometries,
             selectedEntityId: next.selectedEntityId,
+            selectedOrganisationId: next.selectedOrganisationId,
             sourceCache: result.sourceCache,
           })
           setRestoredFromSession(true)
@@ -69,6 +84,11 @@ export function useProjectIO() {
   )
 
   const handleNew = useCallback(async (): Promise<void> => {
+    const previousProject = await loadProject().catch(() => null)
+    const seedBuffer =
+      previousProject?.buffer != null && previousProject.buffer.byteLength > 0
+        ? previousProject.buffer
+        : await loadSeedGeoPackageBuffer()
     resetProject()
     setError(null)
     setRestoredFromSession(false)
@@ -81,13 +101,12 @@ export function useProjectIO() {
     setBusy(true)
     try {
       const defaultLayers = getDefaultEchelonLayers()
-      const gpkgLayers: GpkgLayer[] = defaultLayers.map((l) => ({
-        id: l.id,
-        name: l.name,
-        visible: l.visible,
-        kind: l.kind,
-      }))
-      const bytes = await saveGeoPackage(gpkgLayers, [], [])
+      const industryLayer: GpkgLayer = { id: INDUSTRY_LAYER_ID, name: "Industry", visible: true, kind: "organisation" }
+      const gpkgLayers: GpkgLayer[] = [
+        ...defaultLayers.map((l) => ({ id: l.id, name: l.name, visible: l.visible, kind: l.kind })),
+        industryLayer,
+      ]
+      const bytes = await saveGeoPackage(gpkgLayers, [], [], [], undefined, seedBuffer ?? undefined)
       await writeGeoPackageToFile(bytes)
       window.alert("New project created.")
     } catch (e) {
@@ -109,8 +128,10 @@ export function useProjectIO() {
       useProjectStore.getState().setProject({
         layers: next.layers,
         entities: next.entities,
+        organisations: next.organisations,
         drawnGeometries: next.drawnGeometries,
         selectedEntityId: next.selectedEntityId,
+        selectedOrganisationId: next.selectedOrganisationId,
         sourceCache: result.sourceCache,
       })
       await saveProject(buffer)
@@ -123,7 +144,7 @@ export function useProjectIO() {
   }, [])
 
   const handleSave = useCallback(async (): Promise<void> => {
-    const { layers, entities: persistedEntities, geometries: persistedGeometries, sourceCache } =
+    const { layers, entities: persistedEntities, organisations: persistedOrganisations, geometries: persistedGeometries, sourceCache } =
       selectPersistableSnapshot(useProjectStore.getState())
     const gpkgLayers: GpkgLayer[] = layers.map((l) => ({
       id: l.id,
@@ -133,10 +154,19 @@ export function useProjectIO() {
       sourceQuery: l.sourceQuery,
       osmData: l.osmData,
     }))
+    const gpkgOrganisations: GpkgOrganisation[] = persistedOrganisations
     setBusy(true)
     setError(null)
     try {
-      const bytes = await saveGeoPackage(gpkgLayers, persistedEntities, persistedGeometries, sourceCache)
+      const existing = await loadProject()
+      const bytes = await saveGeoPackage(
+        gpkgLayers,
+        persistedEntities,
+        gpkgOrganisations,
+        persistedGeometries,
+        sourceCache,
+        existing?.buffer,
+      )
       await writeGeoPackageToFile(bytes)
       const buffer = new ArrayBuffer(bytes.length)
       new Uint8Array(buffer).set(bytes)

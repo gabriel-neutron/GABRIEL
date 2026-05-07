@@ -1,7 +1,10 @@
 import { useState } from "react"
 import { Eye, EyeOff } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { Separator } from "@/components/ui/separator"
 import type { MapEntity } from "@/types/domain.types"
+import type { Organisation } from "@/types/organisation.types"
+import { ORGANISATION_TYPE_LABELS } from "@/types/organisation.types"
 import { useProjectStore } from "@/store/useProjectStore"
 import { useShallow } from "zustand/shallow"
 
@@ -170,11 +173,90 @@ function EntityNode({
   )
 }
 
+type OrgNodeProps = {
+  org: Organisation
+  depth: number
+  organisations: Organisation[]
+  selectedOrganisationId: string | null
+  expandedOrgIds: Set<string>
+  onToggleExpanded: (id: string) => void
+}
+
+function OrgNode({ org, depth, organisations, selectedOrganisationId, expandedOrgIds, onToggleExpanded }: OrgNodeProps) {
+  const children = organisations
+    .filter((o) => o.parentId === org.id)
+    .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }))
+  const hasKids = children.length > 0
+  const expanded = expandedOrgIds.has(org.id)
+  const isSelected = selectedOrganisationId === org.id
+
+  function handleSelect() {
+    const s = useProjectStore.getState()
+    s.setSelectedOrganisationId(org.id)
+    s.setSelectedEntityId(null)
+    s.setSelectedOsmObject(null)
+  }
+
+  return (
+    <div className={depth === 0 ? "rounded-md border" : undefined}>
+      <div
+        className="flex items-center gap-2 px-3 py-2 transition-colors duration-150 hover:bg-muted/40"
+        style={{ paddingLeft: `${12 + depth * 16}px` }}
+      >
+        <button
+          type="button"
+          className="flex shrink-0 items-center justify-center text-muted-foreground transition-transform duration-150 active:scale-95 disabled:opacity-0"
+          onClick={() => onToggleExpanded(org.id)}
+          aria-label={expanded ? "Collapse" : "Expand"}
+          disabled={!hasKids}
+        >
+          {hasKids ? (expanded ? "▾" : "▸") : ""}
+        </button>
+        <button
+          type="button"
+          onClick={handleSelect}
+          className={`min-w-0 flex-1 truncate text-left text-sm font-medium transition-colors ${isSelected ? "text-foreground" : ""}`}
+          title={`${org.name} — ${ORGANISATION_TYPE_LABELS[org.type]}`}
+        >
+          {org.name}
+        </button>
+      </div>
+      {hasKids && (
+        <div
+          className={`grid overflow-hidden transition-[grid-template-rows,opacity] duration-150 ease-out ${
+            expanded ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"
+          }`}
+        >
+          <div className={`min-h-0 overflow-hidden ${depth === 0 ? "border-t bg-muted/30" : ""}`}>
+            {children.map((child) => (
+              <OrgNode
+                key={child.id}
+                org={child}
+                depth={depth + 1}
+                organisations={organisations}
+                selectedOrganisationId={selectedOrganisationId}
+                expandedOrgIds={expandedOrgIds}
+                onToggleExpanded={onToggleExpanded}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 export function HierarchyPanel({ hiddenEntityIds, onToggleEntityVisible }: Props) {
-  const { entities, selectedEntityId } = useProjectStore(
-    useShallow((s) => ({ entities: s.entities, selectedEntityId: s.selectedEntityId }))
+  const { entities, selectedEntityId, organisations, selectedOrganisationId } = useProjectStore(
+    useShallow((s) => ({
+      entities: s.entities,
+      selectedEntityId: s.selectedEntityId,
+      organisations: s.organisations,
+      selectedOrganisationId: s.selectedOrganisationId,
+    }))
   )
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
+  const [expandedOrgIds, setExpandedOrgIds] = useState<Set<string>>(new Set())
   const anyVisible = entities.some(
     (e) => !hiddenEntityIds.has(e.id) && !isAncestorHidden(e, entities, hiddenEntityIds),
   )
@@ -182,11 +264,15 @@ export function HierarchyPanel({ hiddenEntityIds, onToggleEntityVisible }: Props
   function handleToggleExpanded(id: string) {
     setExpandedIds((prev) => {
       const next = new Set(prev)
-      if (next.has(id)) {
-        next.delete(id)
-      } else {
-        next.add(id)
-      }
+      if (next.has(id)) { next.delete(id) } else { next.add(id) }
+      return next
+    })
+  }
+
+  function handleToggleOrgExpanded(id: string) {
+    setExpandedOrgIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) { next.delete(id) } else { next.add(id) }
       return next
     })
   }
@@ -200,6 +286,10 @@ export function HierarchyPanel({ hiddenEntityIds, onToggleEntityVisible }: Props
     entities.filter((e) => e.parentId == null),
     entities,
   )
+
+  const orgRoots = organisations
+    .filter((o) => o.parentId == null)
+    .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }))
 
   return (
     <div className="flex min-w-0 flex-col">
@@ -223,6 +313,26 @@ export function HierarchyPanel({ hiddenEntityIds, onToggleEntityVisible }: Props
               onToggleExpanded={handleToggleExpanded}
             />
           ))
+        )}
+
+        {organisations.length > 0 && (
+          <>
+            <Separator className="my-2" />
+            <div className="px-1 pb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Industry
+            </div>
+            {orgRoots.map((root) => (
+              <OrgNode
+                key={root.id}
+                org={root}
+                depth={0}
+                organisations={organisations}
+                selectedOrganisationId={selectedOrganisationId}
+                expandedOrgIds={expandedOrgIds}
+                onToggleExpanded={handleToggleOrgExpanded}
+              />
+            ))}
+          </>
         )}
       </div>
     </div>

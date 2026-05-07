@@ -31,8 +31,10 @@ const meta = {
       useProjectStore.getState().setProject({
         layers: [layer],
         entities: [entity],
+        organisations: [],
         drawnGeometries: [],
         selectedEntityId: entity.id,
+        selectedOrganisationId: null,
         sourceCache: new Map(),
       })
       return <Story />

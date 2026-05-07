@@ -16,8 +16,8 @@ export type Layer = {
   id: string
   name: string
   visible: boolean
-  /** Echelon = automatic by echelon; custom = user-created; osm = OSM overlay with cached GeoJSON. */
-  kind?: "echelon" | "custom" | "osm"
+  /** Echelon = automatic by echelon; custom = user-created; osm = OSM overlay with cached GeoJSON; organisation = fixed Industry layer. */
+  kind?: "echelon" | "custom" | "osm" | "organisation"
   /** When set, this layer is an OSM overlay (GeoJSON). */
   osmData?: GeoJSON.FeatureCollection
   /** Normalized query string for deduplication. */

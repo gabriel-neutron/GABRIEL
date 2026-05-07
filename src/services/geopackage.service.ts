@@ -8,6 +8,8 @@ import {
 } from "@ngageoint/geopackage"
 import { ECHELON_OPTIONS } from "@/types/symbol.types"
 import type { Layer, MapEntity, DrawnGeometry, PositionMode } from "@/types/domain.types"
+import type { Organisation, OrganisationType } from "@/types/organisation.types"
+import { INDUSTRY_LAYER_ID, ORGANISATION_TYPES } from "@/types/organisation.types"
 import { toLeafletCoord, toGeoJsonCoord } from "@/types/coordinates"
 
 setSqljsWasmLocateFile(
@@ -16,13 +18,43 @@ setSqljsWasmLocateFile(
 
 const LAYERS_TABLE = "layers"
 const UNITS_TABLE = "units"
+const ORGANISATIONS_TABLE = "organisations"
 const GEOMETRIES_TABLE = "geometries"
+const BROWSER_SAVE_FILE_POOL_SIZE = 8
+let browserSaveFileIndex = 0
+
+function nextSavePackageFileName(): string {
+  if (typeof window === "undefined") {
+    return `gabriel-${crypto.randomUUID()}.gpkg`
+  }
+  // In browser/sql.js runtimes, unbounded filenames can leak virtual DB files across saves.
+  const index = browserSaveFileIndex++ % BROWSER_SAVE_FILE_POOL_SIZE
+  return `gabriel-browser-save-${index}.gpkg`
+}
+
+async function createGeoPackageWithRetry(maxAttempts = 6): Promise<GeoPackage> {
+  let lastError: unknown = null
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    const packageFileName =
+      attempt < BROWSER_SAVE_FILE_POOL_SIZE
+        ? nextSavePackageFileName()
+        : `gabriel-browser-save-fallback-${crypto.randomUUID()}.gpkg`
+    try {
+      const gpkg = await GeoPackageAPI.create(packageFileName)
+      gpkg.createRequiredTables()
+      return gpkg
+    } catch (error) {
+      lastError = error
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error(String(lastError ?? "Unable to create GeoPackage."))
+}
 
 export interface GpkgLayer {
   id: string
   name: string
   visible: boolean
-  kind?: "echelon" | "custom" | "osm"
+  kind?: "echelon" | "custom" | "osm" | "organisation"
   sourceQuery?: string
   osmData?: GeoJSON.FeatureCollection
 }
@@ -48,9 +80,22 @@ export interface GpkgEntity {
 
 export type GpkgGeometry = DrawnGeometry
 
+export interface GpkgOrganisation {
+  id: string
+  name: string
+  type: OrganisationType
+  parentId: string | null
+  notes: string | null
+  sources: string | null
+  osmRelationId: number | null
+  positionMode: PositionMode
+  isExactPosition: boolean
+}
+
 export interface GeoPackageLoadResult {
   layers: GpkgLayer[]
   entities: GpkgEntity[]
+  organisations: GpkgOrganisation[]
   geometries: GpkgGeometry[]
   /** URL → cached snippet map loaded from the `research_sources` table. Empty map for older projects. */
   sourceCache: Map<string, string>
@@ -63,11 +108,14 @@ export async function loadGeoPackage(buffer: ArrayBuffer): Promise<GeoPackageLoa
 
     const layers = readLayers(geoPackage)
     const entities = readEntities(geoPackage)
+    const organisations = readOrganisations(geoPackage)
     const geometries = await readGeometries(geoPackage)
     const sourceCache = readSourceCache(geoPackage)
 
     const layerIds = new Set(layers.map((l) => l.id))
     const entityIds = new Set(entities.map((e) => e.id))
+    const organisationIds = new Set(organisations.map((o) => o.id))
+    const allEntityIds = new Set([...entityIds, ...organisationIds])
     for (const e of entities) {
       if (!layerIds.has(e.layerId)) {
         throw new Error("Unsupported schema: entity references missing layer.")
@@ -76,16 +124,21 @@ export async function loadGeoPackage(buffer: ArrayBuffer): Promise<GeoPackageLoa
         throw new Error("Unsupported schema: entity references missing parent.")
       }
     }
+    for (const o of organisations) {
+      if (o.parentId != null && !organisationIds.has(o.parentId)) {
+        throw new Error("Unsupported schema: organisation references missing parent.")
+      }
+    }
     for (const g of geometries) {
       if (!layerIds.has(g.layerId)) {
         throw new Error("Unsupported schema: geometry references missing layer.")
       }
-      if (g.entityId != null && !entityIds.has(g.entityId)) {
+      if (g.entityId != null && !allEntityIds.has(g.entityId)) {
         throw new Error("Unsupported schema: geometry references missing entity.")
       }
     }
 
-    return { layers, entities, geometries, sourceCache }
+    return { layers, entities, organisations, geometries, sourceCache }
   } catch (e) {
     if (e instanceof Error && e.message.startsWith("Unsupported schema")) throw e
     const errorMsg = e instanceof Error ? e.message : String(e)
@@ -110,7 +163,8 @@ function readLayers(geoPackage: GeoPackage): GpkgLayer[] {
   }>
   return result.map((row) => {
     const kind =
-      row.kind != null && (row.kind === "echelon" || row.kind === "custom" || row.kind === "osm")
+      row.kind != null &&
+      (row.kind === "echelon" || row.kind === "custom" || row.kind === "osm" || row.kind === "organisation")
         ? (row.kind as GpkgLayer["kind"])
         : undefined
     const layer: GpkgLayer = {
@@ -209,6 +263,54 @@ function readEntities(geoPackage: GeoPackage): GpkgEntity[] {
   })
 }
 
+const VALID_ORGANISATION_TYPES = new Set<OrganisationType>(ORGANISATION_TYPES)
+
+function readOrganisations(geoPackage: GeoPackage): GpkgOrganisation[] {
+  const tables = geoPackage.connection.all(
+    `SELECT name FROM sqlite_master WHERE type='table' AND name=?`,
+    [ORGANISATIONS_TABLE],
+  ) as Array<{ name: string }>
+  if (tables.length === 0) return []
+
+  const result = geoPackage.connection.all(
+    `SELECT id, name, type, parent_id, notes, sources, osm_relation_id, position_mode, is_exact_position
+     FROM ${ORGANISATIONS_TABLE}`,
+  ) as Array<{
+    id: string
+    name: string
+    type: string
+    parent_id: string | null
+    notes: string | null
+    sources: string | null
+    osm_relation_id: number | null
+    position_mode: string | null
+    is_exact_position: number | null
+  }>
+
+  return result.map((row) => {
+    const rawMode = row.position_mode as string | null
+    const positionMode: PositionMode =
+      rawMode != null && VALID_POSITION_MODES.has(rawMode as PositionMode)
+        ? (rawMode as PositionMode)
+        : "own"
+    const rawType = row.type as string
+    const type: OrganisationType = VALID_ORGANISATION_TYPES.has(rawType as OrganisationType)
+      ? (rawType as OrganisationType)
+      : "other"
+    return {
+      id: String(row.id ?? ""),
+      name: String(row.name ?? ""),
+      type,
+      parentId: row.parent_id != null ? String(row.parent_id) : null,
+      notes: row.notes != null ? String(row.notes) : null,
+      sources: row.sources != null ? String(row.sources) : null,
+      osmRelationId: row.osm_relation_id != null ? Number(row.osm_relation_id) : null,
+      positionMode,
+      isExactPosition: Number(row.is_exact_position ?? 0) === 1,
+    }
+  })
+}
+
 function readSourceCache(geoPackage: GeoPackage): Map<string, string> {
   try {
     const rows = geoPackage.connection.all(
@@ -283,17 +385,20 @@ async function readGeometries(geoPackage: GeoPackage): Promise<GpkgGeometry[]> {
 export async function saveGeoPackage(
   layers: GpkgLayer[],
   entities: GpkgEntity[],
+  organisations: GpkgOrganisation[],
   geometries: GpkgGeometry[],
   researchSources?: Map<string, string>,
+  baseBuffer?: ArrayBuffer,
 ): Promise<Uint8Array> {
   let geoPackage: GeoPackage | null = null
-  const packageFileName = `gabriel-${crypto.randomUUID()}.gpkg`
   try {
-    // Use a deterministic package file name so sql.js export works in browser and Node test runtimes.
-    geoPackage = await GeoPackageAPI.create(packageFileName)
-    geoPackage.createRequiredTables()
+    if (baseBuffer != null && baseBuffer.byteLength > 0) {
+      geoPackage = await GeoPackageAPI.open(new Uint8Array(baseBuffer))
+    } else {
+      geoPackage = await createGeoPackageWithRetry()
+    }
 
-    geoPackage.connection.run(`CREATE TABLE ${LAYERS_TABLE} (
+    geoPackage.connection.run(`CREATE TABLE IF NOT EXISTS ${LAYERS_TABLE} (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
   visible INTEGER NOT NULL DEFAULT 1,
@@ -303,7 +408,7 @@ export async function saveGeoPackage(
   geojson TEXT
 )`)
 
-    geoPackage.connection.run(`CREATE TABLE ${UNITS_TABLE} (
+    geoPackage.connection.run(`CREATE TABLE IF NOT EXISTS ${UNITS_TABLE} (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
   layer_id TEXT NOT NULL,
@@ -318,6 +423,18 @@ export async function saveGeoPackage(
   notes TEXT,
   sources TEXT,
   analyzed_at TEXT,
+  position_mode TEXT DEFAULT 'own',
+  is_exact_position INTEGER NOT NULL DEFAULT 0
+)`)
+
+    geoPackage.connection.run(`CREATE TABLE IF NOT EXISTS ${ORGANISATIONS_TABLE} (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  type TEXT NOT NULL,
+  parent_id TEXT,
+  notes TEXT,
+  sources TEXT,
+  osm_relation_id INTEGER,
   position_mode TEXT DEFAULT 'own',
   is_exact_position INTEGER NOT NULL DEFAULT 0
 )`)
@@ -343,20 +460,29 @@ export async function saveGeoPackage(
     const entityIdColumn = FeatureColumn.createColumn(3, "entity_id", GeoPackageDataType.TEXT, false)
     const typeColumn = FeatureColumn.createColumn(4, "type", GeoPackageDataType.TEXT, true)
 
-    geoPackage.createFeatureTable(
-      GEOMETRIES_TABLE,
-      undefined,
-      [geometryColumn, idColumn, layerIdColumn, entityIdColumn, typeColumn],
-      undefined,
-      4326,
-    )
+    if (!geoPackage.getFeatureTables().includes(GEOMETRIES_TABLE)) {
+      geoPackage.createFeatureTable(
+        GEOMETRIES_TABLE,
+        undefined,
+        [geometryColumn, idColumn, layerIdColumn, entityIdColumn, typeColumn],
+        undefined,
+        4326,
+      )
+    }
 
-    geoPackage.connection.run(`CREATE TABLE research_sources (
+    geoPackage.connection.run(`CREATE TABLE IF NOT EXISTS research_sources (
   id TEXT PRIMARY KEY,
   url TEXT UNIQUE NOT NULL,
   content TEXT,
   fetched_at TEXT
 )`)
+
+    // Replace persisted app data with the current in-memory project snapshot.
+    geoPackage.connection.run(`DELETE FROM ${LAYERS_TABLE}`)
+    geoPackage.connection.run(`DELETE FROM ${UNITS_TABLE}`)
+    geoPackage.connection.run(`DELETE FROM ${ORGANISATIONS_TABLE}`)
+    geoPackage.connection.run(`DELETE FROM ${GEOMETRIES_TABLE}`)
+    geoPackage.connection.run(`DELETE FROM research_sources`)
 
     if (researchSources) {
       for (const [url, content] of researchSources.entries()) {
@@ -403,6 +529,23 @@ export async function saveGeoPackage(
           e.analyzedAt != null ? String(e.analyzedAt) : null,
           e.positionMode ?? "own",
           e.isExactPosition ? 1 : 0,
+        ],
+      )
+    }
+
+    for (const o of organisations) {
+      geoPackage.connection.run(
+        `INSERT INTO ${ORGANISATIONS_TABLE} (id, name, type, parent_id, notes, sources, osm_relation_id, position_mode, is_exact_position) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          String(o.id ?? ""),
+          String(o.name ?? ""),
+          String(o.type ?? "other"),
+          o.parentId != null ? String(o.parentId) : null,
+          o.notes != null ? String(o.notes) : null,
+          o.sources != null ? String(o.sources) : null,
+          o.osmRelationId != null ? o.osmRelationId : null,
+          o.positionMode ?? "own",
+          o.isExactPosition ? 1 : 0,
         ],
       )
     }
@@ -468,13 +611,16 @@ export function getDefaultEchelonLayers(): Layer[] {
 export interface ApplyGeoPackageResultState {
   layers: Layer[]
   entities: MapEntity[]
+  organisations: Organisation[]
   drawnGeometries: DrawnGeometry[]
   selectedEntityId: string | null
+  selectedOrganisationId: string | null
 }
 
 export function applyGeoPackageResult(
   result: GeoPackageLoadResult,
   currentSelectedEntityId: string | null,
+  currentSelectedOrganisationId: string | null = null,
 ): ApplyGeoPackageResultState {
   const loaded = result.layers
   const echelonById = new Map(loaded.filter((l) => l.kind === "echelon").map((l) => [l.id, l]))
@@ -495,15 +641,26 @@ export function applyGeoPackageResult(
       osmData: l.osmData,
       sourceQuery: l.sourceQuery,
     }))
+  const industryFromFile = loaded.find((l) => l.id === INDUSTRY_LAYER_ID && l.kind === "organisation")
+  const industryLayer: Layer = industryFromFile
+    ? { id: INDUSTRY_LAYER_ID, name: industryFromFile.name, visible: industryFromFile.visible, kind: "organisation" }
+    : { id: INDUSTRY_LAYER_ID, name: "Industry", visible: true, kind: "organisation" }
   const selectedEntityId =
     currentSelectedEntityId != null && result.entities.some((e) => e.id === currentSelectedEntityId)
       ? currentSelectedEntityId
       : null
-  const layers: Layer[] = [...echelonLayers, ...customLayers, ...osmLayers]
+  const selectedOrganisationId =
+    currentSelectedOrganisationId != null &&
+    result.organisations.some((o) => o.id === currentSelectedOrganisationId)
+      ? currentSelectedOrganisationId
+      : null
+  const layers: Layer[] = [...echelonLayers, ...customLayers, ...osmLayers, industryLayer]
   return {
     layers,
     entities: result.entities as MapEntity[],
+    organisations: result.organisations as Organisation[],
     drawnGeometries: result.geometries as DrawnGeometry[],
     selectedEntityId,
+    selectedOrganisationId,
   }
 }

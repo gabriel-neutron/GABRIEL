@@ -5,6 +5,7 @@ import { MapToolSelector } from "./MapToolSelector"
 import { DrawControls } from "./DrawControls"
 import { GeometryActionMenu } from "./GeometryActionMenu"
 import { SymbolsLayer } from "./SymbolsLayer"
+import { OrganisationsLayer } from "./OrganisationsLayer"
 import { NetworkLinksLayer } from "./NetworkLinksLayer"
 import { CenterOnSelection } from "./CenterOnSelection"
 import { useMapDrawing } from "./useMapDrawing"
@@ -123,6 +124,7 @@ function getOsmTypeAndId(
 type Props = {
   readOnly?: boolean
   onCreateNewEntity: (geom: DrawnGeometry) => void
+  onCreateNewOrganisation?: (geom: DrawnGeometry) => void
   onLinkGeometryToEntity: (geom: DrawnGeometry, entityId: string) => void
   defaultLayerId: string
   hiddenEntityIds?: Set<string>
@@ -133,6 +135,7 @@ type Props = {
 export function MapView({
   readOnly = false,
   onCreateNewEntity,
+  onCreateNewOrganisation,
   onLinkGeometryToEntity,
   defaultLayerId,
   hiddenEntityIds,
@@ -141,6 +144,7 @@ export function MapView({
 }: Props): React.ReactElement {
   const layers = useProjectStore((s) => s.layers)
   const entities = useProjectStore((s) => s.entities)
+  const organisations = useProjectStore((s) => s.organisations)
   const drawnGeometries = useProjectStore((s) => s.drawnGeometries)
   const entityOsmGeometries = useProjectStore((s) => s.entityOsmGeometries)
   const selectedEntityId = useProjectStore((s) => s.selectedEntityId)
@@ -157,9 +161,10 @@ export function MapView({
     isDrawing,
     handleGeometryCreated,
     handleCreateNew,
+    handleCreateNewOrganisation,
     handleLinkToExisting,
     handleCancel,
-  } = useMapDrawing({ onCreateNewEntity, onLinkGeometryToEntity })
+  } = useMapDrawing({ onCreateNewEntity, onCreateNewOrganisation, onLinkGeometryToEntity })
 
   const [mapBounds, setMapBounds] = useState<MapBounds | null>(null)
 
@@ -241,7 +246,9 @@ export function MapView({
       {!readOnly && pendingGeometry && (
         <GeometryActionMenu
           entities={entities}
+          organisations={organisations}
           onCreateNew={handleCreateNew}
+          onCreateNewOrganisation={handleCreateNewOrganisation}
           onLinkToExisting={handleLinkToExisting}
           onCancel={handleCancel}
         />
@@ -277,6 +284,15 @@ export function MapView({
           visibleLayerIds={visibleLayerIds}
           hiddenEntityIds={hiddenEntityIds}
           onSelectEntity={handleSelectEntity}
+          mapBounds={mapBounds}
+          interactive={!isDrawing}
+        />
+        <OrganisationsLayer
+          visibleLayerIds={visibleLayerIds}
+          onSelectOrganisation={(id) => {
+            useProjectStore.getState().setSelectedOrganisationId(id)
+            useProjectStore.getState().setSelectedEntityId(null)
+          }}
           mapBounds={mapBounds}
           interactive={!isDrawing}
         />

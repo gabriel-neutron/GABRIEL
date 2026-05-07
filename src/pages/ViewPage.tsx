@@ -38,8 +38,10 @@ export function ViewPage({ onEditMode, onOpenAbout }: ViewPageProps): React.Reac
         useProjectStore.getState().setProject({
           layers: next.layers,
           entities: next.entities,
+          organisations: next.organisations,
           drawnGeometries: next.drawnGeometries,
           selectedEntityId: next.selectedEntityId,
+          selectedOrganisationId: next.selectedOrganisationId,
           sourceCache: result.sourceCache,
         })
         setLoadError(null)

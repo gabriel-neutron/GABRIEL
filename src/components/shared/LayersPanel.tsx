@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useMemo } from "react"
 import { Eye, EyeOff } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useProjectStore } from "@/store/useProjectStore"
+import { ORGANISATION_TYPE_LABELS } from "@/types/organisation.types"
 
 type Props = {
   readOnly?: boolean
@@ -21,6 +22,7 @@ type LayersContextMenuProps = {
   canRemove: boolean
   isOsmContext: boolean
   isEchelonLayer: boolean
+  isOrgLayer: boolean
   onRename: () => void
   onRemove: () => void
 }
@@ -32,6 +34,7 @@ function LayersContextMenu({
   canRemove,
   isOsmContext,
   isEchelonLayer,
+  isOrgLayer,
   onRename,
   onRemove,
 }: LayersContextMenuProps) {
@@ -63,6 +66,11 @@ function LayersContextMenu({
           Echelon layers cannot be renamed or deleted.
         </div>
       )}
+      {isOrgLayer && (
+        <div className="px-3 py-1.5 text-xs text-muted-foreground">
+          Industry layer cannot be renamed or deleted.
+        </div>
+      )}
     </div>
   )
 }
@@ -70,7 +78,9 @@ function LayersContextMenu({
 export function LayersPanel({ readOnly = false }: Props) {
   const layers = useProjectStore((s) => s.layers)
   const entities = useProjectStore((s) => s.entities)
+  const organisations = useProjectStore((s) => s.organisations)
   const selectedEntityId = useProjectStore((s) => s.selectedEntityId)
+  const selectedOrganisationId = useProjectStore((s) => s.selectedOrganisationId)
 
   const [expandedByLayerId, setExpandedByLayerId] = useState<Record<string, boolean>>({})
   const [contextMenu, setContextMenu] = useState<{ layerId: string; x: number; y: number } | null>(null)
@@ -114,12 +124,14 @@ export function LayersPanel({ readOnly = false }: Props) {
   const contextLayer = contextMenu ? layers.find((l) => l.id === contextMenu.layerId) : null
   const isOsmContext = contextLayer?.osmData != null
   const isEchelonLayer = contextLayer?.kind === "echelon"
+  const isOrgLayerContext = contextLayer?.kind === "organisation"
   const canRename = contextLayer?.kind === "custom"
   const canRemove = !!contextLayer && (contextLayer.kind === "custom" || isOsmContext)
   const visibleLayers = layers.filter(
     (layer) =>
       layer.osmData != null ||
       layer.kind === "custom" ||
+      layer.kind === "organisation" ||
       entities.some((e) => e.layerId === layer.id),
   )
 
@@ -149,16 +161,23 @@ export function LayersPanel({ readOnly = false }: Props) {
       <div className="min-h-0 flex-1 space-y-1 p-4">
         {visibleLayers.map((layer, index) => {
           const isOsmLayer = layer.osmData != null
+          const isOrgLayer = layer.kind === "organisation"
           const isCustomLayer = layer.kind === "custom"
           const rowExpanded = expandedByLayerId[layer.id] === true
-          const layerEntities = entities
-            .filter((e) => e.layerId === layer.id)
-            .sort((a, b) => {
-              const aGroup = entityHasChildren.get(a.id) === true
-              const bGroup = entityHasChildren.get(b.id) === true
-              if (aGroup !== bGroup) return aGroup ? -1 : 1
-              return a.name.localeCompare(b.name, undefined, { sensitivity: "base" })
-            })
+          const layerEntities = isOrgLayer
+            ? []
+            : entities
+                .filter((e) => e.layerId === layer.id)
+                .sort((a, b) => {
+                  const aGroup = entityHasChildren.get(a.id) === true
+                  const bGroup = entityHasChildren.get(b.id) === true
+                  if (aGroup !== bGroup) return aGroup ? -1 : 1
+                  return a.name.localeCompare(b.name, undefined, { sensitivity: "base" })
+                })
+          const layerOrgs = isOrgLayer
+            ? [...organisations].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }))
+            : []
+          const itemCount = isOrgLayer ? layerOrgs.length : layerEntities.length
           const prevLayer = visibleLayers[index - 1]
           const nextLayer = visibleLayers[index + 1]
           const canMoveUp = isCustomLayer && prevLayer?.kind === "custom"
@@ -189,7 +208,7 @@ export function LayersPanel({ readOnly = false }: Props) {
                     </span>
                   )}
                   <span className="min-w-0 truncate text-sm font-medium">
-                    {layer.name} ({layerEntities.length})
+                    {layer.name} ({itemCount})
                   </span>
                 </button>
                 <div className="flex shrink-0 items-center gap-1">
@@ -242,7 +261,9 @@ export function LayersPanel({ readOnly = false }: Props) {
                   </Button>
                 </div>
               </div>
-              {!isOsmLayer && layerEntities.length > 0 && (
+
+              {/* Military entities expand section */}
+              {!isOsmLayer && !isOrgLayer && layerEntities.length > 0 && (
                 <div
                   className={`grid overflow-hidden border-t bg-muted/30 transition-[grid-template-rows,opacity] duration-150 ease-out ${
                     rowExpanded ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"
@@ -290,6 +311,42 @@ export function LayersPanel({ readOnly = false }: Props) {
                   </div>
                 </div>
               )}
+
+              {/* Organisation layer expand section */}
+              {isOrgLayer && layerOrgs.length > 0 && (
+                <div
+                  className={`grid overflow-hidden border-t bg-muted/30 transition-[grid-template-rows,opacity] duration-150 ease-out ${
+                    rowExpanded ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"
+                  }`}
+                >
+                  <div
+                    className={`min-h-0 overflow-hidden px-3 transition-[padding] duration-150 ease-out ${
+                      rowExpanded ? "py-2" : "py-0"
+                    }`}
+                  >
+                    <div className="flex flex-col gap-1">
+                      {layerOrgs.map((org) => (
+                        <button
+                          key={org.id}
+                          type="button"
+                          onClick={() => {
+                            const s = useProjectStore.getState()
+                            s.setSelectedOrganisationId(org.id)
+                            s.setSelectedEntityId(null)
+                            s.setSelectedOsmObject(null)
+                          }}
+                          className={`min-w-0 w-full truncate rounded px-2 py-1 text-left text-xs transition-colors hover:bg-muted ${
+                            selectedOrganisationId === org.id ? "bg-muted font-medium text-foreground" : ""
+                          }`}
+                          title={ORGANISATION_TYPE_LABELS[org.type]}
+                        >
+                          {org.name}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )
         })}
@@ -304,6 +361,7 @@ export function LayersPanel({ readOnly = false }: Props) {
             canRemove={canRemove}
             isOsmContext={isOsmContext}
             isEchelonLayer={isEchelonLayer}
+            isOrgLayer={isOrgLayerContext}
             onRename={() => {
               if (!contextLayer) return
               const name = window.prompt("Layer name", contextLayer.name)

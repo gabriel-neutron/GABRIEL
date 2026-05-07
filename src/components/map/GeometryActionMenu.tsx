@@ -10,17 +10,22 @@ import {
 import { Separator } from "@/components/ui/separator"
 import { FilterableSelect } from "@/components/shared/FilterableSelect"
 import type { MapEntity } from "@/types/domain.types"
+import type { Organisation } from "@/types/organisation.types"
 
 type Props = {
   entities: MapEntity[]
+  organisations: Organisation[]
   onCreateNew: () => void
+  onCreateNewOrganisation: () => void
   onLinkToExisting: (entityId: string) => void
   onCancel: () => void
 }
 
 export function GeometryActionMenu({
   entities,
+  organisations,
   onCreateNew,
+  onCreateNewOrganisation,
   onLinkToExisting,
   onCancel,
 }: Props) {
@@ -30,6 +35,11 @@ export function GeometryActionMenu({
     setLinkTarget(value)
     if (value !== "__none__") onLinkToExisting(value)
   }
+
+  const linkOptions = [
+    ...entities.map((e) => ({ id: e.id, name: e.name, echelon: e.echelon, kind: "entity" as const })),
+    ...organisations.map((o) => ({ id: o.id, name: o.name, kind: "organisation" as const })),
+  ]
 
   return (
     <Card className="absolute left-1/2 z-[1000] w-80 -translate-x-1/2 py-0 shadow-md">
@@ -46,9 +56,14 @@ export function GeometryActionMenu({
       </CardHeader>
 
       <CardContent className="space-y-4 pb-4">
-        <Button className="w-full" onClick={onCreateNew}>
-          New
-        </Button>
+        <div className="flex flex-col gap-2">
+          <Button className="w-full" onClick={onCreateNew}>
+            + Military unit
+          </Button>
+          <Button className="w-full" variant="outline" onClick={onCreateNewOrganisation}>
+            + Industrial entity
+          </Button>
+        </div>
 
         <div className="flex items-center gap-2">
           <Separator className="flex-1" />
@@ -57,7 +72,7 @@ export function GeometryActionMenu({
         </div>
 
         <FilterableSelect
-          options={entities}
+          options={linkOptions}
           value={linkTarget}
           onValueChange={handleLinkChange}
           placeholder="Link"

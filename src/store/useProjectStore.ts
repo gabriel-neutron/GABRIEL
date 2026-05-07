@@ -2,6 +2,8 @@ import { create } from "zustand"
 import { devtools } from "zustand/middleware"
 import { getDefaultEchelonLayers } from "@/services/geopackage.service"
 import type { Layer, MapEntity, DrawnGeometry, SelectedOsmObject } from "@/types/domain.types"
+import type { Organisation } from "@/types/organisation.types"
+import { INDUSTRY_LAYER_ID } from "@/types/organisation.types"
 import type { BaseMapId } from "@/components/shared/BaseMapSwitcher"
 
 // ---------------------------------------------------------------------------
@@ -11,9 +13,11 @@ import type { BaseMapId } from "@/components/shared/BaseMapSwitcher"
 export interface ProjectState {
   layers: Layer[]
   entities: MapEntity[]
+  organisations: Organisation[]
   drawnGeometries: DrawnGeometry[]
   sourceCache: Map<string, string>
   selectedEntityId: string | null
+  selectedOrganisationId: string | null
   selectedOsmObject: SelectedOsmObject
   showNetworks: boolean
   baseMap: BaseMapId
@@ -22,13 +26,22 @@ export interface ProjectState {
   lastSavedAt: Date | null
 }
 
+const INDUSTRY_LAYER = {
+  id: INDUSTRY_LAYER_ID,
+  name: "Industry",
+  visible: true,
+  kind: "organisation" as const,
+}
+
 function initialState(): ProjectState {
   return {
-    layers: getDefaultEchelonLayers(),
+    layers: [...getDefaultEchelonLayers(), INDUSTRY_LAYER],
     entities: [],
+    organisations: [],
     drawnGeometries: [],
     sourceCache: new Map(),
     selectedEntityId: null,
+    selectedOrganisationId: null,
     selectedOsmObject: null,
     showNetworks: true,
     baseMap: "osm",
@@ -46,8 +59,10 @@ export interface ProjectActions {
   setProject(p: {
     layers: Layer[]
     entities: MapEntity[]
+    organisations: Organisation[]
     drawnGeometries: DrawnGeometry[]
     selectedEntityId: string | null
+    selectedOrganisationId: string | null
     sourceCache: Map<string, string>
   }): void
   resetProject(): void
@@ -63,10 +78,15 @@ export interface ProjectActions {
   updateEntity(entityId: string, patch: Partial<MapEntity>): void
   deleteEntity(entityId: string): void
 
+  addOrganisation(org: Organisation): void
+  updateOrganisation(orgId: string, patch: Partial<Organisation>): void
+  deleteOrganisation(orgId: string): void
+
   addGeometry(geom: DrawnGeometry): void
   deleteGeometry(geometryId: string): void
 
   setSelectedEntityId(id: string | null): void
+  setSelectedOrganisationId(id: string | null): void
   setSelectedOsmObject(obj: SelectedOsmObject): void
   closeDetail(): void
 
@@ -93,6 +113,7 @@ export function selectPersistableSnapshot(state: ProjectState) {
     entities: state.entities
       .filter((e) => nonOsmLayerIds.has(e.layerId))
       .map((e) => ({ ...e, name: e.name.trim() || "Untitled" })),
+    organisations: state.organisations.map((o) => ({ ...o, name: o.name.trim() || "Untitled" })),
     geometries: state.drawnGeometries.filter((g) => nonOsmLayerIds.has(g.layerId)),
     sourceCache: state.sourceCache,
   }
@@ -103,8 +124,8 @@ export const useProjectStore = create<ProjectState & ProjectActions>()(
     (set, get) => ({
       ...initialState(),
 
-      setProject({ layers, entities, drawnGeometries, selectedEntityId, sourceCache }) {
-        set({ layers, entities, drawnGeometries, selectedEntityId, sourceCache }, false, "setProject")
+      setProject({ layers, entities, organisations, drawnGeometries, selectedEntityId, selectedOrganisationId, sourceCache }) {
+        set({ layers, entities, organisations, drawnGeometries, selectedEntityId, selectedOrganisationId, sourceCache }, false, "setProject")
       },
 
       resetProject() {
@@ -137,7 +158,7 @@ export const useProjectStore = create<ProjectState & ProjectActions>()(
       removeLayer(id) {
         const { layers, entities, drawnGeometries, selectedEntityId } = get()
         const layer = layers.find((l) => l.id === id)
-        if (layer?.kind === "echelon") return
+        if (layer?.kind === "echelon" || layer?.kind === "organisation") return
         const removedEntityIds = new Set(entities.filter((e) => e.layerId === id).map((e) => e.id))
         set(
           {
@@ -197,6 +218,26 @@ export const useProjectStore = create<ProjectState & ProjectActions>()(
         }), false, "deleteEntity")
       },
 
+      addOrganisation(org) {
+        set((s) => ({ organisations: [...s.organisations, org] }), false, "addOrganisation")
+      },
+
+      updateOrganisation(orgId, patch) {
+        set(
+          (s) => ({ organisations: s.organisations.map((o) => (o.id === orgId ? { ...o, ...patch } : o)) }),
+          false,
+          "updateOrganisation",
+        )
+      },
+
+      deleteOrganisation(orgId) {
+        set((s) => ({
+          organisations: s.organisations.filter((o) => o.id !== orgId),
+          drawnGeometries: s.drawnGeometries.filter((g) => g.entityId !== orgId),
+          selectedOrganisationId: s.selectedOrganisationId === orgId ? null : s.selectedOrganisationId,
+        }), false, "deleteOrganisation")
+      },
+
       addGeometry(geom) {
         set((s) => ({ drawnGeometries: [...s.drawnGeometries, geom] }), false, "addGeometry")
       },
@@ -213,12 +254,16 @@ export const useProjectStore = create<ProjectState & ProjectActions>()(
         set({ selectedEntityId: id }, false, "setSelectedEntityId")
       },
 
+      setSelectedOrganisationId(id) {
+        set({ selectedOrganisationId: id }, false, "setSelectedOrganisationId")
+      },
+
       setSelectedOsmObject(obj) {
         set({ selectedOsmObject: obj }, false, "setSelectedOsmObject")
       },
 
       closeDetail() {
-        set({ selectedEntityId: null, selectedOsmObject: null }, false, "closeDetail")
+        set({ selectedEntityId: null, selectedOrganisationId: null, selectedOsmObject: null }, false, "closeDetail")
       },
 
       setShowNetworks(v) {

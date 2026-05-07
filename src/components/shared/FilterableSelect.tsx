@@ -14,6 +14,7 @@ export interface ParentOption {
   id: string
   name: string
   echelon?: string
+  kind?: "entity" | "organisation"
 }
 
 interface FilterableSelectProps {
@@ -32,9 +33,15 @@ export function FilterableSelect({
   className,
 }: FilterableSelectProps) {
   const [selectedEchelon, setSelectedEchelon] = React.useState<string | null>(null)
+  const [selectedKind, setSelectedKind] = React.useState<"entity" | "organisation" | null>(null)
   const echelonOrder = React.useMemo(
     () => ECHELON_OPTIONS.map((option) => option.value),
     [],
+  )
+
+  const hasMultipleKinds = React.useMemo(
+    () => options.some((o) => o.kind === "entity") && options.some((o) => o.kind === "organisation"),
+    [options],
   )
 
   const availableEchelons = React.useMemo(() => {
@@ -65,12 +72,11 @@ export function FilterableSelect({
   }, [options, echelonOrder])
 
   const filteredOptions = React.useMemo(() => {
-    const sorted = [...options].sort((a, b) =>
-      a.name.localeCompare(b.name, undefined, { sensitivity: "base" }),
-    )
-    if (selectedEchelon == null) return sorted
-    return sorted.filter((opt) => opt.echelon === selectedEchelon)
-  }, [options, selectedEchelon])
+    let filtered = [...options]
+    if (selectedKind != null) filtered = filtered.filter((o) => o.kind === selectedKind)
+    if (selectedEchelon != null) filtered = filtered.filter((opt) => opt.echelon === selectedEchelon)
+    return filtered.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }))
+  }, [options, selectedEchelon, selectedKind])
 
   return (
     <Select value={value} onValueChange={onValueChange}>
@@ -84,6 +90,53 @@ export function FilterableSelect({
         align="start"
         sideOffset={4}
       >
+        {hasMultipleKinds ? (
+          <div className="-mx-1 mb-1 border-b px-1 pb-2 pt-1">
+            <div className="mb-1 flex items-center justify-between gap-2 px-1">
+              <div className="text-[11px] font-medium text-muted-foreground">Filter by type</div>
+              {selectedKind ? (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    setSelectedKind(null)
+                  }}
+                  className="text-[11px] text-muted-foreground underline-offset-4 hover:underline"
+                >
+                  Clear
+                </button>
+              ) : null}
+            </div>
+            <div className="flex flex-wrap gap-1 px-1">
+              {(["entity", "organisation"] as const).map((kind) => {
+                const isActive = selectedKind === kind
+                return (
+                  <button
+                    key={kind}
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      setSelectedKind((prev) => (prev === kind ? null : kind))
+                    }}
+                    className={cn(
+                      "h-6 rounded-full border px-2 text-[11px] leading-none transition-colors",
+                      "hover:bg-accent hover:text-accent-foreground",
+                      isActive
+                        ? "bg-accent text-accent-foreground"
+                        : "bg-background text-foreground",
+                    )}
+                    aria-pressed={isActive}
+                  >
+                    {kind === "entity" ? "Military" : "Industry"}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        ) : null}
+
         {availableEchelons.length > 0 ? (
           <div className="-mx-1 mb-1 border-b px-1 pb-2 pt-1">
             <div className="mb-1 flex items-center justify-between gap-2 px-1">
