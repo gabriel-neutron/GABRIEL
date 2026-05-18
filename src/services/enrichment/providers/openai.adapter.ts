@@ -138,7 +138,8 @@ export class OpenAIModelAdapter implements AiModelAdapter {
       "When unresolvedReasons[field] is conflict, conflicts[field] is required (non-empty array as above).",
       "If evidence is missing for a field, set the field to null.",
       "Never output placeholders such as \"no source\", \"source not found\", \"unknown\", \"n/a\", \"none\", or similar text.",
-      "For the `sources` field, return newline-delimited `https://...` URLs only, or null when there is no supported URL evidence.",
+      "For the `notes` field: only write a note when the evidence contains a recent organisational change (reform, rename, re-subordination) or an epistemic caveat (unconfirmed identity, contradicting sources, confidence flag). Do not repeat information already present in the entity's structured properties (name, echelon, parent, children). If neither criterion applies, output null for notes.",
+      "For the `sources` field, return newline-delimited `https://...` URLs only, or null when there is no supported URL evidence. Never include Wikipedia (wikipedia.org) or Wikipedia mirrors (wikimedia.org, fandom.com, grokipedia.com, wiki.gg, or any domain containing 'wiki') in the `sources` field.",
       `Schema fields (values): ${JSON.stringify(input.outputSchemaFields)}.`,
     ].join("\n")
 

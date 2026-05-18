@@ -52,7 +52,7 @@ const meta = {
         currentValue: null,
         proposedValue: "A1-23",
         reasoning: "Matched in two official registries.",
-        sources: [
+        citations: [
           {
             url: "https://example.com/source-2",
             title: "Registry",

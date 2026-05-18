@@ -75,7 +75,7 @@ export type EnrichmentProposal = {
   field: string
   currentValue: unknown
   proposedValue: unknown
-  sources: EnrichmentSource[]
+  citations: EnrichmentSource[]
   reasoning: string
 }
 

@@ -169,11 +169,11 @@ export function validateProposal(proposal: EnrichmentProposal): string[] {
   const errors: string[] = []
   if (proposal.field.trim().length === 0) errors.push("proposal.field is required")
   if (proposal.reasoning.trim().length === 0) errors.push("proposal.reasoning is required")
-  if (!Array.isArray(proposal.sources) || proposal.sources.length < MIN_SOURCES_PER_PROPOSAL) {
+  if (!Array.isArray(proposal.citations) || proposal.citations.length < MIN_SOURCES_PER_PROPOSAL) {
     errors.push(`proposal must contain at least ${MIN_SOURCES_PER_PROPOSAL} source(s)`)
     return errors
   }
-  for (const source of proposal.sources) {
+  for (const source of proposal.citations) {
     errors.push(...validateSource(source).map((err) => `${proposal.field}: ${err}`))
   }
   return errors

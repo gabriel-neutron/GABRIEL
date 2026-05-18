@@ -244,12 +244,14 @@ describe("runEnrichment", () => {
     }
 
     const result = await runEnrichment(makeRequest(), { providers })
-    expect(result.response.proposals).toHaveLength(0)
-    expect(result.response.unresolvedFields).toEqual(
-      expect.arrayContaining(["notes", "sources"]),
-    )
+    // notes: synthesis returned placeholder text and the chunk doesn't match "notes" → unresolved
+    expect(result.response.unresolvedFields).toContain("notes")
     expect(result.response.unresolvedReasons.notes).toBe("no-evidence")
-    expect(result.response.unresolvedReasons.sources).toBe("no-evidence")
+    // sources: bypasses synthesis, uses retrieved chunks directly → proposed from example.com/hq
+    const sourcesProposal = result.response.proposals.find((p) => p.field === "sources")
+    expect(sourcesProposal).toBeDefined()
+    expect(String(sourcesProposal!.proposedValue)).toContain("https://example.com/hq")
+    expect(result.response.unresolvedFields).not.toContain("sources")
   })
 
   it("downgrades conflict to no-evidence when conflict candidates are missing", async () => {

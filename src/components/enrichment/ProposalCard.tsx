@@ -82,11 +82,11 @@ export function ProposalCard({
         <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Reasoning</p>
         <p className="break-words text-sm leading-6 text-foreground">{proposal.reasoning}</p>
       </section>
-      {proposal.sources.length > 0 && (
+      {proposal.citations.length > 0 && (
         <section className="space-y-1">
           <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Sources</p>
           <ul className="space-y-1">
-            {proposal.sources.map((source) => (
+            {proposal.citations.map((source) => (
               <li key={`${proposal.field}-${source.url}`}>
                 <SourceTag source={source} />
               </li>

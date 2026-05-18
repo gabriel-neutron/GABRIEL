@@ -23,8 +23,12 @@ export class CachedContentAdapter implements RetrievalAdapter {
   }
 
   async search(query: string, signal?: AbortSignal): Promise<ProviderSearchResult[]> {
-    void query
     void signal
-    return this.entries
+    const tokens = query.toLowerCase().split(/\s+/).filter(Boolean)
+    if (tokens.length === 0) return this.entries
+    return this.entries.filter((entry) => {
+      const text = `${entry.title} ${entry.snippet}`.toLowerCase()
+      return tokens.some((token) => text.includes(token))
+    })
   }
 }

@@ -105,7 +105,7 @@ describe("validateProposal", () => {
       currentValue: null,
       proposedValue: "Proposed text here.",
       reasoning: "Backed by retrieval.",
-      sources: [],
+      citations: [],
     }
     expect(validateProposal(proposal).some((e) => e.includes("at least"))).toBe(true)
   })

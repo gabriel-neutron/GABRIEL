@@ -1,6 +1,7 @@
 import type { ProposalDecision } from "@/store/enrichment.store"
 import type { MapEntity } from "@/types/domain.types"
 import type { EnrichmentProposal } from "@/types/enrichment.types"
+import { getAuthorityWeight } from "@/services/enrichment/validators"
 
 export function buildAcceptedPatch(args: {
   decisions: Record<string, ProposalDecision>
@@ -32,7 +33,13 @@ export function buildAcceptedPatch(args: {
 
   const evidenceUrls = proposals
     .filter((p) => p.field !== "sources" && decisions[p.field] === "accepted")
-    .flatMap((p) => p.sources.map((s) => s.url).filter(Boolean))
+    .flatMap((p) =>
+      [...p.citations]
+        .sort((a, b) => getAuthorityWeight(b.domainType) - getAuthorityWeight(a.domainType))
+        .slice(0, 2)
+        .map((c) => c.url)
+        .filter(Boolean),
+    )
 
   const mergedUrls = [...new Set([...existingUrls, ...proposedUrls, ...evidenceUrls])]
   const mergedSources = mergedUrls.join("\n")

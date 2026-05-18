@@ -340,6 +340,27 @@ async function retrieveParallel(
   return { chunks, notes }
 }
 
+const AGGREGATE_URL_PATTERNS = ["/feed/", "/author/", "/tag/", "/category/"]
+
+function isSpecificArticleUrl(url: string): boolean {
+  const lower = url.toLowerCase()
+  return !AGGREGATE_URL_PATTERNS.some((pattern) => lower.includes(pattern))
+}
+
+function chunksToSources(chunks: RetrievalChunk[]): EnrichmentSource[] {
+  return chunks
+    .map((chunk): EnrichmentSource => {
+      const base: EnrichmentSource = {
+        url: chunk.url,
+        title: chunk.title,
+        snippet: chunk.snippet,
+        domainType: chunk.domainType,
+      }
+      return chunk.publishedAt?.trim() ? { ...base, publishedAt: chunk.publishedAt.trim() } : base
+    })
+    .filter((s) => validateSource(s).length === 0)
+}
+
 function fieldSourcesFromChunks(field: string, chunks: RetrievalChunk[]): EnrichmentSource[] {
   const matching = chunks.filter((chunk) => scoreChunkForField(chunk, field) > 0)
   const mapped = matching.map((chunk) => {
@@ -411,13 +432,36 @@ function buildResponse(
   const unresolvedFields: string[] = []
 
   for (const field of fields) {
+    const citations = fieldSourcesFromChunks(field, chunks)
+
+    if (field === "sources") {
+      // For the provenance ledger, ignore field-name scoring (which would match the word
+      // "sources" in unrelated content). Instead rank ALL retrieved chunks by authority weight,
+      // excluding Wikipedia and non-article aggregate URLs (feeds, author pages, tag pages).
+      const allValidCitations = chunksToSources(chunks)
+        .filter((s) => s.domainType !== "wikipedia" && isSpecificArticleUrl(s.url))
+        .sort((a, b) => getAuthorityWeight(b.domainType) - getAuthorityWeight(a.domainType))
+      const topCitations = allValidCitations.slice(0, 2)
+      if (topCitations.length === 0) {
+        unresolvedFields.push(field)
+        continue
+      }
+      proposals.push({
+        field,
+        currentValue: request.feature.properties?.[field] ?? null,
+        proposedValue: topCitations.map((s) => s.url).join("\n"),
+        citations: allValidCitations,
+        reasoning: `Top ${topCitations.length} verified source(s) from retrieved evidence.`,
+      })
+      continue
+    }
+
     const proposedValue = synthesisObject[field] ?? null
-    const sources = fieldSourcesFromChunks(field, chunks)
     if (
       proposedValue === null ||
       proposedValue === "" ||
       (Array.isArray(proposedValue) && proposedValue.length === 0) ||
-      sources.length === 0
+      citations.length === 0
     ) {
       unresolvedFields.push(field)
       continue
@@ -426,8 +470,8 @@ function buildResponse(
       field,
       currentValue: request.feature.properties?.[field] ?? null,
       proposedValue,
-      sources,
-      reasoning: `Evidence-backed proposal for ${field} from ${sources.length} source(s).`,
+      citations,
+      reasoning: `Evidence-backed proposal for ${field} from ${citations.length} source(s).`,
     })
   }
 

@@ -87,7 +87,7 @@ describe("enrichment store", () => {
           field: "commander",
           currentValue: null,
           proposedValue: "Colonel Example",
-          sources: [
+          citations: [
             {
               url: "https://example.com",
               title: "Example",

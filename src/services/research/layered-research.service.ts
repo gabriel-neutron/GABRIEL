@@ -7,7 +7,7 @@ import { toEnrichmentFeature, toEnrichmentContext } from "@/utils/enrichmentAdap
 import { runEnrichment } from "@/services/enrichment/enrichment.service"
 import { buildDefaultEnrichmentPrompt } from "@/services/enrichment/promptTemplate"
 import {
-  DEFAULT_ENRICHMENT_OUTPUT_SCHEMA,
+  buildEnrichmentOutputSchema,
   ENRICHMENT_MAX_DEPTH_DEFAULT,
 } from "@/services/enrichment/schema.fixtures"
 import {
@@ -215,7 +215,9 @@ export async function runLayeredResearch(
             prompt,
             feature,
             context,
-            outputSchema: DEFAULT_ENRICHMENT_OUTPUT_SCHEMA,
+            outputSchema: buildEnrichmentOutputSchema(
+              typeof entity.sources === "string" && entity.sources.trim().length > 0,
+            ),
             maxDepth: ENRICHMENT_MAX_DEPTH_DEFAULT,
           },
           { providers: bundle, signal: options.signal },
@@ -223,7 +225,7 @@ export async function runLayeredResearch(
 
         // Collect cache entries and count hits
         for (const proposal of response.proposals) {
-          for (const source of proposal.sources) {
+          for (const source of proposal.citations) {
             if (sourceCache.has(source.url)) {
               sourcesFromCache += 1
             } else {

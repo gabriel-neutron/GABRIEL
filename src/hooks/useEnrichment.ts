@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useRef, useState } from "react"
-import { buildDefaultEnrichmentPrompt, DEFAULT_ENRICHMENT_OUTPUT_SCHEMA, ENRICHMENT_MAX_DEPTH_DEFAULT, runEnrichment } from "@/services/enrichment"
+import { buildDefaultEnrichmentPrompt, buildEnrichmentOutputSchema, ENRICHMENT_MAX_DEPTH_DEFAULT, runEnrichment } from "@/services/enrichment"
 import { toEnrichmentFeature, toEnrichmentContext } from "@/utils/enrichmentAdapters"
 import {
   acceptProposalToOverlay,
@@ -142,7 +142,9 @@ export function useEnrichment({
         prompt: draftPrompt,
         feature,
         context,
-        outputSchema: DEFAULT_ENRICHMENT_OUTPUT_SCHEMA,
+        outputSchema: buildEnrichmentOutputSchema(
+          typeof selectedEntity.sources === "string" && selectedEntity.sources.trim().length > 0,
+        ),
         maxDepth: ENRICHMENT_MAX_DEPTH_DEFAULT,
       },
       {

@@ -23,7 +23,7 @@ function proposal(
     currentValue: null,
     proposedValue,
     reasoning: "",
-    sources: sourceUrls.map((url) => ({ url, title: "", snippet: "", domainType: "news" as const })),
+    citations: sourceUrls.map((url) => ({ url, title: "", snippet: "", domainType: "news" as const })),
   }
 }
 

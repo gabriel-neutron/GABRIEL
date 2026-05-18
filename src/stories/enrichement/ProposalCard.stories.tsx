@@ -11,7 +11,7 @@ const meta = {
       currentValue: "Current value",
       proposedValue: "Proposed value",
       reasoning: "Evidence-based update suggested from sources.",
-      sources: [
+      citations: [
         {
           url: "https://example.com/report",
           title: "Example report",
