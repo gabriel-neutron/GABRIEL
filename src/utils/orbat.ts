@@ -24,6 +24,11 @@ export interface Orbat<T extends OrbatNode> {
  * in trees/hierarchy panels and eligible for enrichment, matching the one call site
  * (layered-research) that already had this behaviour and tests.
  *
+ * Map exception: this policy does not extend to map positioning. An orphan without its own
+ * geometry (`positionMode` other than "own") has no anchored ancestor to orbit, so
+ * `computePositions` (geometry.ts) still leaves it off the map. Pin it with its own geometry
+ * or restore its parent to place it.
+ *
  * Cycle policy: a fully disconnected cyclic component (every member's `parentId` resolves to
  * another member of the same component) gets a synthetic root at its lexicographically smallest
  * id, so it renders instead of vanishing and so ancestor/depth walks can't infinite-loop.

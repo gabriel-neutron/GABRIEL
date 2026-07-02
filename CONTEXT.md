@@ -20,7 +20,9 @@ The single shared parent/child traversal index for `MapEntity` and `Organisation
 `OrganisationTreeView`, `HierarchyPanel`, `NetworkLinksLayer`, `geometry.ts`,
 `layered-research.service.ts`), instead of each reimplementing its own `childrenByParent` map.
 _Orphan policy_: an item whose `parentId` points to a missing id is treated as a root — visible
-in trees and eligible for enrichment, rather than silently vanishing.
+in trees and eligible for enrichment, rather than silently vanishing. The map is the one
+exception: an orphan without its own geometry has no anchored ancestor to orbit, so it stays off
+the map until pinned or re-parented.
 _Cycle policy_: a fully disconnected cyclic component gets a synthetic root at its
 lexicographically smallest id, so it renders and ancestor/depth walks can't infinite-loop.
 `src/utils/treeLayout.ts` (`computeTreeXIndex`) builds on the Orbat module to give `TreeView` and

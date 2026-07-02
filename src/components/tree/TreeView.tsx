@@ -45,7 +45,7 @@ export function TreeView() {
         targetPosition: Position.Top,
       })
 
-      if (!orbat.isRoot(entity.id) && entity.parentId != null) {
+      if (entity.parentId != null && xIndexById.has(entity.parentId)) {
         edgeList.push({
           id: `e-${entity.parentId}-${nodeId}`,
           source: String(entity.parentId),

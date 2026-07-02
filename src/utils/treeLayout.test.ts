@@ -34,4 +34,15 @@ describe("computeTreeXIndex", () => {
     const xIndexById = computeTreeXIndex(buildOrbat(items))
     expect(xIndexById.size).toBe(3)
   })
+
+  it("gives every cycle member a real xIndex, including the synthetic root's own parent", () => {
+    // a is the cycle's synthetic root (lexicographically smallest), but its real parentId "c"
+    // still resolves to a genuinely rendered node — callers that draw a→c should be able to
+    // detect that via xIndexById.has(entity.parentId) rather than orbat.isRoot(entity.id).
+    const items = [n("a", "c"), n("b", "a"), n("c", "b")]
+    const orbat = buildOrbat(items)
+    const xIndexById = computeTreeXIndex(orbat)
+    expect(orbat.isRoot("a")).toBe(true)
+    expect(xIndexById.has("c")).toBe(true)
+  })
 })

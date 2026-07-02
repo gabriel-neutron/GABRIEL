@@ -18,6 +18,7 @@ type NodeProps = {
   entity: MapEntity
   depth: number
   orbat: Orbat<MapEntity>
+  ancestorPath: ReadonlySet<string>
   selectedEntityId: string | null
   hiddenEntityIds: Set<string>
   expandedIds: Set<string>
@@ -30,6 +31,9 @@ type HierarchyPanelHeaderProps = {
   onToggleAllVisibility: () => void
 }
 
+/** Root ancestor path for a top-level node; never mutated, only copied. */
+const EMPTY_PATH: ReadonlySet<string> = new Set()
+
 function compareByName(a: { name: string }, b: { name: string }): number {
   return a.name.localeCompare(b.name, undefined, { sensitivity: "base" })
 }
@@ -41,12 +45,19 @@ function getOrderedEntities(items: MapEntity[], orbat: Orbat<MapEntity>): MapEnt
   return [...collapsibleItems, ...nonCollapsibleItems]
 }
 
+/**
+ * A disconnected cycle's synthetic root (see `buildOrbat`'s cycle policy) still has its own
+ * dangling `parentId` pointing back into the cycle — that id never resolves to a real node, so
+ * `orbat.ancestors()` can't see it. Check it directly so a hidden-then-orphaned parent still
+ * hides its child, matching pre-refactor behaviour.
+ */
 function isAncestorHidden<T extends OrbatNode>(
-  entityId: string,
+  item: T,
   orbat: Orbat<T>,
   hiddenEntityIds: Set<string>,
 ): boolean {
-  return orbat.ancestors(entityId).some((ancestor) => hiddenEntityIds.has(ancestor.id))
+  if (item.parentId != null && hiddenEntityIds.has(item.parentId)) return true
+  return orbat.ancestors(item.id).some((ancestor) => hiddenEntityIds.has(ancestor.id))
 }
 
 function HierarchyPanelHeader({ anyVisible, onToggleAllVisibility }: HierarchyPanelHeaderProps) {
@@ -66,6 +77,7 @@ function EntityNode({
   entity,
   depth,
   orbat,
+  ancestorPath,
   selectedEntityId,
   hiddenEntityIds,
   expandedIds,
@@ -73,11 +85,15 @@ function EntityNode({
   onToggleExpanded,
 }: NodeProps) {
   const isRoot = depth === 0
-  const children = getOrderedEntities(orbat.childrenOf(entity.id), orbat)
+  const childPath = new Set(ancestorPath).add(entity.id)
+  const children = getOrderedEntities(
+    orbat.childrenOf(entity.id).filter((child) => !childPath.has(child.id)),
+    orbat,
+  )
   const hasKids = children.length > 0
   const expanded = expandedIds.has(entity.id)
   const isHidden = hiddenEntityIds.has(entity.id)
-  const ancestorHidden = isAncestorHidden(entity.id, orbat, hiddenEntityIds)
+  const ancestorHidden = isAncestorHidden(entity, orbat, hiddenEntityIds)
   const effectivelyHidden = isHidden || ancestorHidden
   const isSelected = selectedEntityId === entity.id
 
@@ -153,6 +169,7 @@ function EntityNode({
                 entity={child}
                 depth={depth + 1}
                 orbat={orbat}
+                ancestorPath={childPath}
                 selectedEntityId={selectedEntityId}
                 hiddenEntityIds={hiddenEntityIds}
                 expandedIds={expandedIds}
@@ -171,13 +188,18 @@ type OrgNodeProps = {
   org: Organisation
   depth: number
   orbat: Orbat<Organisation>
+  ancestorPath: ReadonlySet<string>
   selectedOrganisationId: string | null
   expandedOrgIds: Set<string>
   onToggleExpanded: (id: string) => void
 }
 
-function OrgNode({ org, depth, orbat, selectedOrganisationId, expandedOrgIds, onToggleExpanded }: OrgNodeProps) {
-  const children = [...orbat.childrenOf(org.id)].sort(compareByName)
+function OrgNode({ org, depth, orbat, ancestorPath, selectedOrganisationId, expandedOrgIds, onToggleExpanded }: OrgNodeProps) {
+  const childPath = new Set(ancestorPath).add(org.id)
+  const children = orbat
+    .childrenOf(org.id)
+    .filter((child) => !childPath.has(child.id))
+    .sort(compareByName)
   const hasKids = children.length > 0
   const expanded = expandedOrgIds.has(org.id)
   const isSelected = selectedOrganisationId === org.id
@@ -226,6 +248,7 @@ function OrgNode({ org, depth, orbat, selectedOrganisationId, expandedOrgIds, on
                 org={child}
                 depth={depth + 1}
                 orbat={orbat}
+                ancestorPath={childPath}
                 selectedOrganisationId={selectedOrganisationId}
                 expandedOrgIds={expandedOrgIds}
                 onToggleExpanded={onToggleExpanded}
@@ -252,7 +275,7 @@ export function HierarchyPanel({ hiddenEntityIds, onToggleEntityVisible }: Props
   const orbat = useMemo(() => buildOrbat(entities), [entities])
   const orgOrbat = useMemo(() => buildOrbat(organisations), [organisations])
   const anyVisible = entities.some(
-    (e) => !hiddenEntityIds.has(e.id) && !isAncestorHidden(e.id, orbat, hiddenEntityIds),
+    (e) => !hiddenEntityIds.has(e.id) && !isAncestorHidden(e, orbat, hiddenEntityIds),
   )
 
   function handleToggleExpanded(id: string) {
@@ -295,6 +318,7 @@ export function HierarchyPanel({ hiddenEntityIds, onToggleEntityVisible }: Props
               entity={root}
               depth={0}
               orbat={orbat}
+              ancestorPath={EMPTY_PATH}
               selectedEntityId={selectedEntityId}
               hiddenEntityIds={hiddenEntityIds}
               expandedIds={expandedIds}
@@ -316,6 +340,7 @@ export function HierarchyPanel({ hiddenEntityIds, onToggleEntityVisible }: Props
                 org={root}
                 depth={0}
                 orbat={orgOrbat}
+                ancestorPath={EMPTY_PATH}
                 selectedOrganisationId={selectedOrganisationId}
                 expandedOrgIds={expandedOrgIds}
                 onToggleExpanded={handleToggleOrgExpanded}

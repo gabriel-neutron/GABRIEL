@@ -39,7 +39,7 @@ export function OrganisationTreeView() {
         targetPosition: Position.Top,
       })
 
-      if (!orbat.isRoot(org.id) && org.parentId != null) {
+      if (org.parentId != null && xIndexById.has(org.parentId)) {
         edgeList.push({
           id: `e-${org.parentId}-${nodeId}`,
           source: String(org.parentId),
