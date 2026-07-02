@@ -162,10 +162,12 @@ User clicks "Research all" → ResearchDialog → run()
       For each entity (BFS order):
         Skip if: already processed | rich enough | recently analyzed
         → runEnrichment(entity, …)
-        → onEntityComplete(entityId, result)
+        → onEntityComplete(entityId, result) → researchProgress.store markEntityCompleted(...)
         → reviewQueue.push(entityId) if has proposals
   → User steps through reviewQueue via EnrichDrawer
 ```
+
+All status/queue/usage writes for the batch flow through `researchProgress.store.ts` pure transition functions.
 
 ---
 
@@ -179,3 +181,4 @@ User clicks "Research all" → ResearchDialog → run()
 6. Coordinate order `[lat, lng]` is the only representation in the Zustand store,
    components, and utility functions.
 7. `[lng, lat]` appears only inside `geopackage.service.ts`.
+8. `researchProgress.store.ts` pure transition functions have no React imports.
