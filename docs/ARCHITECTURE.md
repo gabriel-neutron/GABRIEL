@@ -64,7 +64,7 @@ File on disk (.gpkg)
   ↓  store.setProject(...)         →  Zustand project store
 
   ↑  useProjectIO.handleSave()     →  selectPersistableSnapshot(store) → reads non-OSM data
-  ↑  saveGeoPackage(layers, entities, geometries, sourceCache)
+  ↑  saveGeoPackage(layers, entities, organisations, geometries, sourceCache)
   ↑  writeGeoPackageToFile(bytes)  →  File System Access API / <a download>
 
 Session cache (IndexedDB)
@@ -78,7 +78,8 @@ GeoPackage I/O lives only in `useProjectIO` (used by `EditPage`) and inline in `
 GeoPackage I/O.
 
 `selectPersistableSnapshot` (in `useProjectStore.ts`) is the single source of truth for what
-data gets written to disk: non-OSM entities and geometries, with names trimmed.
+data gets written to disk: non-OSM entities and geometries, with names trimmed, and layer
+`kind` normalized (inferred as `"osm"` when unset but `osmData` is cached).
 
 ---
 
@@ -89,7 +90,7 @@ data gets written to disk: non-OSM entities and geometries, with names trimmed.
 | Internal app, Leaflet, Zustand store | `[lat, lng]` | `LatLng` (branded) |
 | GeoJSON, GeoPackage storage | `[lng, lat]` | `LngLat` (branded) |
 
-Conversion happens **only** in `geopackage.service.ts`:
+Conversion happens **only** in `src/services/geopackage/` (specifically `geometries.table.ts`):
 - `readGeometries` → wraps parsed GeoJSON coordinates in `toLeafletCoord([lng, lat]): LatLng`
 - `saveGeoPackage` → converts before write with `toGeoJsonCoord(pos: LatLng): LngLat`
 
@@ -178,4 +179,4 @@ User clicks "Research all" → ResearchDialog → run()
 5. `NetworkLinksLayer` BFS is always inside a `useMemo`.
 6. Coordinate order `[lat, lng]` is the only representation in the Zustand store,
    components, and utility functions.
-7. `[lng, lat]` appears only inside `geopackage.service.ts`.
+7. `[lng, lat]` appears only inside `src/services/geopackage/`.
