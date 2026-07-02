@@ -7,16 +7,19 @@ import {
 import { DEFAULT_RICHNESS_THRESHOLD } from "@/services/research/entity-richness"
 import type { DrawnGeometry, MapEntity } from "@/types/domain.types"
 import type { EnrichmentResponse } from "@/types/enrichment.types"
+import {
+  advanceReviewQueue,
+  applyBatchOutcome,
+  hasProcessedEntities as computeHasProcessedEntities,
+  INITIAL_RESEARCH_PROGRESS_STATE,
+  markEntityCompleted,
+  markEntityRunning,
+  startResearchBatch,
+  type EntityResearchStatus,
+  type ResearchProgressState,
+} from "@/store/researchProgress.store"
 
-export type EntityResearchStatus =
-  | "pending"       // in BFS queue, not yet started
-  | "running"       // currently being enriched
-  | "done"          // completed with actionable proposals
-  | "done-empty"    // completed, no proposals found
-  | "failed"        // attempted but failed
-  | "skipped-rich"  // skipped — entity already has enough information
-  | "skipped-recent" // skipped — entity was analyzed recently
-  | "skipped-abort" // skipped — run was stopped before this entity
+export type { EntityResearchStatus }
 
 type LayeredResearchStatus = "idle" | "running" | "done" | "failed"
 
@@ -34,35 +37,6 @@ type UseLayeredResearchOptions = {
   onEntityAnalyzed?: (entityId: string, analyzedAt: string) => void
 }
 
-function buildInitialEntityStatuses(
-  orderedIds: string[],
-  processedIds: ReadonlySet<string>,
-  recentAnalyzedIds: ReadonlySet<string>,
-  prev: Record<string, EntityResearchStatus>,
-): Record<string, EntityResearchStatus> {
-  const next: Record<string, EntityResearchStatus> = {}
-  for (const id of orderedIds) {
-    if (processedIds.has(id)) next[id] = prev[id] ?? "done-empty"
-    else if (recentAnalyzedIds.has(id)) next[id] = "skipped-recent"
-    else next[id] = "pending"
-  }
-  return next
-}
-
-function applyFinalEntityStatuses(
-  prev: Record<string, EntityResearchStatus>,
-  result: LayeredResearchResult,
-  processedIds: ReadonlySet<string>,
-): Record<string, EntityResearchStatus> {
-  const next = { ...prev }
-  for (const id of result.failedEntityIds) next[id] = "failed"
-  for (const id of result.skippedRichEntityIds) next[id] = "skipped-rich"
-  for (const id of result.skippedEntityIds) {
-    if (!processedIds.has(id)) next[id] = "skipped-abort"
-  }
-  return next
-}
-
 export function useLayeredResearch(
   entities: MapEntity[],
   drawnGeometries: DrawnGeometry[],
@@ -72,11 +46,11 @@ export function useLayeredResearch(
   const [status, setStatus] = useState<LayeredResearchStatus>("idle")
   const [progress, setProgress] = useState<ProgressState | null>(null)
   const [batchResults, setBatchResults] = useState<Record<string, EnrichmentResponse>>({})
-  const [reviewQueue, setReviewQueue] = useState<string[]>([])
   const [cacheAdditions, setCacheAdditions] = useState<Array<{ url: string; content: string }>>([])
   const [lastStats, setLastStats] = useState<LayeredResearchResult["stats"] | null>(null)
-  const [entityStatuses, setEntityStatuses] = useState<Record<string, EntityResearchStatus>>({})
-  const [totalUsage, setTotalUsage] = useState({ inputTokens: 0, outputTokens: 0 })
+  const [researchProgress, setResearchProgress] = useState<ResearchProgressState>(
+    INITIAL_RESEARCH_PROGRESS_STATE,
+  )
   const [lastWarnings, setLastWarnings] = useState<LayeredResearchWarning[]>([])
   const [dialogOpen, setDialogOpen] = useState(false)
   const [batchSize, setBatchSize] = useState(20)
@@ -84,11 +58,6 @@ export function useLayeredResearch(
   const [skipAnalyzedWithinDays, setSkipAnalyzedWithinDays] = useState(0)
 
   const abortRef = useRef<AbortController | null>(null)
-  /**
-   * Persists across multiple batch runs so "Continue" skips already-processed
-   * entities without re-running them.
-   */
-  const processedEntityIdsRef = useRef<Set<string>>(new Set())
 
   const buildRecentAnalyzedEntityIds = useCallback((): Set<string> => {
     if (skipAnalyzedWithinDays <= 0) return new Set()
@@ -115,13 +84,13 @@ export function useLayeredResearch(
       const orderedIds = bfsLayers.flat().map((e) => e.id)
       const recentAnalyzedEntityIds = buildRecentAnalyzedEntityIds()
       const combinedSkipEntityIds = new Set<string>([
-        ...processedEntityIdsRef.current,
+        ...Object.keys(researchProgress.processedEntityIds),
         ...recentAnalyzedEntityIds,
       ])
 
       // Initialise statuses: already-processed keep their status, rest become pending
-      setEntityStatuses((prev) =>
-        buildInitialEntityStatuses(orderedIds, processedEntityIdsRef.current, recentAnalyzedEntityIds, prev)
+      setResearchProgress((current) =>
+        startResearchBatch(current, { orderedIds, recentAnalyzedEntityIds }),
       )
 
       setStatus("running")
@@ -141,27 +110,17 @@ export function useLayeredResearch(
 
           onProgress: ({ entityId, name, layer, done, total }) => {
             setProgress({ entityId, name, layer, done, total })
-            setEntityStatuses((prev) => ({ ...prev, [entityId]: "running" }))
+            setResearchProgress((current) => markEntityRunning(current, entityId))
           },
 
           onEntityComplete: (entityId, response, usage) => {
             const analyzedAt = new Date().toISOString()
             // Update incrementally so UI reflects results without waiting for full run
             setBatchResults((prev) => ({ ...prev, [entityId]: response }))
-            if ((response.proposals?.length ?? 0) > 0) {
-              setReviewQueue((prev) =>
-                prev.includes(entityId) ? prev : [...prev, entityId],
-              )
-            }
-            setEntityStatuses((prev) => ({
-              ...prev,
-              [entityId]: response.proposals.length > 0 ? "done" : "done-empty",
-            }))
-            setTotalUsage((prev) => ({
-              inputTokens: prev.inputTokens + usage.estimatedInputTokens,
-              outputTokens: prev.outputTokens + usage.estimatedOutputTokens,
-            }))
-            processedEntityIdsRef.current.add(entityId)
+            const proposalsCount = response.proposals?.length ?? 0
+            setResearchProgress((current) =>
+              markEntityCompleted(current, { entityId, proposalsCount, usage }),
+            )
             onEntityAnalyzed?.(entityId, analyzedAt)
           },
         })
@@ -170,12 +129,7 @@ export function useLayeredResearch(
         setCacheAdditions(result.cacheAdditions)
 
         // Apply final statuses for entities the service marked as skipped/failed
-        for (const id of result.failedEntityIds) {
-          processedEntityIdsRef.current.add(id)
-        }
-        setEntityStatuses((prev) =>
-          applyFinalEntityStatuses(prev, result, processedEntityIdsRef.current)
-        )
+        setResearchProgress((current) => applyBatchOutcome(current, result))
 
         setLastStats(result.stats)
         setLastWarnings(result.warnings)
@@ -197,6 +151,7 @@ export function useLayeredResearch(
       richnessThreshold,
       onEntityAnalyzed,
       buildRecentAnalyzedEntityIds,
+      researchProgress,
     ],
   )
 
@@ -209,17 +164,17 @@ export function useLayeredResearch(
     [batchResults],
   )
 
-  const nextInQueue = reviewQueue[0] ?? null
+  const nextInQueue = researchProgress.reviewQueue[0] ?? null
 
   const advanceQueue = useCallback(() => {
-    setReviewQueue((q) => q.slice(1))
+    setResearchProgress((current) => advanceReviewQueue(current))
   }, [])
 
   return {
     // Run state
     status,
     progress,
-    reviewQueue,
+    reviewQueue: researchProgress.reviewQueue,
     nextInQueue,
     getResult,
     advanceQueue,
@@ -229,9 +184,9 @@ export function useLayeredResearch(
     lastStats,
     lastWarnings,
     // Live per-entity status map (for the dialog)
-    entityStatuses,
+    entityStatuses: researchProgress.entityStatuses,
     // Aggregated token totals across all batches
-    totalUsage,
+    totalUsage: researchProgress.totalUsage,
     // Dialog open/close
     dialogOpen,
     openDialog: () => setDialogOpen(true),
@@ -244,6 +199,6 @@ export function useLayeredResearch(
     skipAnalyzedWithinDays,
     setSkipAnalyzedWithinDays,
     // True when a previous batch has run (changes "Start" label to "Continue")
-    hasProcessedEntities: processedEntityIdsRef.current.size > 0,
+    hasProcessedEntities: computeHasProcessedEntities(researchProgress),
   }
 }

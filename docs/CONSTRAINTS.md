@@ -81,6 +81,7 @@ functions with no side effects.
 ## Testing Requirements
 
 - **Enrichment store** (`store/enrichment.store.ts`): 100 % branch coverage.
+- **Research progress store** (`store/researchProgress.store.ts`): 100 % branch coverage.
 - **Enrichment services** (`services/enrichment/`): unit tests for all public functions.
 - **Layered research** (`services/research/`): unit tests for BFS ordering and skip logic.
 - **GeoPackage round-trip**: integration test in `services/geopackage/geopackage.service.test.ts`
