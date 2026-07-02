@@ -1,9 +1,10 @@
 import { useCallback, useMemo } from "react"
 import ReactFlow, { Background, type Edge, type Node, Position } from "reactflow"
-import type { Organisation } from "@/types/organisation.types"
 import { OrganisationNode } from "./OrganisationNode"
 import { useProjectStore } from "@/store/useProjectStore"
 import { useShallow } from "zustand/shallow"
+import { buildOrbat } from "@/utils/orbat"
+import { computeTreeXIndex } from "@/utils/treeLayout"
 
 const nodeTypes = { organisation: OrganisationNode }
 
@@ -18,47 +19,9 @@ export function OrganisationTreeView() {
   const { nodes, edges } = useMemo(() => {
     const nodeList: Node[] = []
     const edgeList: Edge[] = []
-    const orgsById = new Map(organisations.map((o) => [o.id, o]))
 
-    const childrenByParent = new Map<string | null, Organisation[]>()
-    for (const org of organisations) {
-      const parentKey = (org.parentId ?? null) as string | null
-      if (!childrenByParent.has(parentKey)) childrenByParent.set(parentKey, [])
-      childrenByParent.get(parentKey)!.push(org)
-    }
-
-    const roots = childrenByParent.get(null) ?? []
-    const xIndexById = new Map<string, number>()
-    let currentXIndex = 0
-
-    function layoutOrg(org: Organisation): number {
-      const children = childrenByParent.get(org.id) ?? []
-      const childXIndexes: number[] = []
-      for (const child of children) childXIndexes.push(layoutOrg(child))
-
-      let xIndex: number
-      if (childXIndexes.length === 0) {
-        xIndex = currentXIndex++
-      } else {
-        xIndex = (childXIndexes[0] + childXIndexes[childXIndexes.length - 1]) / 2
-      }
-      xIndexById.set(org.id, xIndex)
-      return xIndex
-    }
-
-    for (const root of roots) layoutOrg(root)
-
-    const depthById = new Map<string, number>()
-    function getDepth(org: Organisation): number {
-      const cached = depthById.get(org.id)
-      if (cached != null) return cached
-      if (org.parentId == null) { depthById.set(org.id, 0); return 0 }
-      const parent = orgsById.get(org.parentId)
-      if (!parent) { depthById.set(org.id, 0); return 0 }
-      const depth = getDepth(parent) + 1
-      depthById.set(org.id, depth)
-      return depth
-    }
+    const orbat = buildOrbat(organisations)
+    const xIndexById = computeTreeXIndex(orbat)
 
     for (const org of organisations) {
       const nodeId = String(org.id)
@@ -69,14 +32,14 @@ export function OrganisationTreeView() {
         id: nodeId,
         type: "organisation",
         className: "tree-symbol-node",
-        position: { x: xIndex * H_SPACING, y: getDepth(org) * V_SPACING },
+        position: { x: xIndex * H_SPACING, y: orbat.depthOf(org.id) * V_SPACING },
         data: { label: org.name, organisation: org },
         selected: nodeId === selectedOrganisationId,
         sourcePosition: Position.Bottom,
         targetPosition: Position.Top,
       })
 
-      if (org.parentId != null) {
+      if (!orbat.isRoot(org.id) && org.parentId != null) {
         edgeList.push({
           id: `e-${org.parentId}-${nodeId}`,
           source: String(org.parentId),

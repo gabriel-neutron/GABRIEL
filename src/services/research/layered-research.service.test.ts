@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from "vitest"
-import { runLayeredResearch } from "./layered-research.service"
+import { buildBfsLayers, runLayeredResearch } from "./layered-research.service"
 import { runEnrichment } from "@/services/enrichment/enrichment.service"
 import type { DrawnGeometry, MapEntity } from "@/types/domain.types"
 
@@ -87,5 +87,22 @@ describe("runLayeredResearch", () => {
       entityId: "entity-1",
       source: "overpass",
     })
+  })
+})
+
+describe("buildBfsLayers", () => {
+  function entity(id: string, parentId: string | null): MapEntity {
+    return { id, name: id, layerId: "layer-1", parentId }
+  }
+
+  it("treats an orphan (parentId set but absent) as a root, so it is still enriched", () => {
+    const layers = buildBfsLayers([entity("orphan", "missing-parent"), entity("child", "orphan")])
+    expect(layers[0].map((e) => e.id)).toEqual(["orphan"])
+    expect(layers[1].map((e) => e.id)).toEqual(["child"])
+  })
+
+  it("still processes an all-cyclic entity set instead of returning no layers", () => {
+    const layers = buildBfsLayers([entity("a", "b"), entity("b", "a")])
+    expect(layers.flat().map((e) => e.id).sort()).toEqual(["a", "b"])
   })
 })

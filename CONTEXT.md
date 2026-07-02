@@ -13,6 +13,19 @@ _Avoid_: entity, feature, unit (use MapEntity when precision matters)
 **ORBAT** (Order of Battle):
 The hierarchical structure of military units and their relationships. Gabriel's primary artefact.
 
+**Orbat module** (`src/utils/orbat.ts`, `buildOrbat`):
+The single shared parent/child traversal index for `MapEntity` and `Organisation` hierarchies —
+`childrenOf`, `ancestors`, `descendants`, `roots`, `layers`, `depthOf`. Built once per items array
+(e.g. inside a `useMemo`) and consumed by every module that walks the tree (`TreeView`,
+`OrganisationTreeView`, `HierarchyPanel`, `NetworkLinksLayer`, `geometry.ts`,
+`layered-research.service.ts`), instead of each reimplementing its own `childrenByParent` map.
+_Orphan policy_: an item whose `parentId` points to a missing id is treated as a root — visible
+in trees and eligible for enrichment, rather than silently vanishing.
+_Cycle policy_: a fully disconnected cyclic component gets a synthetic root at its
+lexicographically smallest id, so it renders and ancestor/depth walks can't infinite-loop.
+`src/utils/treeLayout.ts` (`computeTreeXIndex`) builds on the Orbat module to give `TreeView` and
+`OrganisationTreeView` an identical horizontal-layout algorithm.
+
 ### Enrichment pipeline
 
 **Enrichment Run**:
