@@ -1,4 +1,5 @@
 import type { DrawnGeometry, MapEntity } from "@/types/domain.types"
+import { buildOrbat } from "@/utils/orbat"
 import type {
   EnrichmentResponse,
   EnrichmentUsage,
@@ -79,30 +80,12 @@ export type LayeredResearchOptions = {
 }
 
 /**
- * Builds BFS layers from a flat entity list.
- * layer[0] = roots (parentId null or parent not in set)
+ * Builds BFS layers from a flat entity list, via the shared Orbat traversal module.
+ * layer[0] = roots (parentId null, orphaned, or a disconnected cycle's entry point)
  * layer[N] = entities whose parentId is in layer[N-1]
- * Orphans (parentId set but parent absent) are treated as roots.
  */
 export function buildBfsLayers(entities: MapEntity[], maxLayers?: number): MapEntity[][] {
-  const entityIds = new Set(entities.map((e) => e.id))
-  const layers: MapEntity[][] = []
-
-  const roots = entities.filter((e) => e.parentId === null || !entityIds.has(e.parentId))
-  if (roots.length === 0) return []
-  layers.push(roots)
-
-  const limit = maxLayers ?? Infinity
-  let currentIds = new Set(roots.map((e) => e.id))
-
-  while (layers.length < limit) {
-    const next = entities.filter((e) => e.parentId !== null && currentIds.has(e.parentId))
-    if (next.length === 0) break
-    layers.push(next)
-    currentIds = new Set(next.map((e) => e.id))
-  }
-
-  return layers
+  return buildOrbat(entities).layers(maxLayers)
 }
 
 function sleep(ms: number): Promise<void> {

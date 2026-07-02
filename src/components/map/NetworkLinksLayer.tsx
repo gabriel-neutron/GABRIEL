@@ -3,6 +3,7 @@ import { Polyline } from "react-leaflet"
 import { useProjectStore } from "@/store/useProjectStore"
 import type { MapEntity } from "@/types/domain.types"
 import type { LatLng } from "@/types/coordinates"
+import { buildOrbat } from "@/utils/orbat"
 
 const NETWORK_LINE_OPTIONS = {
   color: "#a855f7",
@@ -22,40 +23,10 @@ function visibleNetworkIds(
   selectedId: string,
   entities: MapEntity[]
 ): Set<string> {
-  const byId = new Map(entities.map((e) => [e.id, e]))
-  const childrenByParent = new Map<string, string[]>()
-  for (const entity of entities) {
-    if (!entity.parentId) continue
-    const children = childrenByParent.get(entity.parentId)
-    if (children) {
-      children.push(entity.id)
-    } else {
-      childrenByParent.set(entity.parentId, [entity.id])
-    }
-  }
-
+  const orbat = buildOrbat(entities)
   const visible = new Set<string>([selectedId])
-
-  let current: MapEntity | undefined = byId.get(selectedId)
-  for (let up = 0; up < MAX_DEGREE && current?.parentId; up++) {
-    visible.add(current.parentId)
-    current = byId.get(current.parentId)
-  }
-
-  let frontier: string[] = [selectedId]
-  for (let depth = 0; depth < MAX_DEGREE && frontier.length > 0; depth++) {
-    const next: string[] = []
-    for (const id of frontier) {
-      const children = childrenByParent.get(id)
-      if (!children) continue
-      for (const childId of children) {
-        visible.add(childId)
-        next.push(childId)
-      }
-    }
-    frontier = next
-  }
-
+  for (const ancestor of orbat.ancestors(selectedId, MAX_DEGREE)) visible.add(ancestor.id)
+  for (const descendant of orbat.descendants(selectedId, MAX_DEGREE)) visible.add(descendant.id)
   return visible
 }
 

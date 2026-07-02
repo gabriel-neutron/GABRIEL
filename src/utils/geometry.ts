@@ -1,6 +1,7 @@
 import type { DrawnGeometry, MapEntity, PositionMode } from "@/types/domain.types"
 import type { Organisation } from "@/types/organisation.types"
 import { type LatLng, asLatLng } from "@/types/coordinates"
+import { buildOrbat } from "@/utils/orbat"
 
 /**
  * Returns a representative point for symbol placement from the first geometry
@@ -72,13 +73,14 @@ function computePositions<T extends Positionable>(
     }
   }
 
+  const orbat = buildOrbat(items)
   const siblingGroups = new Map<string, T[]>()
   for (const item of items) {
-    if ((item.positionMode ?? "own") !== "own" && item.parentId != null) {
-      const group = siblingGroups.get(item.parentId) ?? []
-      group.push(item)
-      siblingGroups.set(item.parentId, group)
-    }
+    if (item.parentId == null || siblingGroups.has(item.parentId)) continue
+    siblingGroups.set(
+      item.parentId,
+      orbat.childrenOf(item.parentId).filter((child) => (child.positionMode ?? "own") !== "own"),
+    )
   }
 
   let remaining = items.filter((item) => (item.positionMode ?? "own") !== "own" && item.parentId != null)
