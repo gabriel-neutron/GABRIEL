@@ -1,6 +1,6 @@
 import { create } from "zustand"
 import { devtools } from "zustand/middleware"
-import { getDefaultEchelonLayers } from "@/services/geopackage.service"
+import { getDefaultEchelonLayers } from "@/services/geopackage"
 import type { Layer, MapEntity, DrawnGeometry, SelectedOsmObject } from "@/types/domain.types"
 import type { Organisation } from "@/types/organisation.types"
 import { INDUSTRY_LAYER_ID } from "@/types/organisation.types"
@@ -109,7 +109,7 @@ export interface ProjectActions {
 export function selectPersistableSnapshot(state: ProjectState) {
   const nonOsmLayerIds = new Set(state.layers.filter((l) => l.osmData == null).map((l) => l.id))
   return {
-    layers: state.layers,
+    layers: state.layers.map((l) => ({ ...l, kind: l.kind ?? (l.osmData != null ? ("osm" as const) : undefined) })),
     entities: state.entities
       .filter((e) => nonOsmLayerIds.has(e.layerId))
       .map((e) => ({ ...e, name: e.name.trim() || "Untitled" })),

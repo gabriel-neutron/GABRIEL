@@ -46,7 +46,7 @@ Enrichment UI state remains reducer-based in `enrichment.store.ts` and is orches
 | Session persistence | Browser IndexedDB via `projectStorage.service.ts` |
 | Internal coordinate order | `[lat, lng]` — Leaflet convention |
 | GeoJSON / storage coordinate order | `[lng, lat]` — GeoJSON / WGS-84 convention |
-| Coordinate conversion | Only in `geopackage.service.ts` at the read/write boundary |
+| Coordinate conversion | Only in `src/services/geopackage/` at the read/write boundary |
 | OSM geometry parsing | `osmtogeojson` ^3.0.0-beta.5 |
 
 ## AI / Enrichment

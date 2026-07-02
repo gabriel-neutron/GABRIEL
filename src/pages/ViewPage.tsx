@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react"
 import { Loader2 } from "lucide-react"
 import { MainLayout } from "@/components/shared/MainLayout"
-import { loadGeoPackage, applyGeoPackageResult } from "@/services/geopackage.service"
+import { loadGeoPackage, applyGeoPackageResult } from "@/services/geopackage"
 import { useProjectStore } from "@/store/useProjectStore"
 import { useEnrichment } from "@/hooks/useEnrichment"
 

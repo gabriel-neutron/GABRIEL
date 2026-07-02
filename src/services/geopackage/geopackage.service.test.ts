@@ -1,17 +1,26 @@
 import { readdirSync, rmSync } from "node:fs"
+import { GeoPackageAPI } from "@ngageoint/geopackage"
 import { describe, expect, it, afterEach } from "vitest"
 import { toLeafletCoord, toGeoJsonCoord, asLatLng } from "@/types/coordinates"
 import type { MapEntity } from "@/types/domain.types"
-import { loadGeoPackage, saveGeoPackage, type GpkgLayer } from "./geopackage.service"
-import type { GpkgGeometry } from "./geopackage.service"
+import type { Organisation } from "@/types/organisation.types"
+import { loadGeoPackage, saveGeoPackage, type GpkgLayer } from "./index"
+import type { GpkgGeometry } from "./index"
 
 // Coordinate contract: internal [lat, lng] ↔ storage [lng, lat].
 
 describe("coordinate round-trip", () => {
   afterEach(() => {
+    // Best-effort cleanup of stray browser-save-pool files: another parallel test file's
+    // worker process may still hold a lock on a same-named pooled file on Windows, so a
+    // transient EPERM here isn't a real failure (the file just outlives this run).
     for (const file of readdirSync(process.cwd())) {
       if (file.startsWith("gabriel-") && file.endsWith(".gpkg")) {
-        rmSync(file, { force: true })
+        try {
+          rmSync(file, { force: true })
+        } catch {
+          // ignore: file is locked by another concurrently-running test worker
+        }
       }
     }
   })
@@ -85,6 +94,115 @@ describe("coordinate round-trip", () => {
       )
       expect(loaded.sourceCache.get("https://example.org/source-a")).toBe("cached snippet A")
       expect(loaded.sourceCache.get("https://example.org/source-b")).toBe("cached snippet B")
+    },
+    30_000,
+  )
+
+  it(
+    "saveGeoPackage -> loadGeoPackage round-trips organisations",
+    async () => {
+      const layers: GpkgLayer[] = [{ id: "industry", name: "Industry", visible: true, kind: "organisation" }]
+      const organisations: Organisation[] = [
+        {
+          id: "org-1",
+          name: "Test Holding",
+          type: "holding",
+          parentId: null,
+          notes: "Parent org note",
+          sources: "https://example.org/org-source",
+          osmRelationId: 42,
+          positionMode: "own",
+          isExactPosition: true,
+        },
+        {
+          id: "org-2",
+          name: "Test Factory",
+          type: "factory",
+          parentId: "org-1",
+          notes: null,
+          sources: null,
+          osmRelationId: null,
+          positionMode: "parent",
+          isExactPosition: false,
+        },
+      ]
+
+      const bytes = await saveGeoPackage(layers, [], organisations, [], undefined)
+      const persistedBuffer = Uint8Array.from(bytes).buffer
+      const loaded = await loadGeoPackage(persistedBuffer)
+
+      expect(loaded.organisations).toHaveLength(2)
+      expect(loaded.organisations).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            id: "org-1",
+            name: "Test Holding",
+            type: "holding",
+            parentId: null,
+            notes: "Parent org note",
+            sources: "https://example.org/org-source",
+            osmRelationId: 42,
+            positionMode: "own",
+            isExactPosition: true,
+          }),
+          expect.objectContaining({
+            id: "org-2",
+            name: "Test Factory",
+            type: "factory",
+            parentId: "org-1",
+            notes: null,
+            sources: null,
+            osmRelationId: null,
+            positionMode: "parent",
+            isExactPosition: false,
+          }),
+        ]),
+      )
+    },
+    30_000,
+  )
+
+  it(
+    "loadGeoPackage falls back to defaults when analyzed_at/position_mode/is_exact_position columns are missing (pre-migration schema)",
+    async () => {
+      const layers: GpkgLayer[] = [{ id: "division", name: "Division", visible: true, kind: "echelon" }]
+      const entities: MapEntity[] = [
+        {
+          id: "e-1",
+          name: "Old Schema Unit",
+          layerId: "division",
+          parentId: null,
+          notes: "predates the analyzed_at/position_mode/is_exact_position columns",
+        },
+      ]
+      const bytes = await saveGeoPackage(layers, entities, [], [])
+      const geoPackage = await GeoPackageAPI.open(new Uint8Array(bytes))
+      try {
+        geoPackage.connection.run("ALTER TABLE units DROP COLUMN analyzed_at")
+        geoPackage.connection.run("ALTER TABLE units DROP COLUMN position_mode")
+        geoPackage.connection.run("ALTER TABLE units DROP COLUMN is_exact_position")
+        const columns = geoPackage.connection.all("PRAGMA table_info(units)") as Array<{ name: string }>
+        expect(columns.map((c) => c.name)).not.toEqual(
+          expect.arrayContaining(["analyzed_at", "position_mode", "is_exact_position"]),
+        )
+        const migratedBytes = await geoPackage.export()
+        if (!(migratedBytes instanceof Uint8Array)) throw new Error("Export did not return Uint8Array")
+
+        const loaded = await loadGeoPackage(Uint8Array.from(migratedBytes).buffer)
+
+        expect(loaded.entities).toHaveLength(1)
+        expect(loaded.entities[0]).toEqual(
+          expect.objectContaining({
+            id: "e-1",
+            name: "Old Schema Unit",
+            analyzedAt: undefined,
+            positionMode: "own",
+            isExactPosition: false,
+          }),
+        )
+      } finally {
+        geoPackage.close()
+      }
     },
     30_000,
   )

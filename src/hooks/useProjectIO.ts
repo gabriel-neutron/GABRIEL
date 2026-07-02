@@ -5,10 +5,12 @@ import {
   getDefaultEchelonLayers,
   applyGeoPackageResult,
   type GpkgLayer,
+  type GpkgEntity,
   type GpkgOrganisation,
-} from "@/services/geopackage.service"
+  type GpkgGeometry,
+} from "@/services/geopackage"
 import { INDUSTRY_LAYER_ID } from "@/types/organisation.types"
-import { loadProject, saveProject, clearProject } from "@/services/projectStorage.service"
+import { loadProject, saveProject, clearProject, type LoadedProject } from "@/services/projectStorage.service"
 import { useProjectStore, selectPersistableSnapshot } from "@/store/useProjectStore"
 
 async function writeGeoPackageToFile(bytes: Uint8Array): Promise<void> {
@@ -36,6 +38,49 @@ async function loadSeedGeoPackageBuffer(): Promise<ArrayBuffer | null> {
   } catch {
     return null
   }
+}
+
+export interface ProjectSaveInput {
+  layers: GpkgLayer[]
+  entities: GpkgEntity[]
+  organisations: GpkgOrganisation[]
+  geometries: GpkgGeometry[]
+  sourceCache: Map<string, string>
+}
+
+export interface ProjectSaveDeps {
+  loadProject: () => Promise<LoadedProject | null>
+  saveGeoPackage: (
+    layers: GpkgLayer[],
+    entities: GpkgEntity[],
+    organisations: GpkgOrganisation[],
+    geometries: GpkgGeometry[],
+    researchSources: Map<string, string> | undefined,
+    baseBuffer: ArrayBuffer | undefined,
+  ) => Promise<Uint8Array>
+  writeGeoPackageToFile: (bytes: Uint8Array) => Promise<void>
+  saveProject: (buffer: ArrayBuffer) => Promise<void>
+}
+
+/**
+ * Save ordering is load-bearing: the disk write must succeed before the IndexedDB
+ * cache is overwritten, so a failed disk write leaves the session cache stale
+ * rather than corrupted.
+ */
+export async function performProjectSave(input: ProjectSaveInput, deps: ProjectSaveDeps): Promise<void> {
+  const existing = await deps.loadProject()
+  const bytes = await deps.saveGeoPackage(
+    input.layers,
+    input.entities,
+    input.organisations,
+    input.geometries,
+    input.sourceCache,
+    existing?.buffer,
+  )
+  await deps.writeGeoPackageToFile(bytes)
+  const buffer = new ArrayBuffer(bytes.length)
+  new Uint8Array(buffer).set(bytes)
+  await deps.saveProject(buffer)
 }
 
 export function useProjectIO() {
@@ -144,33 +189,16 @@ export function useProjectIO() {
   }, [])
 
   const handleSave = useCallback(async (): Promise<void> => {
-    const { layers, entities: persistedEntities, organisations: persistedOrganisations, geometries: persistedGeometries, sourceCache } =
-      selectPersistableSnapshot(useProjectStore.getState())
-    const gpkgLayers: GpkgLayer[] = layers.map((l) => ({
-      id: l.id,
-      name: l.name,
-      visible: l.visible,
-      kind: l.kind ?? (l.osmData != null ? ("osm" as const) : undefined),
-      sourceQuery: l.sourceQuery,
-      osmData: l.osmData,
-    }))
-    const gpkgOrganisations: GpkgOrganisation[] = persistedOrganisations
+    const { layers, entities, organisations, geometries, sourceCache } = selectPersistableSnapshot(
+      useProjectStore.getState(),
+    )
     setBusy(true)
     setError(null)
     try {
-      const existing = await loadProject()
-      const bytes = await saveGeoPackage(
-        gpkgLayers,
-        persistedEntities,
-        gpkgOrganisations,
-        persistedGeometries,
-        sourceCache,
-        existing?.buffer,
+      await performProjectSave(
+        { layers, entities, organisations, geometries, sourceCache },
+        { loadProject, saveGeoPackage, writeGeoPackageToFile, saveProject },
       )
-      await writeGeoPackageToFile(bytes)
-      const buffer = new ArrayBuffer(bytes.length)
-      new Uint8Array(buffer).set(bytes)
-      await saveProject(buffer)
       window.alert("Saved successfully")
     } catch (e) {
       if (e instanceof Error && e.name === "AbortError") return

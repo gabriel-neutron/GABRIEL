@@ -32,8 +32,8 @@ functions with no side effects.
 - **Stores (after Phase 1)**: `use<Domain>Store.ts` in `src/store/`
   (e.g. `useProjectStore.ts`, `useEnrichmentStore.ts`).
 - **Types**: PascalCase for interfaces and type aliases.
-- **Domain boundary**: `MapEntity` (UI / runtime) vs `GpkgEntity` (GeoPackage / DB).
-  Use `MapEntity` everywhere except inside `geopackage.service.ts`.
+- **Domain boundary**: `MapEntity` (UI / runtime) vs `GpkgEntity` (GeoPackage / DB, a thin
+  alias of `MapEntity`). Use `MapEntity` everywhere except inside `src/services/geopackage/`.
 - **Constants**: `SCREAMING_SNAKE_CASE`.
 - **No default exports** for named components. Use named exports.
 
@@ -43,7 +43,7 @@ functions with no side effects.
 - Internal app: `[lat, lng]` — Leaflet convention. This is the only coordinate order used in
   components, hooks, utilities, and the Zustand store.
 - GeoJSON / GeoPackage: `[lng, lat]` — WGS-84 / GeoJSON standard.
-- Conversion happens **only** in `geopackage.service.ts` at the read/write boundary.
+- Conversion happens **only** in `src/services/geopackage/` at the read/write boundary.
 - After Phase 8: enforce with branded types (`LatLng` vs `LngLat`) from `src/types/coordinates.ts`.
 
 **Pure reducers**
@@ -83,7 +83,7 @@ functions with no side effects.
 - **Enrichment store** (`store/enrichment.store.ts`): 100 % branch coverage.
 - **Enrichment services** (`services/enrichment/`): unit tests for all public functions.
 - **Layered research** (`services/research/`): unit tests for BFS ordering and skip logic.
-- **GeoPackage round-trip**: integration test in `services/geopackage.service.test.ts`
+- **GeoPackage round-trip**: integration test in `services/geopackage/geopackage.service.test.ts`
   (required before Phase 8 coordinate changes).
 - **Test runner**: Vitest only. No Jest.
 - **Storybook stories** required for: `EntityInspector`, `EnrichDrawer`, `OsmObjectInspector`,
