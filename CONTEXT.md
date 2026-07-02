@@ -46,7 +46,7 @@ The persistent set of cited URLs stored on a MapEntity that back its accepted cl
 _Avoid_: bibliography, source list, references
 
 **Authority Weight**:
-A 0–1 score assigned to a Research Citation based on its domain type: official/gov (0.95) > OSINT reports (0.8) > news (0.7) > social (0.55) > forum (0.45) > general web (0.4). Used to rank citations when selecting the top-2 for the Provenance Ledger.
+A 0–1 score assigned to a Research Citation based on its domain type: official/gov (0.95) > OSINT reports (0.8) > Wikipedia (0.75) > news (0.7) > social (0.55) > forum (0.45) > general web (0.4). Used to rank citations when selecting the top-2 for the Provenance Ledger — Wikipedia and non-article aggregate URLs (feeds, author/tag/category pages) are excluded from ledger selection entirely, regardless of weight.
 
 ### Notes
 

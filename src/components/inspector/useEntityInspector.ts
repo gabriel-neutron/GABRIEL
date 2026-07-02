@@ -2,16 +2,9 @@ import { useCallback, useMemo, useState } from "react"
 import type { DrawnGeometry, MapEntity, PositionMode } from "@/types/domain.types"
 import type { SymbolAffiliation, SymbolDomain, SymbolEchelon } from "@/types/symbol.types"
 import { useProjectStore } from "@/store/useProjectStore"
+import { parse as parseSources } from "@/services/enrichment/provenance-ledger"
 
 const SOURCES_DELIMITER = "\n"
-
-function parseSources(raw?: string | null): string[] {
-  if (!raw) return []
-  return raw
-    .split(SOURCES_DELIMITER)
-    .map((s) => s.trim())
-    .filter((s) => s.length > 0)
-}
 
 function detectEchelonFromName(name: string): SymbolEchelon | null {
   const n = name.toLowerCase()

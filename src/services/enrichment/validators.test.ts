@@ -158,5 +158,11 @@ describe("domain classification", () => {
     expect(getDomainTypeFromUrl("https://en.wikipedia.org/wiki/Test")).toBe("wikipedia")
     expect(getAuthorityWeight("wikipedia")).toBeGreaterThan(getAuthorityWeight("web"))
   })
+
+  it("ranks wikipedia below osint and above news, not tied with official", () => {
+    expect(getAuthorityWeight("osint")).toBeGreaterThan(getAuthorityWeight("wikipedia"))
+    expect(getAuthorityWeight("wikipedia")).toBeGreaterThan(getAuthorityWeight("news"))
+    expect(getAuthorityWeight("wikipedia")).toBeLessThan(getAuthorityWeight("official"))
+  })
 })
 

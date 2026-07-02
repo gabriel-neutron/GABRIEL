@@ -8,7 +8,7 @@ import type {
   UnresolvedReason,
 } from "@/types/enrichment.types"
 import { ENRICHMENT_DOMAIN_TYPES } from "@/types/enrichment.types"
-import { ENRICHMENT_MAX_DEPTH_HARD_LIMIT } from "./schema.fixtures"
+import { ENRICHMENT_MAX_DEPTH_HARD_LIMIT } from "./enrichment.constants"
 
 /** Minimum URLs attached to each accepted proposal (citation contract). */
 export const MIN_SOURCES_PER_PROPOSAL = 1
@@ -64,12 +64,12 @@ export function getDomainTypeFromUrl(url: string): SourceDomainType {
 
 export function getAuthorityWeight(domainType: SourceDomainType): number {
   switch (domainType) {
-    case "wikipedia":
-      return 0.95
     case "official":
       return 0.95
     case "osint":
       return 0.8
+    case "wikipedia":
+      return 0.75
     case "news":
       return 0.7
     case "social":

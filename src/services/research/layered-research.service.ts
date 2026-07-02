@@ -4,13 +4,9 @@ import type {
   EnrichmentResponse,
   EnrichmentUsage,
 } from "@/types/enrichment.types"
-import { toEnrichmentFeature, toEnrichmentContext } from "@/utils/enrichmentAdapters"
 import { runEnrichment } from "@/services/enrichment/enrichment.service"
-import { buildDefaultEnrichmentPrompt } from "@/services/enrichment/promptTemplate"
-import {
-  buildEnrichmentOutputSchema,
-  ENRICHMENT_MAX_DEPTH_DEFAULT,
-} from "@/services/enrichment/schema.fixtures"
+import { buildEnrichmentRequest } from "@/services/enrichment/request-builder"
+import * as provenanceLedger from "@/services/enrichment/provenance-ledger"
 import {
   createLayeredResearchProviderBundle,
   type ProviderBundle,
@@ -185,24 +181,10 @@ export async function runLayeredResearch(
       })
 
       try {
-        const poolHintUrls = entity.sources
-          ? entity.sources.split("\n").map((u) => u.trim()).filter(Boolean)
-          : []
-
-        const feature = toEnrichmentFeature(entity, drawnGeometries)
-        const context = toEnrichmentContext(entity, entities)
-        const prompt = buildDefaultEnrichmentPrompt(feature, context, poolHintUrls)
+        const poolHintUrls = provenanceLedger.parse(entity.sources)
 
         const { response, usage } = await runEnrichment(
-          {
-            prompt,
-            feature,
-            context,
-            outputSchema: buildEnrichmentOutputSchema(
-              typeof entity.sources === "string" && entity.sources.trim().length > 0,
-            ),
-            maxDepth: ENRICHMENT_MAX_DEPTH_DEFAULT,
-          },
+          buildEnrichmentRequest(entity, entities, drawnGeometries, { poolHintUrls }),
           { providers: bundle, signal: options.signal },
         )
 

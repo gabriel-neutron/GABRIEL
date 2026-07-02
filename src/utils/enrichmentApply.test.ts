@@ -82,4 +82,27 @@ describe("buildAcceptedPatch", () => {
     })
   })
 
+  it("excludes a wikipedia citation from the merged ledger even when it ranks highest by weight", () => {
+    const notesProposal: EnrichmentProposal = {
+      field: "notes",
+      currentValue: null,
+      proposedValue: "HQ note",
+      reasoning: "",
+      citations: [
+        { url: "https://en.wikipedia.org/wiki/Unit", title: "", snippet: "", domainType: "wikipedia" },
+        { url: "https://news.example/article", title: "", snippet: "", domainType: "news" },
+      ],
+    }
+    const patch = buildAcceptedPatch({
+      decisions: { notes: "accepted" },
+      overlay: { notes: "HQ note" },
+      proposals: [notesProposal],
+      entity: { ...baseEntity, sources: null },
+    })
+    expect(patch).toEqual({
+      notes: "HQ note",
+      sources: "https://news.example/article",
+    })
+  })
+
 })
