@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useRef, useState } from "react"
-import { buildDefaultEnrichmentPrompt, buildEnrichmentOutputSchema, ENRICHMENT_MAX_DEPTH_DEFAULT, runEnrichment } from "@/services/enrichment"
+import { buildDefaultEnrichmentPrompt, buildEnrichmentRequest, ENRICHMENT_MAX_DEPTH_DEFAULT, runEnrichment } from "@/services/enrichment"
 import { toEnrichmentFeature, toEnrichmentContext } from "@/utils/enrichmentAdapters"
 import {
   acceptProposalToOverlay,
@@ -138,15 +138,7 @@ export function useEnrichment({
       }),
     )
     await runnerRef.current.run(
-      {
-        prompt: draftPrompt,
-        feature,
-        context,
-        outputSchema: buildEnrichmentOutputSchema(
-          typeof selectedEntity.sources === "string" && selectedEntity.sources.trim().length > 0,
-        ),
-        maxDepth: ENRICHMENT_MAX_DEPTH_DEFAULT,
-      },
+      buildEnrichmentRequest(selectedEntity, entities, drawnGeometries, { prompt: draftPrompt }),
       {
         onProgress: (progress) => {
           setState((current) => updateEnrichmentProgress(current, progress))
@@ -179,7 +171,7 @@ export function useEnrichment({
         onFinally: () => {},
       },
     )
-  }, [context, draftPrompt, feature, selectedEntity, state.run.status])
+  }, [context, draftPrompt, drawnGeometries, entities, feature, selectedEntity, state.run.status])
 
   const accept = useCallback(
     (proposal: EnrichmentProposal) => {

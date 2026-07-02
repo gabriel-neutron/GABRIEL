@@ -25,7 +25,8 @@ import {
   ENRICHMENT_MAX_DEPTH_HARD_LIMIT,
   ENRICHMENT_MAX_ELAPSED_MS,
   ENRICHMENT_MAX_ESTIMATED_TOKENS,
-} from "./schema.fixtures"
+} from "./enrichment.constants"
+import * as provenanceLedger from "./provenance-ledger"
 
 type ServiceProgress = {
   depthUsed: number
@@ -340,13 +341,6 @@ async function retrieveParallel(
   return { chunks, notes }
 }
 
-const AGGREGATE_URL_PATTERNS = ["/feed/", "/author/", "/tag/", "/category/"]
-
-function isSpecificArticleUrl(url: string): boolean {
-  const lower = url.toLowerCase()
-  return !AGGREGATE_URL_PATTERNS.some((pattern) => lower.includes(pattern))
-}
-
 function chunksToSources(chunks: RetrievalChunk[]): EnrichmentSource[] {
   return chunks
     .map((chunk): EnrichmentSource => {
@@ -438,9 +432,7 @@ function buildResponse(
       // For the provenance ledger, ignore field-name scoring (which would match the word
       // "sources" in unrelated content). Instead rank ALL retrieved chunks by authority weight,
       // excluding Wikipedia and non-article aggregate URLs (feeds, author pages, tag pages).
-      const allValidCitations = chunksToSources(chunks)
-        .filter((s) => s.domainType !== "wikipedia" && isSpecificArticleUrl(s.url))
-        .sort((a, b) => getAuthorityWeight(b.domainType) - getAuthorityWeight(a.domainType))
+      const allValidCitations = provenanceLedger.rankCitations(chunksToSources(chunks))
       const topCitations = allValidCitations.slice(0, 2)
       if (topCitations.length === 0) {
         unresolvedFields.push(field)
