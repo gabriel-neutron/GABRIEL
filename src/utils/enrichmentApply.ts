@@ -1,7 +1,8 @@
 import type { ProposalDecision } from "@/store/enrichment.store"
 import type { MapEntity } from "@/types/domain.types"
 import type { EnrichmentProposal } from "@/types/enrichment.types"
-import * as provenanceLedger from "@/services/enrichment/provenance-ledger"
+import { merge, parse, serialize } from "@/core/provenance/ledger"
+import { selectTopCitations } from "@/modules/enrichment/citation-rating"
 
 export function buildAcceptedPatch(args: {
   decisions: Record<string, ProposalDecision>
@@ -23,15 +24,15 @@ export function buildAcceptedPatch(args: {
 
   const proposedUrls =
     decisions["sources"] === "accepted" && "sources" in overlay
-      ? provenanceLedger.parse(String(overlay["sources"] ?? ""))
+      ? parse(String(overlay["sources"] ?? ""))
       : []
 
   const evidenceUrls = proposals
     .filter((p) => p.field !== "sources" && decisions[p.field] === "accepted")
-    .flatMap((p) => provenanceLedger.selectTopCitations(p.citations).map((c) => c.url).filter(Boolean))
+    .flatMap((p) => selectTopCitations(p.citations).map((c) => c.url).filter(Boolean))
 
-  const merged = provenanceLedger.merge(entity?.sources, [...proposedUrls, ...evidenceUrls])
-  const existingNormalized = provenanceLedger.serialize(provenanceLedger.parse(entity?.sources))
+  const merged = merge(entity?.sources, [...proposedUrls, ...evidenceUrls])
+  const existingNormalized = serialize(parse(entity?.sources))
 
   if (merged !== existingNormalized) {
     patch.sources = merged

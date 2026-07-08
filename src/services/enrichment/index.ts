@@ -13,6 +13,5 @@ export {
   validateProposal,
   validateSource,
 } from "./validators"
-export * as provenanceLedger from "./provenance-ledger"
 export { buildEnrichmentRequest } from "./request-builder"
 

@@ -1,5 +1,5 @@
 import type { EnrichmentOutputSchema } from "@/types/enrichment.types"
-import * as provenanceLedger from "./provenance-ledger"
+import { shouldPropose } from "@/core/provenance/ledger"
 
 export const DEFAULT_ENRICHMENT_OUTPUT_SCHEMA: EnrichmentOutputSchema = {
   type: "object",
@@ -20,7 +20,7 @@ export const DEFAULT_ENRICHMENT_OUTPUT_SCHEMA: EnrichmentOutputSchema = {
  * accumulation and no independent proposal is needed.
  */
 export function buildEnrichmentOutputSchema(sources?: string | null): EnrichmentOutputSchema {
-  if (!provenanceLedger.shouldPropose(sources)) {
+  if (!shouldPropose(sources)) {
     return {
       type: "object",
       properties: {

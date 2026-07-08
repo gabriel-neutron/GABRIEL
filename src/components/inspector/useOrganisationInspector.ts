@@ -2,7 +2,7 @@ import { useCallback, useMemo, useState } from "react"
 import type { DrawnGeometry, PositionMode } from "@/types/domain.types"
 import type { Organisation, OrganisationType } from "@/types/organisation.types"
 import { useProjectStore } from "@/store/useProjectStore"
-import { parse as parseSources } from "@/services/enrichment/provenance-ledger"
+import { parse as parseSources } from "@/core/provenance/ledger"
 
 const SOURCES_DELIMITER = "\n"
 

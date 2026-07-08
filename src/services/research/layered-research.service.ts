@@ -6,7 +6,7 @@ import type {
 } from "@/types/enrichment.types"
 import { runEnrichment } from "@/services/enrichment/enrichment.service"
 import { buildEnrichmentRequest } from "@/services/enrichment/request-builder"
-import * as provenanceLedger from "@/services/enrichment/provenance-ledger"
+import { parse } from "@/core/provenance/ledger"
 import {
   createLayeredResearchProviderBundle,
   type ProviderBundle,
@@ -181,7 +181,7 @@ export async function runLayeredResearch(
       })
 
       try {
-        const poolHintUrls = provenanceLedger.parse(entity.sources)
+        const poolHintUrls = parse(entity.sources)
 
         const { response, usage } = await runEnrichment(
           buildEnrichmentRequest(entity, entities, drawnGeometries, { poolHintUrls }),
