@@ -7,12 +7,15 @@ import {
   type GpkgLayer,
   type GpkgEntity,
   type GpkgGeometry,
+  type GpkgSource,
+  type GpkgClaim,
 } from "@/core/persistence/geopackage"
 import { INDUSTRY_LAYER_ID } from "@/types/organisation.types"
 import { loadProject, saveProject, clearProject, type LoadedProject } from "@/services/projectStorage.service"
 import { useProjectStore, selectPersistableSnapshot } from "@/store/useProjectStore"
 import { useSourceCacheStore } from "@/store/useSourceCacheStore"
 import { useOsmViewStore } from "@/store/useOsmViewStore"
+import { useProvenanceStore } from "@/store/useProvenanceStore"
 
 async function writeGeoPackageToFile(bytes: Uint8Array): Promise<void> {
   const showSave = (
@@ -46,6 +49,8 @@ export interface ProjectSaveInput {
   entities: GpkgEntity[]
   geometries: GpkgGeometry[]
   sourceCache: Map<string, string>
+  sources: GpkgSource[]
+  claims: GpkgClaim[]
 }
 
 export interface ProjectSaveDeps {
@@ -56,6 +61,8 @@ export interface ProjectSaveDeps {
     geometries: GpkgGeometry[],
     researchSources: Map<string, string> | undefined,
     baseBuffer: ArrayBuffer | undefined,
+    sources: GpkgSource[] | undefined,
+    claims: GpkgClaim[] | undefined,
   ) => Promise<Uint8Array>
   writeGeoPackageToFile: (bytes: Uint8Array) => Promise<void>
   saveProject: (buffer: ArrayBuffer) => Promise<void>
@@ -74,6 +81,8 @@ export async function performProjectSave(input: ProjectSaveInput, deps: ProjectS
     input.geometries,
     input.sourceCache,
     existing?.buffer,
+    input.sources,
+    input.claims,
   )
   await deps.writeGeoPackageToFile(bytes)
   const buffer = new ArrayBuffer(bytes.length)
@@ -99,9 +108,11 @@ export function useProjectIO() {
             layers: next.layers,
             entities: next.entities,
             drawnGeometries: next.drawnGeometries,
+            claims: result.claims,
             selectedEntityId: next.selectedEntityId,
           })
           useSourceCacheStore.getState().setSourceCache(result.sourceCache)
+          useProvenanceStore.getState().setSources(result.sources)
           setRestoredFromSession(true)
         })
       })
@@ -132,6 +143,7 @@ export function useProjectIO() {
         : await loadSeedGeoPackageBuffer()
     resetProject()
     useSourceCacheStore.getState().resetSourceCache()
+    useProvenanceStore.getState().resetSources()
     useOsmViewStore.getState().resetOsmView()
     setError(null)
     setRestoredFromSession(false)
@@ -172,9 +184,11 @@ export function useProjectIO() {
         layers: next.layers,
         entities: next.entities,
         drawnGeometries: next.drawnGeometries,
+        claims: result.claims,
         selectedEntityId: next.selectedEntityId,
       })
       useSourceCacheStore.getState().setSourceCache(result.sourceCache)
+      useProvenanceStore.getState().setSources(result.sources)
       await saveProject(buffer)
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load GeoPackage")
@@ -185,15 +199,16 @@ export function useProjectIO() {
   }, [])
 
   const handleSave = useCallback(async (): Promise<void> => {
-    const { layers, entities, geometries, sourceCache } = selectPersistableSnapshot(
+    const { layers, entities, geometries, sourceCache, sources, claims } = selectPersistableSnapshot(
       useProjectStore.getState(),
       useSourceCacheStore.getState().sourceCache,
+      useProvenanceStore.getState().sources,
     )
     setBusy(true)
     setError(null)
     try {
       await performProjectSave(
-        { layers, entities, geometries, sourceCache },
+        { layers, entities, geometries, sourceCache, sources, claims },
         { loadProject, saveGeoPackage, writeGeoPackageToFile, saveProject },
       )
       window.alert("Saved successfully")

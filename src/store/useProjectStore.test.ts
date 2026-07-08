@@ -1,12 +1,14 @@
-import { describe, expect, it } from "vitest"
-import { selectPersistableSnapshot, type ProjectState } from "./useProjectStore"
+import { beforeEach, describe, expect, it } from "vitest"
+import { selectPersistableSnapshot, useProjectStore, type ProjectState } from "./useProjectStore"
 import type { Layer, MapEntity, DrawnGeometry } from "@/types/domain.types"
+import type { Claim } from "@/core/provenance/claim"
 
 function makeState(overrides: Partial<ProjectState> = {}): ProjectState {
   return {
     layers: [],
     entities: [],
     drawnGeometries: [],
+    claims: [],
     selectedEntityId: null,
     ...overrides,
   }
@@ -90,5 +92,68 @@ describe("selectPersistableSnapshot", () => {
     const snapshot = selectPersistableSnapshot(makeState({ layers, entities }), new Map())
     expect(snapshot.entities.find((e) => e.id === "e-1")?.name).toBe("Untitled")
     expect(snapshot.entities.find((e) => e.id === "org-1")?.name).toBe("Untitled")
+  })
+
+  it("excludes claims belonging to a filtered-out (OSM-layer) entity", () => {
+    const osmData: GeoJSON.FeatureCollection = { type: "FeatureCollection", features: [] }
+    const layers: Layer[] = [
+      { id: "osm-1", name: "OSM Layer", visible: true, kind: "osm", osmData },
+      { id: "custom-1", name: "Custom", visible: true, kind: "custom" },
+    ]
+    const entities: MapEntity[] = [
+      { kind: "unit", id: "e-osm", name: "On OSM layer", layerId: "osm-1", parentId: null },
+      { kind: "unit", id: "e-custom", name: "On custom layer", layerId: "custom-1", parentId: null },
+    ]
+    const claims: Claim[] = [
+      { id: "c-osm", entityId: "e-osm", field: "sources", value: null, sourceId: "src-1", credibility: null, timestamp: null },
+      { id: "c-custom", entityId: "e-custom", field: "sources", value: null, sourceId: "src-1", credibility: null, timestamp: null },
+    ]
+    const snapshot = selectPersistableSnapshot(makeState({ layers, entities, claims }), new Map())
+    expect(snapshot.claims.map((c) => c.id)).toEqual(["c-custom"])
+  })
+})
+
+describe("useProjectStore claims cascade", () => {
+  beforeEach(() => {
+    useProjectStore.getState().resetProject()
+  })
+
+  it("deleteEntity removes claims belonging to the deleted entity", () => {
+    useProjectStore.getState().setProject({
+      layers: [{ id: "custom-1", name: "Custom", visible: true, kind: "custom" }],
+      entities: [
+        { kind: "unit", id: "e-1", name: "A", layerId: "custom-1", parentId: null },
+        { kind: "unit", id: "e-2", name: "B", layerId: "custom-1", parentId: null },
+      ],
+      drawnGeometries: [],
+      claims: [
+        { id: "c-1", entityId: "e-1", field: "sources", value: null, sourceId: "src-1", credibility: null, timestamp: null },
+        { id: "c-2", entityId: "e-2", field: "sources", value: null, sourceId: "src-1", credibility: null, timestamp: null },
+      ],
+      selectedEntityId: null,
+    })
+    useProjectStore.getState().deleteEntity("e-1")
+    expect(useProjectStore.getState().claims.map((c) => c.id)).toEqual(["c-2"])
+  })
+
+  it("removeLayer cascades to claims of every entity removed with that layer", () => {
+    useProjectStore.getState().setProject({
+      layers: [
+        { id: "custom-1", name: "Custom", visible: true, kind: "custom" },
+        { id: "custom-2", name: "Custom 2", visible: true, kind: "custom" },
+      ],
+      entities: [
+        { kind: "unit", id: "e-1", name: "A", layerId: "custom-1", parentId: null },
+        { kind: "unit", id: "e-2", name: "B", layerId: "custom-2", parentId: null },
+      ],
+      drawnGeometries: [],
+      claims: [
+        { id: "c-1", entityId: "e-1", field: "sources", value: null, sourceId: "src-1", credibility: null, timestamp: null },
+        { id: "c-2", entityId: "e-2", field: "sources", value: null, sourceId: "src-1", credibility: null, timestamp: null },
+      ],
+      selectedEntityId: null,
+    })
+    useProjectStore.getState().removeLayer("custom-1")
+    expect(useProjectStore.getState().claims.map((c) => c.id)).toEqual(["c-2"])
   })
 })

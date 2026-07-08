@@ -3,6 +3,8 @@ import { devtools } from "zustand/middleware"
 import { getDefaultEchelonLayers } from "@/core/persistence/geopackage"
 import type { Layer, MapEntity, DrawnGeometry } from "@/types/domain.types"
 import { INDUSTRY_LAYER_ID } from "@/types/organisation.types"
+import type { Claim } from "@/core/provenance/claim"
+import type { Source } from "@/core/provenance/source"
 
 // ---------------------------------------------------------------------------
 // State
@@ -13,6 +15,13 @@ export interface ProjectState {
   /** Both military units and corporate entities (kind-discriminated, ADR 0004 / E1) share this array. */
   entities: MapEntity[]
   drawnGeometries: DrawnGeometry[]
+  /**
+   * Provenance claims (ADR 0006, E2.4) — entity-keyed, so cascade-deleted alongside
+   * `drawnGeometries` for the same reason: a dangling `claim.entityId` after entity
+   * deletion is the same class of bug atomicity here prevents. `Source` records
+   * themselves are NOT entity-keyed and live in the peripheral `useProvenanceStore`.
+   */
+  claims: Claim[]
   selectedEntityId: string | null
 }
 
@@ -28,6 +37,7 @@ function initialState(): ProjectState {
     layers: [...getDefaultEchelonLayers(), INDUSTRY_LAYER],
     entities: [],
     drawnGeometries: [],
+    claims: [],
     selectedEntityId: null,
   }
 }
@@ -41,6 +51,7 @@ export interface ProjectActions {
     layers: Layer[]
     entities: MapEntity[]
     drawnGeometries: DrawnGeometry[]
+    claims?: Claim[]
     selectedEntityId: string | null
   }): void
   resetProject(): void
@@ -68,20 +79,30 @@ export interface ProjectActions {
 // ---------------------------------------------------------------------------
 
 /**
- * The single source of truth for what data gets written to disk. `sourceCache`
- * lives in `useSourceCacheStore` (a peripheral store, ADR 0005) — passed in
- * explicitly rather than read off `ProjectState` so this stays the one place
- * callers assemble a save snapshot from, even though the data now spans two stores.
+ * The single source of truth for what data gets written to disk. `sourceCache`/
+ * `sources` live in peripheral stores (ADR 0005/0006) — passed in explicitly rather
+ * than read off `ProjectState` so this stays the one place callers assemble a save
+ * snapshot from, even though the data now spans multiple stores.
  */
-export function selectPersistableSnapshot(state: ProjectState, sourceCache: Map<string, string>) {
+export function selectPersistableSnapshot(
+  state: ProjectState,
+  sourceCache: Map<string, string>,
+  sources: Source[] = [],
+) {
   const nonOsmLayerIds = new Set(state.layers.filter((l) => l.osmData == null).map((l) => l.id))
+  const entities = state.entities
+    .filter((e) => nonOsmLayerIds.has(e.layerId))
+    .map((e) => ({ ...e, name: e.name.trim() || "Untitled" }))
+  const survivingEntityIds = new Set(entities.map((e) => e.id))
   return {
     layers: state.layers.map((l) => ({ ...l, kind: l.kind ?? (l.osmData != null ? ("osm" as const) : undefined) })),
-    entities: state.entities
-      .filter((e) => nonOsmLayerIds.has(e.layerId))
-      .map((e) => ({ ...e, name: e.name.trim() || "Untitled" })),
+    entities,
     geometries: state.drawnGeometries.filter((g) => nonOsmLayerIds.has(g.layerId)),
     sourceCache,
+    // Only the claims belonging to a surviving (non-OSM) entity are persisted —
+    // otherwise an OSM entity filtered out above would leave a dangling claim.entityId.
+    claims: state.claims.filter((c) => survivingEntityIds.has(c.entityId)),
+    sources,
   }
 }
 
@@ -90,8 +111,8 @@ export const useProjectStore = create<ProjectState & ProjectActions>()(
     (set, get) => ({
       ...initialState(),
 
-      setProject({ layers, entities, drawnGeometries, selectedEntityId }) {
-        set({ layers, entities, drawnGeometries, selectedEntityId }, false, "setProject")
+      setProject({ layers, entities, drawnGeometries, claims, selectedEntityId }) {
+        set({ layers, entities, drawnGeometries, claims: claims ?? [], selectedEntityId }, false, "setProject")
       },
 
       resetProject() {
@@ -122,7 +143,7 @@ export const useProjectStore = create<ProjectState & ProjectActions>()(
       },
 
       removeLayer(id) {
-        const { layers, entities, drawnGeometries, selectedEntityId } = get()
+        const { layers, entities, drawnGeometries, claims, selectedEntityId } = get()
         const layer = layers.find((l) => l.id === id)
         if (layer?.kind === "echelon" || layer?.kind === "organisation") return
         const removedEntityIds = new Set(entities.filter((e) => e.layerId === id).map((e) => e.id))
@@ -131,6 +152,7 @@ export const useProjectStore = create<ProjectState & ProjectActions>()(
             layers: layers.filter((l) => l.id !== id),
             entities: entities.filter((e) => e.layerId !== id),
             drawnGeometries: drawnGeometries.filter((g) => g.layerId !== id),
+            claims: claims.filter((c) => !removedEntityIds.has(c.entityId)),
             selectedEntityId: selectedEntityId && removedEntityIds.has(selectedEntityId) ? null : selectedEntityId,
           },
           false,
@@ -180,6 +202,7 @@ export const useProjectStore = create<ProjectState & ProjectActions>()(
         set((s) => ({
           entities: s.entities.filter((e) => e.id !== entityId),
           drawnGeometries: s.drawnGeometries.filter((g) => g.entityId !== entityId),
+          claims: s.claims.filter((c) => c.entityId !== entityId),
           selectedEntityId: s.selectedEntityId === entityId ? null : s.selectedEntityId,
         }), false, "deleteEntity")
       },

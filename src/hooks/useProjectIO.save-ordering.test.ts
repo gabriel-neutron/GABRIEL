@@ -7,6 +7,8 @@ function makeInput(): ProjectSaveInput {
     entities: [],
     geometries: [],
     sourceCache: new Map(),
+    sources: [],
+    claims: [],
   }
 }
 
