@@ -14,6 +14,14 @@ export type EntityCore = {
   /** Required: every entity sits on a layer. New geometry uses `getDefaultEntityLayerId` when picking a layer. */
   layerId: string
   parentId: string | null
+  /**
+   * Alternate names this entity is also known by (ADR 0006 / E3 `core/identity`).
+   * Populated when two records for one real-world entity are merged: the losing
+   * record's name and aliases survive here rather than being discarded, and they
+   * feed later duplicate detection (`proposeMatches`). Also the home for
+   * Latin↔Cyrillic alias spellings. Absent/`[]` means "no known aliases".
+   */
+  aliases?: string[]
   /** Free-form notes. */
   notes?: string | null
   /** ISO timestamp of the latest completed batch analysis for this entity. */
