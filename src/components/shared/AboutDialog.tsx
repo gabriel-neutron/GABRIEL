@@ -1,7 +1,7 @@
 import { useRef, useState } from "react"
-import { Button } from "@/components/ui/button"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Button } from "@/ui/button"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/ui/dialog"
+import { Tabs, TabsList, TabsTrigger } from "@/ui/tabs"
 
 const ABOUT_EN = {
   title: "About Gabriel",

@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect, useLayoutEffect, useRef } from "react
 import type { DrawnGeometry } from "@/types/domain.types"
 import type { Organisation } from "@/types/organisation.types"
 import { INDUSTRY_LAYER_ID } from "@/types/organisation.types"
-import { MainLayout } from "@/components/shared/MainLayout"
+import { MainLayout } from "@/shell/MainLayout"
 import { ToastStack, type ToastItem } from "@/components/shared/ToastStack"
 import { useProjectStore } from "@/store/useProjectStore"
 import { useEnrichment } from "@/modules/enrichment/hooks/useEnrichment"

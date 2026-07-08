@@ -1,6 +1,6 @@
 import { Map } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { Button } from "@/ui/button"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdown-menu"
 import { useProjectStore } from "@/store/useProjectStore"
 
 export const BASE_MAP_IDS = ["osm", "satellite", "hybrid", "topo"] as const

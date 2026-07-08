@@ -1,5 +1,5 @@
-import { Button } from "@/components/ui/button"
-import { Card } from "@/components/ui/card"
+import { Button } from "@/ui/button"
+import { Card } from "@/ui/card"
 import {
   Dialog,
   DialogContent,
@@ -7,8 +7,8 @@ import {
   DialogOverlay,
   DialogPortal,
   DialogTitle,
-} from "@/components/ui/dialog"
-import { Textarea } from "@/components/ui/textarea"
+} from "@/ui/dialog"
+import { Textarea } from "@/ui/textarea"
 import type { MapEntity } from "@/types/domain.types"
 import type {
   EnrichmentConflictCandidate,

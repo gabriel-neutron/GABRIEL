@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react"
-import { Button } from "@/components/ui/button"
-import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
-import { Input } from "@/components/ui/input"
-import { Switch } from "@/components/ui/switch"
-import { Textarea } from "@/components/ui/textarea"
+import { Button } from "@/ui/button"
+import { Field, FieldGroup, FieldLabel } from "@/ui/field"
+import { Input } from "@/ui/input"
+import { Switch } from "@/ui/switch"
+import { Textarea } from "@/ui/textarea"
 import {
   Select,
   SelectContent,
@@ -12,7 +12,7 @@ import {
   SelectLabel,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select"
+} from "@/ui/select"
 import { FilterableSelect } from "@/components/shared/FilterableSelect"
 import type { DrawnGeometry, MapEntity, PositionMode } from "@/types/domain.types"
 import {

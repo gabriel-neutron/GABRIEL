@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react"
-import { Button } from "@/components/ui/button"
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Button } from "@/ui/button"
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/ui/dialog"
 import { shouldSkipEntity } from "@/modules/enrichment/services/research/entity-richness"
 import type { MapEntity } from "@/types/domain.types"
 import type { EntityResearchStatus } from "@/modules/enrichment/hooks/useLayeredResearch"

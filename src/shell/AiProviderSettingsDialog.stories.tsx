@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react-vite"
 import { useState } from "react"
-import { Button } from "@/components/ui/button"
-import { AiProviderSettingsDialog } from "@/components/shared/AiProviderSettingsDialog"
+import { Button } from "@/ui/button"
+import { AiProviderSettingsDialog } from "./AiProviderSettingsDialog"
 
 const meta = {
   title: "Shared/AiProviderSettingsDialog",

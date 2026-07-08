@@ -6,7 +6,7 @@ import {
   SelectSeparator,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select"
+} from "@/ui/select"
 import { cn } from "@/lib/utils"
 import { ECHELON_OPTIONS } from "@/types/symbol.types"
 

@@ -1,18 +1,18 @@
 import { useEffect, useRef, useState, type ChangeEvent, type ReactNode } from "react"
 import { Ellipsis, X } from "lucide-react"
 
-import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Button } from "@/components/ui/button"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Alert, AlertDescription } from "@/ui/alert"
+import { Button } from "@/ui/button"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuSeparator, DropdownMenuTrigger } from "@/ui/dropdown-menu"
+import { Tabs, TabsList, TabsTrigger } from "@/ui/tabs"
 import {
   Sidebar,
   SidebarContent,
   SidebarProvider,
   SidebarTrigger,
   useSidebar,
-} from "@/components/ui/sidebar"
-import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet"
+} from "@/ui/sidebar"
+import { Sheet, SheetContent, SheetTitle } from "@/ui/sheet"
 import { useIsMobile } from "@/hooks/use-mobile"
 import { cn } from "@/lib/utils"
 import { useTheme } from "@/provider/theme-provider"

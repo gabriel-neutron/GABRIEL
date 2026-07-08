@@ -1,5 +1,5 @@
 import { Network } from "lucide-react"
-import { Button } from "@/components/ui/button"
+import { Button } from "@/ui/button"
 import { useProjectStore } from "@/store/useProjectStore"
 
 export function ShowNetworksToggle() {

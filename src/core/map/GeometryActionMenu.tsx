@@ -1,13 +1,13 @@
 import { useState } from "react"
 import { X } from "lucide-react"
-import { Button } from "@/components/ui/button"
+import { Button } from "@/ui/button"
 import {
   Card,
   CardContent,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card"
-import { Separator } from "@/components/ui/separator"
+} from "@/ui/card"
+import { Separator } from "@/ui/separator"
 import { FilterableSelect } from "@/components/shared/FilterableSelect"
 import type { MapEntity } from "@/types/domain.types"
 import type { Organisation } from "@/types/organisation.types"

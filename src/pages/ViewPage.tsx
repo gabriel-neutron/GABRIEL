@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react"
 import { Loader2 } from "lucide-react"
-import { MainLayout } from "@/components/shared/MainLayout"
+import { MainLayout } from "@/shell/MainLayout"
 import { loadGeoPackage, applyGeoPackageResult } from "@/core/persistence/geopackage"
 import { useProjectStore } from "@/store/useProjectStore"
 import { useEnrichment } from "@/modules/enrichment/hooks/useEnrichment"

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react"
-import { Button } from "@/components/ui/button"
-import { Field, FieldLabel } from "@/components/ui/field"
+import { Button } from "@/ui/button"
+import { Field, FieldLabel } from "@/ui/field"
 import { fetchOsmObjectDetails, type OsmObjectDetails } from "@/modules/osm/services/overpass.service"
 
 const META_KEYS = new Set([

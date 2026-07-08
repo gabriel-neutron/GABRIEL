@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from "react"
 import { Eye, EyeOff } from "lucide-react"
-import { Button } from "@/components/ui/button"
+import { Button } from "@/ui/button"
 import { useProjectStore } from "@/store/useProjectStore"
 import { ORGANISATION_TYPE_LABELS } from "@/types/organisation.types"
 

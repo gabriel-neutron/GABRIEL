@@ -1,5 +1,5 @@
 import type { KeyboardEvent } from "react"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/ui/dialog"
 import type { OsmElementCandidate } from "@/modules/osm/hooks/useFindOsmAtPoint"
 import { useFindOsmAtPoint } from "@/modules/osm/hooks/useFindOsmAtPoint"
 
