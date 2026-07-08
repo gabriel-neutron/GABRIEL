@@ -80,4 +80,41 @@ describe("public/project.gpkg round-trip (real pre-E1 fixture)", () => {
     },
     60_000,
   )
+
+  it(
+    "derives Source/Claim provenance from the real fixture's legacy sources strings, and a double round-trip doesn't duplicate them (ADR 0006, E2 Slice A)",
+    async () => {
+      const buffer = Uint8Array.from(readFileSync(resolve(process.cwd(), "public/project.gpkg"))).buffer
+      const first = await loadGeoPackage(buffer)
+      expect(first.sources.length).toBeGreaterThan(0)
+      expect(first.claims.length).toBeGreaterThan(0)
+
+      const firstBytes = await saveGeoPackage(
+        first.layers,
+        first.entities,
+        first.geometries,
+        first.sourceCache,
+        buffer,
+        first.sources,
+        first.claims,
+      )
+      const second = await loadGeoPackage(Uint8Array.from(firstBytes).buffer)
+      expect(second.sources).toHaveLength(first.sources.length)
+      expect(second.claims).toHaveLength(first.claims.length)
+
+      const secondBytes = await saveGeoPackage(
+        second.layers,
+        second.entities,
+        second.geometries,
+        second.sourceCache,
+        Uint8Array.from(firstBytes).buffer,
+        second.sources,
+        second.claims,
+      )
+      const third = await loadGeoPackage(Uint8Array.from(secondBytes).buffer)
+      expect(third.sources).toHaveLength(first.sources.length)
+      expect(third.claims).toHaveLength(first.claims.length)
+    },
+    60_000,
+  )
 })

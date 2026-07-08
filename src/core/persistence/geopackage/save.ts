@@ -3,10 +3,20 @@ import { UNITS_TABLE, createUnitsTable, writeEntities, unitColumns } from "./uni
 import { LAYERS_TABLE, createLayersTable, writeLayers } from "./layers.table"
 import { GEOMETRIES_TABLE, createGeometriesTable, writeGeometries } from "./geometries.table"
 import { RESEARCH_SOURCES_TABLE, createResearchSourcesTable, writeSourceCache } from "./researchSources.table"
+import {
+  PROVENANCE_SOURCES_TABLE,
+  createProvenanceSourcesTable,
+  writeProvenanceSources,
+} from "./provenanceSources.table"
+import {
+  PROVENANCE_CLAIMS_TABLE,
+  createProvenanceClaimsTable,
+  writeProvenanceClaims,
+} from "./provenanceClaims.table"
 import { clearLegacyOrganisationsTable } from "./organisations.table"
 import { createGeoPackageWithRetry } from "./browserSaveFile"
 import { ensureOptionalColumns } from "./columnDescriptor"
-import type { GpkgLayer, GpkgEntity, GpkgGeometry } from "./types"
+import type { GpkgLayer, GpkgEntity, GpkgGeometry, GpkgSource, GpkgClaim } from "./types"
 
 /**
  * A legacy `organisations` table (pre-E1, ADR 0004) is folded into `units` (via its
@@ -19,6 +29,10 @@ export async function saveGeoPackage(
   geometries: GpkgGeometry[],
   researchSources?: Map<string, string>,
   baseBuffer?: ArrayBuffer,
+  // ADR 0006, E2 Slice A: additive trailing params, not yet threaded through from the
+  // store/useProjectIO (E2.4) — every existing call site keeps working unchanged.
+  sources?: GpkgSource[],
+  claims?: GpkgClaim[],
 ): Promise<Uint8Array> {
   let geoPackage: GeoPackage | null = null
   try {
@@ -32,6 +46,8 @@ export async function saveGeoPackage(
     createUnitsTable(geoPackage)
     createGeometriesTable(geoPackage)
     createResearchSourcesTable(geoPackage)
+    createProvenanceSourcesTable(geoPackage)
+    createProvenanceClaimsTable(geoPackage)
 
     // A reopened pre-migration `units` table (baseBuffer path) may still be missing
     // columns added since its physical creation — add them before any INSERT runs.
@@ -42,6 +58,8 @@ export async function saveGeoPackage(
     geoPackage.connection.run(`DELETE FROM ${UNITS_TABLE}`)
     geoPackage.connection.run(`DELETE FROM ${GEOMETRIES_TABLE}`)
     geoPackage.connection.run(`DELETE FROM ${RESEARCH_SOURCES_TABLE}`)
+    geoPackage.connection.run(`DELETE FROM ${PROVENANCE_SOURCES_TABLE}`)
+    geoPackage.connection.run(`DELETE FROM ${PROVENANCE_CLAIMS_TABLE}`)
     clearLegacyOrganisationsTable(geoPackage)
 
     writeSourceCache(geoPackage, researchSources)
@@ -51,6 +69,9 @@ export async function saveGeoPackage(
     writeEntities(geoPackage, entities)
 
     writeGeometries(geoPackage, geometries)
+
+    if (sources) writeProvenanceSources(geoPackage, sources)
+    if (claims) writeProvenanceClaims(geoPackage, claims)
 
     const exported = await geoPackage.export()
     if (!(exported instanceof Uint8Array)) {

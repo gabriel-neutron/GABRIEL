@@ -4,6 +4,9 @@ import { migrateLegacyOrganisations } from "./organisations.table"
 import { readLayers } from "./layers.table"
 import { readGeometries } from "./geometries.table"
 import { readSourceCache } from "./researchSources.table"
+import { readProvenanceSources } from "./provenanceSources.table"
+import { readProvenanceClaims } from "./provenanceClaims.table"
+import { deriveProvenanceFromEntities } from "@/core/provenance/deriveFromEntities"
 import type { GeoPackageLoadResult } from "./types"
 
 export async function loadGeoPackage(buffer: ArrayBuffer): Promise<GeoPackageLoadResult> {
@@ -17,6 +20,13 @@ export async function loadGeoPackage(buffer: ArrayBuffer): Promise<GeoPackageLoa
     const entities = [...readEntities(geoPackage), ...migrateLegacyOrganisations(geoPackage)]
     const geometries = await readGeometries(geoPackage)
     const sourceCache = readSourceCache(geoPackage)
+    // ADR 0006, E2 Slice A: additive, derived from entity.sources (untouched by this
+    // step) merged with whatever provenance was already persisted from a prior save.
+    const { sources, claims } = deriveProvenanceFromEntities(
+      entities,
+      readProvenanceSources(geoPackage),
+      readProvenanceClaims(geoPackage),
+    )
 
     const layerIds = new Set(layers.map((l) => l.id))
     const entityIds = new Set(entities.map((e) => e.id))
@@ -45,7 +55,7 @@ export async function loadGeoPackage(buffer: ArrayBuffer): Promise<GeoPackageLoa
       }
     }
 
-    return { layers, entities, geometries, sourceCache }
+    return { layers, entities, geometries, sourceCache, sources, claims }
   } catch (e) {
     if (e instanceof Error && e.message.startsWith("Unsupported schema")) throw e
     const errorMsg = e instanceof Error ? e.message : String(e)

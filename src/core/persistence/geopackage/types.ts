@@ -1,4 +1,6 @@
 import type { Layer, MapEntity, DrawnGeometry } from "@/types/domain.types"
+import type { Source } from "@/core/provenance/source"
+import type { Claim } from "@/core/provenance/claim"
 
 /**
  * Thin aliases, not separate shapes: the SQL column-descriptor lists (units.table.ts,
@@ -9,6 +11,8 @@ import type { Layer, MapEntity, DrawnGeometry } from "@/types/domain.types"
 export type GpkgLayer = Layer
 export type GpkgEntity = MapEntity
 export type GpkgGeometry = DrawnGeometry
+export type GpkgSource = Source
+export type GpkgClaim = Claim
 
 export interface GeoPackageLoadResult {
   layers: GpkgLayer[]
@@ -17,6 +21,13 @@ export interface GeoPackageLoadResult {
   geometries: GpkgGeometry[]
   /** URL → cached snippet map loaded from the `research_sources` table. Empty map for older projects. */
   sourceCache: Map<string, string>
+  /**
+   * First-class provenance records (ADR 0006, E2 Slice A) — additive alongside the still-
+   * authoritative `entity.sources` string, derived from it on every load if not already
+   * persisted. Not yet the source of truth for UI rendering (that's Slice B).
+   */
+  sources: GpkgSource[]
+  claims: GpkgClaim[]
 }
 
 export interface ApplyGeoPackageResultState {
