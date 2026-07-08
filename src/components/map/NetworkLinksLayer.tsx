@@ -2,7 +2,7 @@ import { useMemo } from "react"
 import { Polyline } from "react-leaflet"
 import { useProjectStore } from "@/store/useProjectStore"
 import type { MapEntity } from "@/types/domain.types"
-import type { LatLng } from "@/types/coordinates"
+import type { LatLng } from "@/core/coordinates"
 import { buildOrbat } from "@/core/entity/hierarchy"
 
 const NETWORK_LINE_OPTIONS = {

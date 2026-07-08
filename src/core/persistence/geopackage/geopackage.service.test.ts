@@ -1,7 +1,7 @@
 import { readdirSync, rmSync } from "node:fs"
 import { GeoPackageAPI } from "@ngageoint/geopackage"
 import { describe, expect, it, afterEach } from "vitest"
-import { toLeafletCoord, toGeoJsonCoord, asLatLng } from "@/types/coordinates"
+import { toLeafletCoord, toGeoJsonCoord, asLatLng } from "@/core/coordinates"
 import type { MapEntity } from "@/types/domain.types"
 import type { Organisation } from "@/types/organisation.types"
 import { loadGeoPackage, saveGeoPackage, type GpkgLayer } from "./index"

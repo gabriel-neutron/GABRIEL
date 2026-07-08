@@ -1,6 +1,6 @@
 import { FeatureColumn, GeometryType, GeoPackageDataType, type GeoPackage } from "@ngageoint/geopackage"
 import type { DrawnGeometry } from "@/types/domain.types"
-import { toGeoJsonCoord, toLeafletCoord } from "@/types/coordinates"
+import { toGeoJsonCoord, toLeafletCoord } from "@/core/coordinates"
 import { buildInsertColumns, buildInsertValues, decodeRow, type ColumnDescriptor } from "./columnDescriptor"
 
 export const GEOMETRIES_TABLE = "geometries"

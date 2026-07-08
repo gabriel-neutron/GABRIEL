@@ -4,7 +4,7 @@ import "leaflet-draw"
 import type { Geometry } from "geojson"
 import { useMap } from "react-leaflet"
 import type { DrawnGeometry } from "@/types/domain.types"
-import { toLeafletCoord } from "@/types/coordinates"
+import { toLeafletCoord } from "@/core/coordinates"
 
 type DrawGeometryType = "point" | "line" | "polygon"
 

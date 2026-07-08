@@ -3,7 +3,7 @@ import { MapContainer, TileLayer } from "react-leaflet"
 import "leaflet/dist/leaflet.css"
 import { SymbolsLayer } from "@/components/map/SymbolsLayer"
 import { useProjectStore } from "@/store/useProjectStore"
-import { asLatLng } from "@/types/coordinates"
+import { asLatLng } from "@/core/coordinates"
 import type { Layer, MapEntity } from "@/types/domain.types"
 
 const layer: Layer = {

@@ -2,7 +2,7 @@ import { readdirSync, rmSync } from "node:fs"
 import { GeoPackageAPI, type GeoPackage } from "@ngageoint/geopackage"
 import { afterEach, describe, expect, it } from "vitest"
 import type { DrawnGeometry } from "@/types/domain.types"
-import { asLatLng } from "@/types/coordinates"
+import { asLatLng } from "@/core/coordinates"
 import { createGeometriesTable, readGeometries, writeGeometries } from "./geometries.table"
 
 async function createTestGeoPackage(): Promise<GeoPackage> {

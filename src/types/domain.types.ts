@@ -1,4 +1,4 @@
-import type { LatLng } from "@/types/coordinates"
+import type { LatLng } from "@/core/coordinates"
 
 /**
  * Domain types for the application.

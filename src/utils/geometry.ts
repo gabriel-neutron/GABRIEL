@@ -1,6 +1,6 @@
 import type { DrawnGeometry, MapEntity, PositionMode } from "@/types/domain.types"
 import type { Organisation } from "@/types/organisation.types"
-import { type LatLng, asLatLng } from "@/types/coordinates"
+import { type LatLng, asLatLng } from "@/core/coordinates"
 import { buildOrbat } from "@/core/entity/hierarchy"
 
 /**

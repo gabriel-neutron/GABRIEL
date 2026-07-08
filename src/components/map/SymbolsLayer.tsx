@@ -3,7 +3,7 @@ import L from "leaflet"
 import { Marker, Popup } from "react-leaflet"
 import { getRenderedSymbolForEntity } from "@/services/symbol.service"
 import { useProjectStore } from "@/store/useProjectStore"
-import type { LatLng } from "@/types/coordinates"
+import type { LatLng } from "@/core/coordinates"
 import type { MapBounds } from "./MapBoundsReporter"
 
 const BOUNDS_BUFFER = 0.5

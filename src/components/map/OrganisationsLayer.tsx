@@ -5,7 +5,7 @@ import { makeOrganisationIcon } from "@/utils/organisation-icons"
 import { computeAllOrganisationPositions } from "@/utils/geometry"
 import { useProjectStore } from "@/store/useProjectStore"
 import { INDUSTRY_LAYER_ID } from "@/types/organisation.types"
-import type { LatLng } from "@/types/coordinates"
+import type { LatLng } from "@/core/coordinates"
 import type { MapBounds } from "./MapBoundsReporter"
 
 const BOUNDS_BUFFER = 0.5
