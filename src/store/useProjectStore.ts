@@ -1,10 +1,9 @@
 import { create } from "zustand"
 import { devtools } from "zustand/middleware"
 import { getDefaultEchelonLayers } from "@/core/persistence/geopackage"
-import type { Layer, MapEntity, DrawnGeometry, SelectedOsmObject } from "@/types/domain.types"
+import type { Layer, MapEntity, DrawnGeometry } from "@/types/domain.types"
 import type { Organisation } from "@/types/organisation.types"
 import { INDUSTRY_LAYER_ID } from "@/types/organisation.types"
-import type { BaseMapId } from "@/components/shared/BaseMapSwitcher"
 
 // ---------------------------------------------------------------------------
 // State
@@ -15,15 +14,8 @@ export interface ProjectState {
   entities: MapEntity[]
   organisations: Organisation[]
   drawnGeometries: DrawnGeometry[]
-  sourceCache: Map<string, string>
   selectedEntityId: string | null
   selectedOrganisationId: string | null
-  selectedOsmObject: SelectedOsmObject
-  showNetworks: boolean
-  baseMap: BaseMapId
-  entityOsmGeometries: Record<string, GeoJSON.FeatureCollection>
-  osmUnavailable: boolean
-  lastSavedAt: Date | null
 }
 
 const INDUSTRY_LAYER = {
@@ -39,15 +31,8 @@ function initialState(): ProjectState {
     entities: [],
     organisations: [],
     drawnGeometries: [],
-    sourceCache: new Map(),
     selectedEntityId: null,
     selectedOrganisationId: null,
-    selectedOsmObject: null,
-    showNetworks: true,
-    baseMap: "osm",
-    entityOsmGeometries: {},
-    osmUnavailable: false,
-    lastSavedAt: null,
   }
 }
 
@@ -63,7 +48,6 @@ export interface ProjectActions {
     drawnGeometries: DrawnGeometry[]
     selectedEntityId: string | null
     selectedOrganisationId: string | null
-    sourceCache: Map<string, string>
   }): void
   resetProject(): void
 
@@ -87,26 +71,20 @@ export interface ProjectActions {
 
   setSelectedEntityId(id: string | null): void
   setSelectedOrganisationId(id: string | null): void
-  setSelectedOsmObject(obj: SelectedOsmObject): void
   closeDetail(): void
-
-  setShowNetworks(v: boolean): void
-  setBaseMap(id: BaseMapId): void
-  setEntityOsmGeometries(
-    updater:
-      | Record<string, GeoJSON.FeatureCollection>
-      | ((prev: Record<string, GeoJSON.FeatureCollection>) => Record<string, GeoJSON.FeatureCollection>),
-  ): void
-  setOsmUnavailable(v: boolean): void
-  mergeSourceCache(additions: { url: string; content: string }[]): void
-  setLastSavedAt(date: Date | null): void
 }
 
 // ---------------------------------------------------------------------------
 // Store
 // ---------------------------------------------------------------------------
 
-export function selectPersistableSnapshot(state: ProjectState) {
+/**
+ * The single source of truth for what data gets written to disk. `sourceCache`
+ * lives in `useSourceCacheStore` (a peripheral store, ADR 0005) — passed in
+ * explicitly rather than read off `ProjectState` so this stays the one place
+ * callers assemble a save snapshot from, even though the data now spans two stores.
+ */
+export function selectPersistableSnapshot(state: ProjectState, sourceCache: Map<string, string>) {
   const nonOsmLayerIds = new Set(state.layers.filter((l) => l.osmData == null).map((l) => l.id))
   return {
     layers: state.layers.map((l) => ({ ...l, kind: l.kind ?? (l.osmData != null ? ("osm" as const) : undefined) })),
@@ -115,7 +93,7 @@ export function selectPersistableSnapshot(state: ProjectState) {
       .map((e) => ({ ...e, name: e.name.trim() || "Untitled" })),
     organisations: state.organisations.map((o) => ({ ...o, name: o.name.trim() || "Untitled" })),
     geometries: state.drawnGeometries.filter((g) => nonOsmLayerIds.has(g.layerId)),
-    sourceCache: state.sourceCache,
+    sourceCache,
   }
 }
 
@@ -124,8 +102,8 @@ export const useProjectStore = create<ProjectState & ProjectActions>()(
     (set, get) => ({
       ...initialState(),
 
-      setProject({ layers, entities, organisations, drawnGeometries, selectedEntityId, selectedOrganisationId, sourceCache }) {
-        set({ layers, entities, organisations, drawnGeometries, selectedEntityId, selectedOrganisationId, sourceCache }, false, "setProject")
+      setProject({ layers, entities, organisations, drawnGeometries, selectedEntityId, selectedOrganisationId }) {
+        set({ layers, entities, organisations, drawnGeometries, selectedEntityId, selectedOrganisationId }, false, "setProject")
       },
 
       resetProject() {
@@ -258,44 +236,8 @@ export const useProjectStore = create<ProjectState & ProjectActions>()(
         set({ selectedOrganisationId: id }, false, "setSelectedOrganisationId")
       },
 
-      setSelectedOsmObject(obj) {
-        set({ selectedOsmObject: obj }, false, "setSelectedOsmObject")
-      },
-
       closeDetail() {
-        set({ selectedEntityId: null, selectedOrganisationId: null, selectedOsmObject: null }, false, "closeDetail")
-      },
-
-      setShowNetworks(v) {
-        set({ showNetworks: v }, false, "setShowNetworks")
-      },
-
-      setBaseMap(id) {
-        set({ baseMap: id }, false, "setBaseMap")
-      },
-
-      setEntityOsmGeometries(updater) {
-        if (typeof updater === "function") {
-          set((s) => ({ entityOsmGeometries: updater(s.entityOsmGeometries) }), false, "setEntityOsmGeometries")
-        } else {
-          set({ entityOsmGeometries: updater }, false, "setEntityOsmGeometries")
-        }
-      },
-
-      setOsmUnavailable(v) {
-        set({ osmUnavailable: v }, false, "setOsmUnavailable")
-      },
-
-      mergeSourceCache(additions) {
-        set((s) => {
-          const next = new Map(s.sourceCache)
-          for (const { url, content } of additions) next.set(url, content)
-          return { sourceCache: next }
-        }, false, "mergeSourceCache")
-      },
-
-      setLastSavedAt(date) {
-        set({ lastSavedAt: date }, false, "setLastSavedAt")
+        set({ selectedEntityId: null, selectedOrganisationId: null }, false, "closeDetail")
       },
     }),
     { name: "GabrielProjectStore", enabled: import.meta.env.DEV },

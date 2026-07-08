@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useMemo } from "react"
 import { createPortal } from "react-dom"
 import { Search } from "lucide-react"
 import { useProjectStore } from "@/store/useProjectStore"
+import { useOsmViewStore } from "@/store/useOsmViewStore"
 import { Input } from "@/ui/input"
 import { Button } from "@/ui/button"
 import { searchPlace, type NominatimResult } from "@/modules/osm/services/nominatim.service"
@@ -40,7 +41,7 @@ function parseLatLngPair(query: string): { lat: number; lng: number } | null {
 export function UnifiedSearch({ flyToRef }: Props) {
   const entities = useProjectStore((s) => s.entities)
   const layers = useProjectStore((s) => s.layers)
-  const entityOsmGeometries = useProjectStore((s) => s.entityOsmGeometries)
+  const entityOsmGeometries = useOsmViewStore((s) => s.entityOsmGeometries)
 
   const [query, setQuery] = useState("")
   const [open, setOpen] = useState(false)

@@ -9,15 +9,8 @@ function makeState(overrides: Partial<ProjectState> = {}): ProjectState {
     entities: [],
     organisations: [],
     drawnGeometries: [],
-    sourceCache: new Map(),
     selectedEntityId: null,
     selectedOrganisationId: null,
-    selectedOsmObject: null,
-    showNetworks: true,
-    baseMap: "osm",
-    entityOsmGeometries: {},
-    osmUnavailable: false,
-    lastSavedAt: null,
     ...overrides,
   }
 }
@@ -25,20 +18,20 @@ function makeState(overrides: Partial<ProjectState> = {}): ProjectState {
 describe("selectPersistableSnapshot", () => {
   it("leaves an already-tagged layer's kind untouched", () => {
     const layers: Layer[] = [{ id: "custom-1", name: "Custom", visible: true, kind: "custom" }]
-    const snapshot = selectPersistableSnapshot(makeState({ layers }))
+    const snapshot = selectPersistableSnapshot(makeState({ layers }), new Map())
     expect(snapshot.layers).toEqual([{ id: "custom-1", name: "Custom", visible: true, kind: "custom" }])
   })
 
   it("infers kind='osm' for a layer with cached osmData but no explicit kind", () => {
     const osmData: GeoJSON.FeatureCollection = { type: "FeatureCollection", features: [] }
     const layers: Layer[] = [{ id: "legacy-osm", name: "Legacy OSM Layer", visible: true, osmData }]
-    const snapshot = selectPersistableSnapshot(makeState({ layers }))
+    const snapshot = selectPersistableSnapshot(makeState({ layers }), new Map())
     expect(snapshot.layers[0].kind).toBe("osm")
   })
 
   it("leaves kind undefined for a layer with neither an explicit kind nor osmData", () => {
     const layers: Layer[] = [{ id: "bare", name: "Bare Layer", visible: true }]
-    const snapshot = selectPersistableSnapshot(makeState({ layers }))
+    const snapshot = selectPersistableSnapshot(makeState({ layers }), new Map())
     expect(snapshot.layers[0].kind).toBeUndefined()
   })
 
@@ -69,7 +62,7 @@ describe("selectPersistableSnapshot", () => {
         isExactPosition: false,
       },
     ]
-    const snapshot = selectPersistableSnapshot(makeState({ layers, entities, drawnGeometries, organisations }))
+    const snapshot = selectPersistableSnapshot(makeState({ layers, entities, drawnGeometries, organisations }), new Map())
 
     expect(snapshot.entities.map((e) => e.id)).toEqual(["e-custom"])
     expect(snapshot.geometries.map((g) => g.id)).toEqual(["g-custom"])
@@ -92,7 +85,7 @@ describe("selectPersistableSnapshot", () => {
         isExactPosition: false,
       },
     ]
-    const snapshot = selectPersistableSnapshot(makeState({ layers, entities, organisations }))
+    const snapshot = selectPersistableSnapshot(makeState({ layers, entities, organisations }), new Map())
     expect(snapshot.entities[0].name).toBe("Untitled")
     expect(snapshot.organisations[0].name).toBe("Untitled")
   })

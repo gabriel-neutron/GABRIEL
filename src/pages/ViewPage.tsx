@@ -3,6 +3,7 @@ import { Loader2 } from "lucide-react"
 import { MainLayout } from "@/shell/MainLayout"
 import { loadGeoPackage, applyGeoPackageResult } from "@/core/persistence/geopackage"
 import { useProjectStore } from "@/store/useProjectStore"
+import { useSourceCacheStore } from "@/store/useSourceCacheStore"
 import { useEnrichment } from "@/modules/enrichment/hooks/useEnrichment"
 
 export type ViewPageProps = {
@@ -42,8 +43,8 @@ export function ViewPage({ onEditMode, onOpenAbout }: ViewPageProps): React.Reac
           drawnGeometries: next.drawnGeometries,
           selectedEntityId: next.selectedEntityId,
           selectedOrganisationId: next.selectedOrganisationId,
-          sourceCache: result.sourceCache,
         })
+        useSourceCacheStore.getState().setSourceCache(result.sourceCache)
         setLoadError(null)
       })
       .catch((e) => {

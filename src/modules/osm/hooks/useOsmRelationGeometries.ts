@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react"
 import { fetchRelationGeometry } from "@/modules/osm/services/overpass.service"
 import { useProjectStore } from "@/store/useProjectStore"
+import { useOsmViewStore } from "@/store/useOsmViewStore"
 import type { Layer } from "@/types/domain.types"
 
 export type UseOsmRelationGeometriesOptions = {
@@ -41,7 +42,7 @@ export function useOsmRelationGeometries(options?: UseOsmRelationGeometriesOptio
   const entities = useProjectStore((s) => s.entities)
   const layers = useProjectStore((s) => s.layers)
   const selectedEntityId = useProjectStore((s) => s.selectedEntityId)
-  const setEntityOsmGeometries = useProjectStore((s) => s.setEntityOsmGeometries)
+  const setEntityOsmGeometries = useOsmViewStore((s) => s.setEntityOsmGeometries)
 
   const onOverpassUnavailableRef = useRef(options?.onOverpassUnavailable)
 
@@ -87,7 +88,7 @@ export function useOsmRelationGeometries(options?: UseOsmRelationGeometriesOptio
       void (async () => {
         for (const [relationId, entityIds] of relationToEntityIds.entries()) {
           if (cancelled) return
-          if (useProjectStore.getState().osmUnavailable) continue
+          if (useOsmViewStore.getState().osmUnavailable) continue
 
           const cachedGeometry = relationGeometryCacheRef.current.get(relationId)
           if (cachedGeometry) {
@@ -121,7 +122,7 @@ export function useOsmRelationGeometries(options?: UseOsmRelationGeometriesOptio
             })
           } catch (error) {
             if (error instanceof Error && error.message.includes("Failed to fetch")) {
-              useProjectStore.getState().setOsmUnavailable(true)
+              useOsmViewStore.getState().setOsmUnavailable(true)
               onOverpassUnavailableRef.current?.()
             }
           }
@@ -130,7 +131,7 @@ export function useOsmRelationGeometries(options?: UseOsmRelationGeometriesOptio
 
       return () => {
         cancelled = true
-        useProjectStore.getState().setOsmUnavailable(false)
+        useOsmViewStore.getState().setOsmUnavailable(false)
       }
     },
     [entities, layers, selectedEntityId, setEntityOsmGeometries],

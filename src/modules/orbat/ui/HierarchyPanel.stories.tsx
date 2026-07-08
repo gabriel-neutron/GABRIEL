@@ -123,7 +123,6 @@ const meta = {
         drawnGeometries: [],
         selectedEntityId: "entity-hq",
         selectedOrganisationId: null,
-        sourceCache: new Map(),
       })
 
       return (

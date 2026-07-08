@@ -36,7 +36,6 @@ const meta = {
         drawnGeometries: [],
         selectedEntityId: entity.id,
         selectedOrganisationId: null,
-        sourceCache: new Map(),
       })
       return <Story />
     },

@@ -2,6 +2,7 @@ import { useCallback, useMemo } from "react"
 import ReactFlow, { Background, type Edge, type Node, Position } from "reactflow"
 import { MilitarySymbolNode } from "./MilitarySymbolNode"
 import { useProjectStore } from "@/store/useProjectStore"
+import { useOsmViewStore } from "@/store/useOsmViewStore"
 import { useShallow } from "zustand/shallow"
 import { buildOrbat } from "@/core/entity/hierarchy"
 import { computeTreeXIndex } from "@/modules/orbat/services/treeLayout"
@@ -60,13 +61,13 @@ export function TreeView() {
   const handleNodeClick = useCallback((_: React.MouseEvent, node: Node) => {
     const s = useProjectStore.getState()
     s.setSelectedEntityId(node.id)
-    s.setSelectedOsmObject(null)
+    useOsmViewStore.getState().setSelectedOsmObject(null)
   }, [])
 
   const handlePaneClick = useCallback(() => {
     const s = useProjectStore.getState()
     s.setSelectedEntityId(null)
-    s.setSelectedOsmObject(null)
+    useOsmViewStore.getState().setSelectedOsmObject(null)
   }, [])
 
   return (

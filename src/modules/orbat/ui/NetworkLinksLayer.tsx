@@ -1,6 +1,7 @@
 import { useMemo } from "react"
 import { Polyline } from "react-leaflet"
 import { useProjectStore } from "@/store/useProjectStore"
+import { useMapPrefsStore } from "@/store/useMapPrefsStore"
 import type { MapEntity } from "@/types/domain.types"
 import type { LatLng } from "@/core/coordinates"
 import { buildOrbat } from "@/core/entity/hierarchy"
@@ -36,7 +37,7 @@ export function NetworkLinksLayer({
 }: Props): React.ReactElement | null {
   const entities = useProjectStore((s) => s.entities)
   const selectedEntityId = useProjectStore((s) => s.selectedEntityId)
-  const showNetworks = useProjectStore((s) => s.showNetworks)
+  const showNetworks = useMapPrefsStore((s) => s.showNetworks)
 
   const links = useMemo(() => {
     if (!showNetworks || !selectedEntityId) return []

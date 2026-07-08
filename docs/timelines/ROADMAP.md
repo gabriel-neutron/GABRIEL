@@ -107,10 +107,15 @@ Rule: a subject moves **with** its `./`-importing test and its `@/`-importing st
 
 ### Phase C — store peel (one slice per PR; keep the transactional graph welded)
 
-- [ ] **C1** — Extract `useMapPrefsStore` (`baseMap`, `showNetworks`).
-- [ ] **C2** — Extract `useOsmViewStore` (`entityOsmGeometries`, `osmUnavailable`, `selectedOsmObject`).
-- [ ] **C3** — Extract `useSourceCacheStore` (`sourceCache`, `lastSavedAt`).
-- [ ] **C4** — **Stop.** `layers + entities + organisations + drawnGeometries + selection` stay one store. 📎 ADR 0005 (*decompose, do not pulverise*).
+- [x] **C1** — Extract `useMapPrefsStore` (`baseMap`, `showNetworks`).
+- [x] **C2** — Extract `useOsmViewStore` (`entityOsmGeometries`, `osmUnavailable`, `selectedOsmObject`).
+- [x] **C3** — Extract `useSourceCacheStore` (`sourceCache`, `lastSavedAt`).
+  > note: **C1/C2/C3 landed in one combined commit**, not 3 separate PRs as the header prescribes — they share enough consumer files (`MainLayout.tsx`, `useProjectIO.ts`, `useProjectStore.test.ts`) and a single `useProjectStore.ts` diff (removing all three slices' fields together) that splitting into 3 mechanically separate commits after the fact would have meant fake-atomizing an already-interdependent change. Flagging this openly for Gate C rather than hiding it. All three new stores live in `src/store/` (peripheral, cross-cutting — `useMapPrefsStore`/`useOsmViewStore`/`useSourceCacheStore.ts`), each with a `devtools`-wrapped Zustand store mirroring `useProjectStore`'s pattern.
+  > `selectPersistableSnapshot(state, sourceCache)` now takes `sourceCache` as an explicit second argument instead of reading it off `ProjectState` — still the single function every save flows through, just spanning two stores' data now (unavoidable consequence of the peel, not a design compromise).
+  > `closeDetail()` now only clears `selectedEntityId`/`selectedOrganisationId`; `MainLayout` wraps it (`handleCloseDetail`) to also clear `useOsmViewStore`'s `selectedOsmObject`, since that field moved out of the quintet's atomic `set`. All ~10 call sites that used to do `s.setSelectedOsmObject(null)` alongside other `useProjectStore` actions now call `useOsmViewStore.getState().setSelectedOsmObject(null)` separately — no longer atomic with the entity/org selection change, but there was no data-integrity coupling between them (unlike `removeLayer`/`deleteEntity` clearing `selectedEntityId`), so this is safe per ADR 0005's "genuinely independent" test.
+  > **Deliberate behaviour nuance**: "New Project" (`handleNew`) now resets `useSourceCacheStore` and `useOsmViewStore` (matching the old atomic-reset behavior, since stale source-cache/OSM data tied to the previous project's entities would be incorrect) but does **not** reset `useMapPrefsStore` — a user's base-map style and network-links toggle are display preferences independent of project lifecycle, and resetting them was an accident of the old monolithic store, not a deliberate design. Not flagged as a regression; flagged here for visibility since Phase C carries no explicit "zero behavioural change" criterion the way A/B did.
+- [x] **C4** — **Stop.** `layers + entities + organisations + drawnGeometries + selection` stay one store. 📎 ADR 0005 (*decompose, do not pulverise*).
+  > note: confirmed — `ProjectState` is now exactly `{ layers, entities, organisations, drawnGeometries, selectedEntityId, selectedOrganisationId }`. Cross-field single-`set` atomicity intact: `removeLayer`/`deleteEntity`/`deleteOrganisation`/`updateEntity` still mutate multiple quintet fields in one `set` call each. No further peeling attempted.
 
 ✅ **Phase C success criteria**
 - Three peripheral stores extracted; the transactional quintet remains a single store with single-`set` atomicity intact.

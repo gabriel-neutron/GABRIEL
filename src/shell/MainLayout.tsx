@@ -22,6 +22,7 @@ import type { MapEntity, DrawnGeometry } from "@/types/domain.types"
 import { getDefaultEntityLayerId } from "./entityLayer"
 import type { EnrichmentControls, LayeredResearchControls } from "@/types/layout.types"
 import { useProjectStore } from "@/store/useProjectStore"
+import { useOsmViewStore } from "@/store/useOsmViewStore"
 
 export type { EnrichmentControls, LayeredResearchControls }
 
@@ -92,10 +93,15 @@ export function MainLayout({
     entities,
     selectedEntityId,
     selectedOrganisationId,
-    selectedOsmObject,
     addLayer,
     closeDetail,
   } = useProjectStore()
+  const selectedOsmObject = useOsmViewStore((s) => s.selectedOsmObject)
+  const setSelectedOsmObject = useOsmViewStore((s) => s.setSelectedOsmObject)
+  const handleCloseDetail = useCallback(() => {
+    closeDetail()
+    setSelectedOsmObject(null)
+  }, [closeDetail, setSelectedOsmObject])
 
   const flyToRef = useRef<FlyToFn | null>(null)
 
@@ -117,14 +123,14 @@ export function MainLayout({
     const entity = entityFromGeometry(geom, defaultLayerId, s.selectedEntityId)
     s.addEntity(entity)
     s.addGeometry({ ...geom, entityId: entity.id })
-    s.setSelectedOsmObject(null)
+    useOsmViewStore.getState().setSelectedOsmObject(null)
     s.setSelectedEntityId(entity.id)
   }, [])
 
   const handleLinkGeometryToEntity = useCallback((geom: DrawnGeometry, entityId: string): void => {
     const s = useProjectStore.getState()
     s.addGeometry({ ...geom, entityId })
-    s.setSelectedOsmObject(null)
+    useOsmViewStore.getState().setSelectedOsmObject(null)
     const isOrg = s.organisations.some((o) => o.id === entityId)
     if (isOrg) {
       s.updateOrganisation(entityId, { positionMode: "own" })
@@ -223,7 +229,7 @@ export function MainLayout({
         selectedEntityId={selectedEntityId}
         selectedOrganisationId={selectedOrganisationId}
         selectedOsmObject={selectedOsmObject}
-        onCloseDetail={closeDetail}
+        onCloseDetail={handleCloseDetail}
         detailHeaderActions={
           !readOnly && selectedEntityId !== null && selectedOsmObject === null ? (
             <Button

@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useMemo } from "react"
 import { Eye, EyeOff } from "lucide-react"
 import { Button } from "@/ui/button"
 import { useProjectStore } from "@/store/useProjectStore"
+import { useOsmViewStore } from "@/store/useOsmViewStore"
 import { ORGANISATION_TYPE_LABELS } from "@/types/organisation.types"
 
 type Props = {
@@ -282,7 +283,7 @@ export function LayersPanel({ readOnly = false }: Props) {
                             onClick={() => {
                               const s = useProjectStore.getState()
                               s.setSelectedEntityId(entity.id)
-                              s.setSelectedOsmObject(null)
+                              useOsmViewStore.getState().setSelectedOsmObject(null)
                             }}
                             className={`min-w-0 flex-1 truncate rounded px-2 py-1 text-left text-xs transition-colors hover:bg-muted ${
                               selectedEntityId === entity.id ? "bg-muted font-medium text-foreground" : ""
@@ -333,7 +334,7 @@ export function LayersPanel({ readOnly = false }: Props) {
                             const s = useProjectStore.getState()
                             s.setSelectedOrganisationId(org.id)
                             s.setSelectedEntityId(null)
-                            s.setSelectedOsmObject(null)
+                            useOsmViewStore.getState().setSelectedOsmObject(null)
                           }}
                           className={`min-w-0 w-full truncate rounded px-2 py-1 text-left text-xs transition-colors hover:bg-muted ${
                             selectedOrganisationId === org.id ? "bg-muted font-medium text-foreground" : ""

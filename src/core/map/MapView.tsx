@@ -14,22 +14,22 @@ import type { DrawnGeometry } from "@/types/domain.types"
 import { computeAllEntityPositions } from "@/core/map/geometry"
 import { MapBoundsReporter, type MapBounds } from "./MapBoundsReporter"
 import { useProjectStore } from "@/store/useProjectStore"
+import { useMapPrefsStore } from "@/store/useMapPrefsStore"
+import { useOsmViewStore } from "@/store/useOsmViewStore"
 import { useOsmRelationGeometries } from "@/modules/osm/hooks/useOsmRelationGeometries"
 
 type FlyToFn = (lat: number, lng: number, zoom?: number) => void
 
 function selectEntity(id: string | null) {
-  const { setSelectedEntityId, setSelectedOsmObject } = useProjectStore.getState()
-  setSelectedEntityId(id)
-  setSelectedOsmObject(null)
+  useProjectStore.getState().setSelectedEntityId(id)
+  useOsmViewStore.getState().setSelectedOsmObject(null)
 }
 
 function selectOsmObject(feature: GeoJSON.Feature & { id?: string }) {
   const parsed = getOsmTypeAndId(feature)
   if (!parsed) return
-  const { setSelectedOsmObject, setSelectedEntityId } = useProjectStore.getState()
-  setSelectedOsmObject({ ...parsed, cachedFeature: feature })
-  setSelectedEntityId(null)
+  useOsmViewStore.getState().setSelectedOsmObject({ ...parsed, cachedFeature: feature })
+  useProjectStore.getState().setSelectedEntityId(null)
 }
 
 function MapInstanceBridge({ flyToRef }: { flyToRef: React.RefObject<FlyToFn | null> }) {
@@ -146,9 +146,9 @@ export function MapView({
   const entities = useProjectStore((s) => s.entities)
   const organisations = useProjectStore((s) => s.organisations)
   const drawnGeometries = useProjectStore((s) => s.drawnGeometries)
-  const entityOsmGeometries = useProjectStore((s) => s.entityOsmGeometries)
+  const entityOsmGeometries = useOsmViewStore((s) => s.entityOsmGeometries)
   const selectedEntityId = useProjectStore((s) => s.selectedEntityId)
-  const baseMap = useProjectStore((s) => s.baseMap)
+  const baseMap = useMapPrefsStore((s) => s.baseMap)
 
   useOsmRelationGeometries({ onOverpassUnavailable })
 

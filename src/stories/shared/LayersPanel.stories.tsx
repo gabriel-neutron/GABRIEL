@@ -72,7 +72,6 @@ const meta = {
         drawnGeometries: geometries,
         selectedEntityId: "entity-hq",
         selectedOrganisationId: null,
-        sourceCache: new Map(),
       })
 
       return (

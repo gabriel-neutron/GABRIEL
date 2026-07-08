@@ -12,6 +12,8 @@ import {
 import { INDUSTRY_LAYER_ID } from "@/types/organisation.types"
 import { loadProject, saveProject, clearProject, type LoadedProject } from "@/services/projectStorage.service"
 import { useProjectStore, selectPersistableSnapshot } from "@/store/useProjectStore"
+import { useSourceCacheStore } from "@/store/useSourceCacheStore"
+import { useOsmViewStore } from "@/store/useOsmViewStore"
 
 async function writeGeoPackageToFile(bytes: Uint8Array): Promise<void> {
   const showSave = (
@@ -104,8 +106,8 @@ export function useProjectIO() {
             drawnGeometries: next.drawnGeometries,
             selectedEntityId: next.selectedEntityId,
             selectedOrganisationId: next.selectedOrganisationId,
-            sourceCache: result.sourceCache,
           })
+          useSourceCacheStore.getState().setSourceCache(result.sourceCache)
           setRestoredFromSession(true)
         })
       })
@@ -135,6 +137,8 @@ export function useProjectIO() {
         ? previousProject.buffer
         : await loadSeedGeoPackageBuffer()
     resetProject()
+    useSourceCacheStore.getState().resetSourceCache()
+    useOsmViewStore.getState().resetOsmView()
     setError(null)
     setRestoredFromSession(false)
     try {
@@ -177,8 +181,8 @@ export function useProjectIO() {
         drawnGeometries: next.drawnGeometries,
         selectedEntityId: next.selectedEntityId,
         selectedOrganisationId: next.selectedOrganisationId,
-        sourceCache: result.sourceCache,
       })
+      useSourceCacheStore.getState().setSourceCache(result.sourceCache)
       await saveProject(buffer)
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load GeoPackage")
@@ -191,6 +195,7 @@ export function useProjectIO() {
   const handleSave = useCallback(async (): Promise<void> => {
     const { layers, entities, organisations, geometries, sourceCache } = selectPersistableSnapshot(
       useProjectStore.getState(),
+      useSourceCacheStore.getState().sourceCache,
     )
     setBusy(true)
     setError(null)

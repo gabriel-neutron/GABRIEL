@@ -6,6 +6,7 @@ import type { MapEntity } from "@/types/domain.types"
 import type { Organisation } from "@/types/organisation.types"
 import { ORGANISATION_TYPE_LABELS } from "@/types/organisation.types"
 import { useProjectStore } from "@/store/useProjectStore"
+import { useOsmViewStore } from "@/store/useOsmViewStore"
 import { useShallow } from "zustand/shallow"
 import { buildOrbat, type Orbat, type OrbatNode } from "@/core/entity/hierarchy"
 
@@ -100,7 +101,7 @@ function EntityNode({
   function handleSelectEntity() {
     const s = useProjectStore.getState()
     s.setSelectedEntityId(entity.id)
-    s.setSelectedOsmObject(null)
+    useOsmViewStore.getState().setSelectedOsmObject(null)
   }
 
   return (
@@ -208,7 +209,7 @@ function OrgNode({ org, depth, orbat, ancestorPath, selectedOrganisationId, expa
     const s = useProjectStore.getState()
     s.setSelectedOrganisationId(org.id)
     s.setSelectedEntityId(null)
-    s.setSelectedOsmObject(null)
+    useOsmViewStore.getState().setSelectedOsmObject(null)
   }
 
   return (

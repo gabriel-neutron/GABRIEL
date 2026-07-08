@@ -5,6 +5,7 @@ import { INDUSTRY_LAYER_ID } from "@/types/organisation.types"
 import { MainLayout } from "@/shell/MainLayout"
 import { ToastStack, type ToastItem } from "@/components/shared/ToastStack"
 import { useProjectStore } from "@/store/useProjectStore"
+import { useSourceCacheStore } from "@/store/useSourceCacheStore"
 import { useEnrichment } from "@/modules/enrichment/hooks/useEnrichment"
 import { useLayeredResearch } from "@/modules/enrichment/hooks/useLayeredResearch"
 import { useProjectIO } from "@/hooks/useProjectIO"
@@ -15,8 +16,9 @@ export type EditPageProps = {
 }
 
 export function EditPage({ onViewMode, onOpenAbout }: EditPageProps): React.ReactElement {
-  const { entities, drawnGeometries, selectedEntityId, sourceCache, updateEntity, mergeSourceCache, addOrganisation, addGeometry, setSelectedOrganisationId, setSelectedEntityId } =
+  const { entities, drawnGeometries, selectedEntityId, updateEntity, addOrganisation, addGeometry, setSelectedOrganisationId, setSelectedEntityId } =
     useProjectStore()
+  const { sourceCache, mergeSourceCache } = useSourceCacheStore()
 
   const { busy, error, restoredFromSession, handleNew, handleOpen, handleSave } = useProjectIO()
 
