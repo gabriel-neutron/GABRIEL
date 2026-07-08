@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react-vite"
 import { MapContainer, TileLayer } from "react-leaflet"
 import "leaflet/dist/leaflet.css"
-import { SymbolsLayer } from "@/components/map/SymbolsLayer"
+import { SymbolsLayer } from "./SymbolsLayer"
 import { useProjectStore } from "@/store/useProjectStore"
 import { asLatLng } from "@/core/coordinates"
 import type { Layer, MapEntity } from "@/types/domain.types"

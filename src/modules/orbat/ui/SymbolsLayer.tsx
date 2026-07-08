@@ -1,10 +1,10 @@
 import { useMemo, useLayoutEffect, useState } from "react"
 import L from "leaflet"
 import { Marker, Popup } from "react-leaflet"
-import { getRenderedSymbolForEntity } from "@/services/symbol.service"
+import { getRenderedSymbolForEntity } from "@/modules/orbat/services/symbol.service"
 import { useProjectStore } from "@/store/useProjectStore"
 import type { LatLng } from "@/core/coordinates"
-import type { MapBounds } from "./MapBoundsReporter"
+import type { MapBounds } from "@/components/map/MapBoundsReporter"
 
 const BOUNDS_BUFFER = 0.5
 

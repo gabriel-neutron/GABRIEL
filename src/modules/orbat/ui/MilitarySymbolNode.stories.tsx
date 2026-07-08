@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite"
 import ReactFlow, { type Node } from "reactflow"
-import { MilitarySymbolNode, type MilitarySymbolNodeData } from "@/components/tree/MilitarySymbolNode"
+import { MilitarySymbolNode, type MilitarySymbolNodeData } from "./MilitarySymbolNode"
 import type { MapEntity } from "@/types/domain.types"
 
 const entity: MapEntity = {

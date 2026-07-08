@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite"
-import { TreeView } from "@/components/tree/TreeView"
+import { TreeView } from "./TreeView"
 import { useProjectStore } from "@/store/useProjectStore"
 import type { Layer, MapEntity } from "@/types/domain.types"
 

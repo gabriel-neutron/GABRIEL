@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite"
-import { EntityInspector } from "@/components/inspector/EntityInspector"
+import { EntityInspector } from "./EntityInspector"
 import { useProjectStore } from "@/store/useProjectStore"
 import type { Layer, MapEntity, DrawnGeometry } from "@/types/domain.types"
 

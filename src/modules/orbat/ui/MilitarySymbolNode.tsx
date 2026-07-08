@@ -1,6 +1,6 @@
 import { memo, useMemo } from "react"
 import { Handle, type NodeProps, Position } from "reactflow"
-import { getRenderedSymbolForEntity } from "@/services/symbol.service"
+import { getRenderedSymbolForEntity } from "@/modules/orbat/services/symbol.service"
 import type { MapEntity } from "@/types/domain.types"
 
 const TREE_SYMBOL_SIZE = 28

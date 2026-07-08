@@ -1,6 +1,6 @@
 import { useState } from "react"
 import type { Meta, StoryObj } from "@storybook/react-vite"
-import { HierarchyPanel } from "@/components/shared/HierarchyPanel"
+import { HierarchyPanel } from "./HierarchyPanel"
 import { useProjectStore } from "@/store/useProjectStore"
 import type { MapEntity } from "@/types/domain.types"
 

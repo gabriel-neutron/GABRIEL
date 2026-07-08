@@ -24,8 +24,8 @@ import {
 } from "@/types/symbol.types"
 import { Trash2 } from "lucide-react"
 import { UNIT_TYPE_OPTIONS_GROUPED } from "./entityInspector.options"
-import { FindOsmAtPointDialog } from "./FindOsmAtPointDialog"
-import { useEntityInspector } from "./useEntityInspector"
+import { FindOsmAtPointDialog } from "@/components/inspector/FindOsmAtPointDialog"
+import { useEntityInspector } from "@/modules/orbat/hooks/useEntityInspector"
 import { useProjectStore } from "@/store/useProjectStore"
 
 const POSITION_MODE_OPTIONS: { value: PositionMode; label: string }[] = [
