@@ -87,7 +87,7 @@ Rule: a subject moves **with** its `./`-importing test and its `@/`-importing st
 - Every file sits in the target `core/shell/modules/ui` layout; no source imports an old path except intentional shims.
 - `npm run verify` green (lint + test:coverage + build). Storybook builds.
 - No behavioural change: the app opens, edits, enriches, and saves a `.gpkg` exactly as before.
-- `reactflow` gone from `package.json` and lockfile.
+- ~~`reactflow` gone from `package.json` and lockfile.~~ **Superseded by A10's finding**: this criterion assumed reactflow was dead; it isn't (see A10). Removing it would itself be a behavioural change, contradicting the criterion above it. Not satisfied, and correctly so — kept pending a product decision on the Hierarchy tab.
 
 🔒 **Gate A** — separate validation agent confirms the ✅ above against the git diff + a running app, records verdict in the Validation Log. Do not start Phase B before `PASS`.
 
@@ -164,7 +164,7 @@ ADMIRALTY scoring (STANAG 2511) on every entity and claim is delivered by E2, th
 
 | Date | Gate | Verdict | Validator feedback (summary) |
 |---|---|---|---|
-| _(pending)_ | A | — | — |
+| 2026-07-08 | A | **PASS-WITH-NOTES** | Independent fresh-context agent re-ran `npm run verify` (29/29 test files, 195/195 tests, lint+build clean) and `storybook build` (both green, confirmed not just trusted). Grepped for stale old-path imports across all A1–A9/A11 target areas — zero hits; `utils/orbat.ts` shim confirmed to have no in-tree importers (external-only, as designed). Spot-checked A3/A9/A11 commit diffs against their claimed content — all matched. Independently re-traced A10's reactflow claim (grepped the import, traced `TreeView.tsx` → `MainLayout.tsx` → `AppShell.tsx`'s `activeView`/`treeSlot` render path) and concurred: reactflow is genuinely live, blocking removal was correct, and forcing it to satisfy the roadmap's own (contradictory) 4th success criterion would itself be an unauthorized behavioural change. One real gap found and not yet logged at review time: `entityLayer.ts`, `organisation-icons.ts`, `treeLayout.ts(+test)`, `enrichmentAdapters.ts(+test)`, `enrichmentApply.ts(+test)` were still sitting in `utils/` — single-module-consumer files that should have swept into their owning module per A5/A6/A8's own pattern. **Resolved same-day**: all five moved into `shell/`/`modules/orbat/services/`/`modules/enrichment/services/` (commit `23c2a45`), re-verified green. Phase A layout, build, and no-behavioural-change criteria are now fully met; the reactflow criterion is knowingly unmet for a documented, correct reason. **Stream 1 Phase B is cleared to start.** |
 
 ### Deferred / to revisit later
 
