@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { Button } from "@/ui/button"
 import { Field, FieldGroup, FieldLabel } from "@/ui/field"
 import { Input } from "@/ui/input"
@@ -29,6 +29,8 @@ import { useEntityInspector } from "@/modules/orbat/hooks/useEntityInspector"
 import { useProjectStore } from "@/store/useProjectStore"
 import { ReadOnlyField, SourcesList, LinkedGeometriesList } from "@/components/shared/InspectorFields"
 import type { AdmiraltyReliability } from "@/core/provenance/admiralty"
+import { matchesForEntity } from "@/core/identity/matchCandidates"
+import { DuplicateMatchesSection } from "./DuplicateMatchesSection"
 
 const POSITION_MODE_OPTIONS: { value: PositionMode; label: string }[] = [
   { value: "own", label: "Own geometry" },
@@ -195,6 +197,9 @@ function EntityInspectorReadOnlyView({
 export function EntityInspector({ readOnly = false, enrichedOverlay = {} }: Props) {
   const { layers, updateEntity, deleteGeometry } = useProjectStore()
   const assignableLayers = layers.filter((l) => l.osmData == null)
+  // Granular selectors (not the whole-store destructure above) for the E3 merge surface.
+  const allEntities = useProjectStore((s) => s.entities)
+  const mergeEntities = useProjectStore((s) => s.mergeEntities)
 
   const {
     entity,
@@ -239,6 +244,17 @@ export function EntityInspector({ readOnly = false, enrichedOverlay = {} }: Prop
     if (entity != null) setDraft(draftFromEntity(entity))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [entity?.id])
+
+  const duplicateCandidates = useMemo(() => {
+    if (entity == null) return []
+    const byId = new Map(allEntities.map((e) => [e.id, e]))
+    return matchesForEntity(entity, allEntities).map((m) => ({
+      id: m.bId,
+      name: byId.get(m.bId)?.name ?? m.bId,
+      score: m.score,
+      reason: m.reason,
+    }))
+  }, [entity, allEntities])
 
   function handleDeleteEntity(entityId: string): void {
     const noun = entity?.kind === "corporate" ? "organisation" : "entity"
@@ -538,6 +554,14 @@ export function EntityInspector({ readOnly = false, enrichedOverlay = {} }: Prop
                   ? "No geometries linked. Draw on the map and link to this organisation."
                   : "No geometries linked. The symbol is placed at the first linked geometry. Draw on the map and link to this entity to add one."
               }
+            />
+          </Field>
+        )}
+        {duplicateCandidates.length > 0 && (
+          <Field>
+            <DuplicateMatchesSection
+              candidates={duplicateCandidates}
+              onMerge={(otherId) => mergeEntities(entity.id, otherId)}
             />
           </Field>
         )}
