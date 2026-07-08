@@ -7,7 +7,7 @@ import type { Organisation } from "@/types/organisation.types"
 import { ORGANISATION_TYPE_LABELS } from "@/types/organisation.types"
 import { useProjectStore } from "@/store/useProjectStore"
 import { useShallow } from "zustand/shallow"
-import { buildOrbat, type Orbat, type OrbatNode } from "@/utils/orbat"
+import { buildOrbat, type Orbat, type OrbatNode } from "@/core/entity/hierarchy"
 
 type Props = {
   hiddenEntityIds: Set<string>

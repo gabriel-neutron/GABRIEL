@@ -1,5 +1,5 @@
 import type { DrawnGeometry, MapEntity } from "@/types/domain.types"
-import { buildOrbat } from "@/utils/orbat"
+import { buildOrbat } from "@/core/entity/hierarchy"
 import type {
   EnrichmentResponse,
   EnrichmentUsage,

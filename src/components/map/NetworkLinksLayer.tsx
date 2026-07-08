@@ -3,7 +3,7 @@ import { Polyline } from "react-leaflet"
 import { useProjectStore } from "@/store/useProjectStore"
 import type { MapEntity } from "@/types/domain.types"
 import type { LatLng } from "@/types/coordinates"
-import { buildOrbat } from "@/utils/orbat"
+import { buildOrbat } from "@/core/entity/hierarchy"
 
 const NETWORK_LINE_OPTIONS = {
   color: "#a855f7",

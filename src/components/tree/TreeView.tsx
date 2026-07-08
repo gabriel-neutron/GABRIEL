@@ -3,7 +3,7 @@ import ReactFlow, { Background, type Edge, type Node, Position } from "reactflow
 import { MilitarySymbolNode } from "./MilitarySymbolNode"
 import { useProjectStore } from "@/store/useProjectStore"
 import { useShallow } from "zustand/shallow"
-import { buildOrbat } from "@/utils/orbat"
+import { buildOrbat } from "@/core/entity/hierarchy"
 import { computeTreeXIndex } from "@/utils/treeLayout"
 
 const nodeTypes = { militarySymbol: MilitarySymbolNode }

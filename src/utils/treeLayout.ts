@@ -1,4 +1,4 @@
-import type { Orbat, OrbatNode } from "@/utils/orbat"
+import type { Orbat, OrbatNode } from "@/core/entity/hierarchy"
 
 /**
  * Horizontal position for each item in a top-down tree layout: leaves get sequential
