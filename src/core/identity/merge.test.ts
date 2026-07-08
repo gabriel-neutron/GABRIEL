@@ -111,6 +111,77 @@ describe("mergeEntities", () => {
     expect(mergeEntities(graph, "a", "c")).toBe(graph)
   })
 
+  it("reconciles positionMode to 'own' so a located secondary's moved geometry still renders (F1)", () => {
+    const graph: IdentityGraph = {
+      entities: [
+        unit("a", "A", { positionMode: "none" }),
+        unit("b", "B", { positionMode: "own", isExactPosition: true }),
+      ],
+      claims: [],
+      geometries: [point("g1", "b")],
+    }
+    const { entities, geometries } = mergeEntities(graph, "a", "b")
+    expect(entities[0].positionMode).toBe("own")
+    expect(entities[0].isExactPosition).toBe(true)
+    expect(geometries[0].entityId).toBe("a")
+  })
+
+  it("back-fills the secondary's parent when the primary is at the root (F3)", () => {
+    const graph: IdentityGraph = {
+      entities: [
+        unit("brigade", "1st Brigade"),
+        unit("a", "A", { parentId: null }),
+        unit("b", "B", { parentId: "brigade" }),
+      ],
+      claims: [],
+      geometries: [],
+    }
+    expect(mergeEntities(graph, "a", "b").entities.find((e) => e.id === "a")!.parentId).toBe("brigade")
+  })
+
+  it("promotes the primary out of the secondary's subtree instead of forming a cycle (F2)", () => {
+    // Root -> B -> X -> A; merge B (an ancestor) into A (its descendant).
+    const graph: IdentityGraph = {
+      entities: [
+        unit("root", "Root"),
+        unit("b", "B", { parentId: "root" }),
+        unit("x", "X", { parentId: "b" }),
+        unit("a", "A", { parentId: "x" }),
+      ],
+      claims: [],
+      geometries: [],
+    }
+    const { entities } = mergeEntities(graph, "a", "b")
+    const byId = new Map(entities.map((e) => [e.id, e]))
+    // A takes B's slot under Root; X (B's former child) re-parents onto A. No cycle.
+    expect(byId.get("a")!.parentId).toBe("root")
+    expect(byId.get("x")!.parentId).toBe("a")
+    // Walking up from every node terminates (acyclic).
+    for (const e of entities) {
+      const seen = new Set<string>()
+      let cur: string | null = e.parentId
+      while (cur) {
+        expect(seen.has(cur)).toBe(false)
+        seen.add(cur)
+        cur = byId.get(cur)?.parentId ?? null
+      }
+    }
+  })
+
+  it("does not inherit the secondary's stored NATO symbol code (F5)", () => {
+    const graph: IdentityGraph = {
+      entities: [
+        unit("a", "A", { type: "infantry", echelon: "Brigade" }),
+        unit("b", "B", { natoSymbolCode: "10031000001211000000" }),
+      ],
+      claims: [],
+      geometries: [],
+    }
+    const merged = mergeEntities(graph, "a", "b").entities[0]
+    expect(merged.natoSymbolCode).toBeUndefined()
+    expect(merged.type).toBe("infantry")
+  })
+
   it("does not mutate its input", () => {
     const graph: IdentityGraph = {
       entities: [unit("a", "A"), unit("b", "B", { parentId: null })],

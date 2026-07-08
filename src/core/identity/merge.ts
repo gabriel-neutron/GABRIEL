@@ -1,4 +1,4 @@
-import type { Entity } from "@/core/entity/entity"
+import type { Entity, PositionMode } from "@/core/entity/entity"
 import type { Claim } from "@/core/provenance/claim"
 import type { DrawnGeometry } from "@/types/domain.types"
 
@@ -17,10 +17,14 @@ export type IdentityGraph = {
  * Merges `secondaryId` into `primaryId`, collapsing two records for one real-world entity
  * into one **without losing data** (ADR 0006, E3 success criterion):
  *
- * - the primary keeps its id, name, kind and layer;
+ * - the primary keeps its id, name, kind, layer and symbol identity (`natoSymbolCode`);
  * - the secondary's name + aliases survive as the primary's `aliases`;
- * - any field the primary leaves empty is back-filled from the secondary; `notes` are concatenated;
- * - the secondary's children are re-parented onto the primary;
+ * - any *informational* field the primary leaves empty is back-filled from the secondary,
+ *   `parentId` included; `notes` are concatenated;
+ * - `positionMode` becomes "own" if either record was, so a located secondary's geometry
+ *   (moved to the primary) still renders instead of silently vanishing;
+ * - the secondary's children are re-parented onto the primary (promoting the primary out of
+ *   the secondary's subtree first, so a merge up the hierarchy can't form a cycle);
  * - the secondary's geometries and claims move to the primary (claims de-duplicated);
  * - the secondary entity is removed.
  *
@@ -34,14 +38,14 @@ export function mergeEntities(graph: IdentityGraph, primaryId: string, secondary
   const secondary = graph.entities.find((e) => e.id === secondaryId)
   if (!primary || !secondary || primary.kind !== secondary.kind) return graph
 
-  const merged = mergeFields(primary, secondary)
+  const merged = mergeFields(primary, secondary, graph.entities)
 
   const entities = graph.entities
     .filter((e) => e.id !== secondaryId)
     .map((e) => {
       if (e.id === primaryId) return merged
-      // Re-parent the secondary's children (and, defensively, anything the primary's own
-      // promoted parent pointer might now dangle) onto the primary.
+      // Re-parent the secondary's children onto the primary. `mergeFields` has already
+      // promoted the primary out of the secondary's subtree, so this can't create a cycle.
       if (e.parentId === secondaryId) return { ...e, parentId: primaryId }
       return e
     })
@@ -57,38 +61,81 @@ export function mergeEntities(graph: IdentityGraph, primaryId: string, secondary
   return { entities, claims, geometries }
 }
 
-/** Primary wins on every set field; the secondary back-fills gaps so nothing populated is dropped. */
-function mergeFields(primary: Entity, secondary: Entity): Entity {
-  // parentId: if the primary was parented *to* the secondary, promote to the secondary's
-  // parent to avoid a dangling/self reference once the secondary is gone.
-  let parentId = primary.parentId
-  if (parentId === secondary.id) parentId = secondary.parentId === primary.id ? null : secondary.parentId
+/**
+ * The primary wins on identity/layer/symbol; positioning reconciles with the moved geometry;
+ * every other informational field back-fills from the secondary so nothing populated is dropped.
+ */
+function mergeFields(primary: Entity, secondary: Entity, allEntities: Entity[]): Entity {
+  const primaryMode = primary.positionMode ?? "own"
+  const secondaryMode = secondary.positionMode ?? "own"
+  // The merged entity holds both records' geometry, so it is positioned by its own geometry
+  // if EITHER record was — otherwise a located secondary's pin would vanish (its geometry
+  // moves onto the primary but would render nowhere under a "none"/"parent" mode).
+  const positionMode: PositionMode = primaryMode === "own" || secondaryMode === "own" ? "own" : primaryMode
+  const isExactPosition =
+    positionMode !== "own"
+      ? false
+      : primaryMode === "own"
+        ? (primary.isExactPosition ?? false)
+        : (secondary.isExactPosition ?? false)
 
-  const merged: Entity = { ...secondary, ...definedOnly(primary) } as Entity
-  merged.id = primary.id
-  merged.name = primary.name
-  merged.kind = primary.kind
-  merged.layerId = primary.layerId
-  merged.parentId = parentId
-  merged.aliases = mergeAliases(primary, secondary)
-  merged.notes = mergeNotes(primary.notes, secondary.notes)
-  return merged
+  return {
+    // Identity + layer: the primary wins outright.
+    id: primary.id,
+    name: primary.name,
+    kind: primary.kind,
+    layerId: primary.layerId,
+    parentId: resolveParent(primary, secondary, allEntities),
+    aliases: mergeAliases(primary, secondary),
+    notes: mergeNotes(primary.notes, secondary.notes),
+    positionMode,
+    isExactPosition,
+    // Symbol identity follows the primary: never inherit the secondary's stored SIDC, or the
+    // survivor would render the secondary's symbol while showing the primary's type/echelon.
+    natoSymbolCode: primary.natoSymbolCode,
+    // Informational fields: keep the primary's value, else back-fill the secondary's.
+    type: primary.type ?? secondary.type,
+    echelon: primary.echelon ?? secondary.echelon,
+    affiliation: primary.affiliation ?? secondary.affiliation,
+    domain: primary.domain ?? secondary.domain,
+    osmRelationId: primary.osmRelationId ?? secondary.osmRelationId,
+    militaryUnitId: primary.militaryUnitId ?? secondary.militaryUnitId,
+    analyzedAt: primary.analyzedAt ?? secondary.analyzedAt,
+  }
 }
 
-/** Own enumerable properties of `obj` whose value is neither `undefined` nor `null`. */
-function definedOnly<T extends object>(obj: T): Partial<T> {
-  const out: Partial<T> = {}
-  for (const key of Object.keys(obj) as (keyof T)[]) {
-    const value = obj[key]
-    if (value !== undefined && value !== null) out[key] = value
+/**
+ * The merged primary's parent. Back-fills the secondary's placement when the primary has
+ * none (no-data-loss), and — when the primary sits inside the secondary's subtree — promotes
+ * the primary into the secondary's slot instead of keeping its own parent, which would become
+ * a cycle once the secondary's children re-parent onto the primary.
+ */
+function resolveParent(primary: Entity, secondary: Entity, entities: Entity[]): string | null {
+  let parentId = isDescendant(primary.id, secondary.id, entities)
+    ? (secondary.parentId ?? null)
+    : (primary.parentId ?? secondary.parentId ?? null)
+  if (parentId === secondary.id) parentId = secondary.parentId ?? null // never point at the removed record
+  if (parentId === primary.id) parentId = null // never self-parent
+  return parentId
+}
+
+/** True if `descendantId` sits somewhere below `ancestorId` in the parent chain (cycle-safe). */
+function isDescendant(descendantId: string, ancestorId: string, entities: Entity[]): boolean {
+  const parentById = new Map(entities.map((e) => [e.id, e.parentId]))
+  const seen = new Set<string>()
+  let cur = parentById.get(descendantId) ?? null
+  while (cur != null && !seen.has(cur)) {
+    if (cur === ancestorId) return true
+    seen.add(cur)
+    cur = parentById.get(cur) ?? null
   }
-  return out
+  return false
 }
 
 /**
  * Union of the primary's aliases, the secondary's name, and the secondary's aliases —
- * de-duplicated by normalized-ish exact string, and dropping any that just restate the
- * primary's current name. `undefined` when the result is empty (keeps clean rows/diffs).
+ * de-duplicated by exact trimmed string, and dropping any that just restate the primary's
+ * current name. `undefined` when the result is empty (keeps clean rows/diffs).
  */
 function mergeAliases(primary: Entity, secondary: Entity): string[] | undefined {
   const result: string[] = []
