@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { cn } from "@/lib/utils"
-import { executeOverpassQuery, normalizeQuery } from "@/services/overpass.service"
+import { executeOverpassQuery, normalizeQuery } from "@/modules/osm/services/overpass.service"
 import type { Layer } from "@/types/domain.types"
 
 type Props = {

@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react"
-import { fetchRelationGeometry } from "@/services/overpass.service"
+import { fetchRelationGeometry } from "@/modules/osm/services/overpass.service"
 import { useProjectStore } from "@/store/useProjectStore"
 import type { Layer } from "@/types/domain.types"
 

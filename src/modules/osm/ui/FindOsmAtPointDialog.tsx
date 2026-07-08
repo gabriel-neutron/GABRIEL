@@ -1,7 +1,7 @@
 import type { KeyboardEvent } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import type { OsmElementCandidate } from "@/components/inspector/useFindOsmAtPoint"
-import { useFindOsmAtPoint } from "@/components/inspector/useFindOsmAtPoint"
+import type { OsmElementCandidate } from "@/modules/osm/hooks/useFindOsmAtPoint"
+import { useFindOsmAtPoint } from "@/modules/osm/hooks/useFindOsmAtPoint"
 
 function getLanduseTypeLabel(tags: Record<string, string>): string | null {
   const keys = ["landuse", "boundary", "military", "amenity", "building", "place"]

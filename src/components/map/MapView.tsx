@@ -14,7 +14,7 @@ import type { DrawnGeometry } from "@/types/domain.types"
 import { computeAllEntityPositions } from "@/utils/geometry"
 import { MapBoundsReporter, type MapBounds } from "./MapBoundsReporter"
 import { useProjectStore } from "@/store/useProjectStore"
-import { useOsmRelationGeometries } from "@/hooks/useOsmRelationGeometries"
+import { useOsmRelationGeometries } from "@/modules/osm/hooks/useOsmRelationGeometries"
 
 type FlyToFn = (lat: number, lng: number, zoom?: number) => void
 

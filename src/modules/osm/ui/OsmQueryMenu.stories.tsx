@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite"
-import { OsmQueryMenu } from "@/components/shared/OsmQueryMenu"
+import { OsmQueryMenu } from "./OsmQueryMenu"
 
 const meta = {
   title: "Shared/OsmQueryMenu",

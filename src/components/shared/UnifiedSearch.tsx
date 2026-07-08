@@ -4,8 +4,8 @@ import { Search } from "lucide-react"
 import { useProjectStore } from "@/store/useProjectStore"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import { searchPlace, type NominatimResult } from "@/services/nominatim.service"
-import { searchLocalOsmFeatures, type LocalOsmSearchHit } from "@/utils/osmLocalSearch"
+import { searchPlace, type NominatimResult } from "@/modules/osm/services/nominatim.service"
+import { searchLocalOsmFeatures, type LocalOsmSearchHit } from "@/modules/osm/services/osmLocalSearch"
 import { cn } from "@/lib/utils"
 
 export type FlyToFn = (lat: number, lng: number, zoom?: number) => void

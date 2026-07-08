@@ -24,7 +24,7 @@ import {
 } from "@/types/symbol.types"
 import { Trash2 } from "lucide-react"
 import { UNIT_TYPE_OPTIONS_GROUPED } from "./entityInspector.options"
-import { FindOsmAtPointDialog } from "@/components/inspector/FindOsmAtPointDialog"
+import { FindOsmAtPointDialog } from "@/modules/osm/ui/FindOsmAtPointDialog"
 import { useEntityInspector } from "@/modules/orbat/hooks/useEntityInspector"
 import { useProjectStore } from "@/store/useProjectStore"
 

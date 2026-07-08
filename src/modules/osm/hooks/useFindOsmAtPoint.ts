@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { findOsmElementsAtPoint, type OsmElementCandidate } from "@/services/overpass.service"
+import { findOsmElementsAtPoint, type OsmElementCandidate } from "@/modules/osm/services/overpass.service"
 
 export type { OsmElementCandidate }
 

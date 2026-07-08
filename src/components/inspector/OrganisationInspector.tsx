@@ -16,7 +16,7 @@ import type { DrawnGeometry, PositionMode } from "@/types/domain.types"
 import type { Organisation } from "@/types/organisation.types"
 import { ORGANISATION_TYPE_LABELS, ORGANISATION_TYPES } from "@/types/organisation.types"
 import { Trash2 } from "lucide-react"
-import { FindOsmAtPointDialog } from "./FindOsmAtPointDialog"
+import { FindOsmAtPointDialog } from "@/modules/osm/ui/FindOsmAtPointDialog"
 import { useOrganisationInspector } from "./useOrganisationInspector"
 import { useProjectStore } from "@/store/useProjectStore"
 

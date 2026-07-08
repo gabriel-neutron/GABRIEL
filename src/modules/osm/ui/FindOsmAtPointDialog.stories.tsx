@@ -2,8 +2,8 @@ import type { Meta, StoryObj } from "@storybook/react-vite"
 import {
   FindOsmAtPointDialog,
   FindOsmAtPointDialogContent,
-} from "@/components/inspector/FindOsmAtPointDialog"
-import type { OsmElementCandidate } from "@/components/inspector/useFindOsmAtPoint"
+} from "./FindOsmAtPointDialog"
+import type { OsmElementCandidate } from "@/modules/osm/hooks/useFindOsmAtPoint"
 
 const sampleCandidates: OsmElementCandidate[] = [
   { type: "relation", id: 123456, tags: { name: "Camp Alpha", military: "base" } },

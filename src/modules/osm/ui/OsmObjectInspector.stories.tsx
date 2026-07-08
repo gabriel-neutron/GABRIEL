@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite"
-import { OsmObjectInspector } from "@/components/inspector/OsmObjectInspector"
+import { OsmObjectInspector } from "./OsmObjectInspector"
 
 const meta = {
   title: "Inspector/OsmObjectInspector",
