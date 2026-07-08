@@ -67,4 +67,19 @@ describe("provenanceSources.table", () => {
       geoPackage.close()
     }
   })
+
+  it("defaults an invalid persisted reliability value to null", async () => {
+    const geoPackage = await createTestGeoPackage()
+    try {
+      createProvenanceSourcesTable(geoPackage)
+      geoPackage.connection.run(
+        `INSERT INTO provenance_sources (id, url, domain_type, reliability) VALUES (?, ?, ?, ?)`,
+        ["src-1", "https://example.org/a", "web", "Z"],
+      )
+      const [loaded] = readProvenanceSources(geoPackage)
+      expect(loaded.reliability).toBeNull()
+    } finally {
+      geoPackage.close()
+    }
+  })
 })

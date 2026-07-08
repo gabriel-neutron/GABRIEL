@@ -1,5 +1,6 @@
 import type { GeoPackage } from "@ngageoint/geopackage"
 import type { Claim } from "@/core/provenance/claim"
+import { decodeAdmiraltyCredibility } from "@/core/provenance/admiralty"
 import {
   buildCreateTableColumnDefs,
   decodeRow,
@@ -16,7 +17,7 @@ export const provenanceClaimColumns: ColumnDescriptor<Claim>[] = [
   { prop: "field", column: "field", sqlType: "TEXT", constraints: "NOT NULL", encode: (v) => String(v ?? ""), decode: (raw) => String(raw ?? "") },
   { prop: "value", column: "value", sqlType: "TEXT", encode: (v) => (v != null ? String(v) : null), decode: (raw) => (raw != null ? String(raw) : null) },
   { prop: "sourceId", column: "source_id", sqlType: "TEXT", constraints: "NOT NULL", encode: (v) => String(v ?? ""), decode: (raw) => String(raw ?? "") },
-  { prop: "credibility", column: "credibility", sqlType: "INTEGER", encode: (v) => (v != null ? Number(v) : null), decode: (raw) => (raw != null ? (Number(raw) as Claim["credibility"]) : null) },
+  { prop: "credibility", column: "credibility", sqlType: "INTEGER", encode: (v) => (v != null ? Number(v) : null), decode: (raw) => decodeAdmiraltyCredibility(raw) },
   { prop: "timestamp", column: "timestamp", sqlType: "TEXT", encode: (v) => (v != null ? String(v) : null), decode: (raw) => (raw != null ? String(raw) : null) },
 ]
 

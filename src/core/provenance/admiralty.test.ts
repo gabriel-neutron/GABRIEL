@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { setSourceReliability } from "./admiralty"
+import { decodeAdmiraltyCredibility, decodeAdmiraltyReliability, setSourceReliability } from "./admiralty"
 import type { Source } from "./source"
 
 describe("setSourceReliability", () => {
@@ -23,5 +23,35 @@ describe("setSourceReliability", () => {
   it("is a no-op array-shaped change when the id doesn't match anything", () => {
     const result = setSourceReliability(sources, "src-missing", "A")
     expect(result).toEqual(sources)
+  })
+})
+
+describe("decodeAdmiraltyReliability", () => {
+  it("accepts every value in the closed A-F set", () => {
+    for (const value of ["A", "B", "C", "D", "E", "F"]) {
+      expect(decodeAdmiraltyReliability(value)).toBe(value)
+    }
+  })
+
+  it("defaults an invalid persisted value to null rather than throwing", () => {
+    expect(decodeAdmiraltyReliability("Z")).toBeNull()
+    expect(decodeAdmiraltyReliability(null)).toBeNull()
+    expect(decodeAdmiraltyReliability(undefined)).toBeNull()
+    expect(decodeAdmiraltyReliability(123)).toBeNull()
+  })
+})
+
+describe("decodeAdmiraltyCredibility", () => {
+  it("accepts every value in the closed 1-6 set", () => {
+    for (const value of [1, 2, 3, 4, 5, 6]) {
+      expect(decodeAdmiraltyCredibility(value)).toBe(value)
+    }
+  })
+
+  it("defaults an invalid persisted value to null rather than throwing", () => {
+    expect(decodeAdmiraltyCredibility(0)).toBeNull()
+    expect(decodeAdmiraltyCredibility(7)).toBeNull()
+    expect(decodeAdmiraltyCredibility(null)).toBeNull()
+    expect(decodeAdmiraltyCredibility("bogus")).toBeNull()
   })
 })

@@ -1,5 +1,6 @@
 import type { GeoPackage } from "@ngageoint/geopackage"
 import type { Source } from "@/core/provenance/source"
+import { decodeAdmiraltyReliability } from "@/core/provenance/admiralty"
 import {
   buildCreateTableColumnDefs,
   buildSelectClause,
@@ -19,7 +20,7 @@ export const provenanceSourceColumns: ColumnDescriptor<Source>[] = [
   { prop: "id", column: "id", sqlType: "TEXT", constraints: "PRIMARY KEY", encode: (v) => String(v ?? ""), decode: (raw) => String(raw ?? "") },
   { prop: "url", column: "url", sqlType: "TEXT", constraints: "NOT NULL UNIQUE", encode: (v) => String(v ?? ""), decode: (raw) => String(raw ?? "") },
   { prop: "domainType", column: "domain_type", sqlType: "TEXT", encode: (v) => (v != null ? String(v) : null), decode: (raw) => (raw != null ? (String(raw) as Source["domainType"]) : null) },
-  { prop: "reliability", column: "reliability", sqlType: "TEXT", encode: (v) => (v != null ? String(v) : null), decode: (raw) => (raw != null ? (String(raw) as Source["reliability"]) : null) },
+  { prop: "reliability", column: "reliability", sqlType: "TEXT", encode: (v) => (v != null ? String(v) : null), decode: (raw) => decodeAdmiraltyReliability(raw) },
 ]
 
 export function createProvenanceSourcesTable(geoPackage: GeoPackage): void {
