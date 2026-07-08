@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useRef, useState } from "react"
 import { buildDefaultEnrichmentPrompt, buildEnrichmentRequest, ENRICHMENT_MAX_DEPTH_DEFAULT, runEnrichment } from "@/modules/enrichment/services"
-import { toEnrichmentFeature, toEnrichmentContext } from "@/utils/enrichmentAdapters"
+import { toEnrichmentFeature, toEnrichmentContext } from "@/modules/enrichment/services/enrichmentAdapters"
 import {
   acceptProposalToOverlay,
   clearFeatureEnrichmentState,
@@ -18,7 +18,7 @@ import {
 } from "@/store/enrichment.store"
 import type { DrawnGeometry, MapEntity } from "@/types/domain.types"
 import type { EnrichmentProposal, EnrichmentResponse } from "@/types/enrichment.types"
-import { buildAcceptedPatch } from "@/utils/enrichmentApply"
+import { buildAcceptedPatch } from "@/modules/enrichment/services/enrichmentApply"
 import { createEnrichmentRunner } from "./enrichmentRunner"
 
 export type UseEnrichmentArgs = {

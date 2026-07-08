@@ -4,7 +4,7 @@ import { OrganisationNode } from "./OrganisationNode"
 import { useProjectStore } from "@/store/useProjectStore"
 import { useShallow } from "zustand/shallow"
 import { buildOrbat } from "@/core/entity/hierarchy"
-import { computeTreeXIndex } from "@/utils/treeLayout"
+import { computeTreeXIndex } from "@/modules/orbat/services/treeLayout"
 
 const nodeTypes = { organisation: OrganisationNode }
 

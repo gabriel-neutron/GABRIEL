@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { buildOrbat } from "./orbat"
+import { buildOrbat } from "@/core/entity/hierarchy"
 import { computeTreeXIndex } from "./treeLayout"
 
 type Node = { id: string; parentId: string | null }

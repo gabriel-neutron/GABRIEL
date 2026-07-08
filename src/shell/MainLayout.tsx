@@ -19,7 +19,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/ui/tabs"
 import { SidebarGroup, SidebarGroupContent, SidebarTrigger } from "@/ui/sidebar"
 import { FlaskConical } from "lucide-react"
 import type { MapEntity, DrawnGeometry } from "@/types/domain.types"
-import { getDefaultEntityLayerId } from "@/utils/entityLayer"
+import { getDefaultEntityLayerId } from "./entityLayer"
 import type { EnrichmentControls, LayeredResearchControls } from "@/types/layout.types"
 import { useProjectStore } from "@/store/useProjectStore"
 

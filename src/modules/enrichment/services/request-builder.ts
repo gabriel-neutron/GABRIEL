@@ -1,6 +1,6 @@
 import type { DrawnGeometry, MapEntity } from "@/types/domain.types"
 import type { EnrichmentRequest } from "@/types/enrichment.types"
-import { toEnrichmentFeature, toEnrichmentContext } from "@/utils/enrichmentAdapters"
+import { toEnrichmentFeature, toEnrichmentContext } from "./enrichmentAdapters"
 import { buildDefaultEnrichmentPrompt } from "./promptTemplate"
 import { buildEnrichmentOutputSchema } from "./schema.fixtures"
 import { ENRICHMENT_MAX_DEPTH_DEFAULT } from "./enrichment.constants"

@@ -1,7 +1,7 @@
 import { useMemo, useLayoutEffect, useState } from "react"
 import L from "leaflet"
 import { Marker, Popup } from "react-leaflet"
-import { makeOrganisationIcon } from "@/utils/organisation-icons"
+import { makeOrganisationIcon } from "@/modules/orbat/services/organisation-icons"
 import { computeAllOrganisationPositions } from "@/core/map/geometry"
 import { useProjectStore } from "@/store/useProjectStore"
 import { INDUSTRY_LAYER_ID } from "@/types/organisation.types"
