@@ -2,6 +2,9 @@ import type { ReactNode } from "react"
 import { Trash2 } from "lucide-react"
 import { Button } from "@/ui/button"
 import type { DrawnGeometry } from "@/types/domain.types"
+import type { AdmiraltyReliability } from "@/core/provenance/admiralty"
+
+const RELIABILITY_OPTIONS: AdmiraltyReliability[] = ["A", "B", "C", "D", "E", "F"]
 
 function isUrl(value: string): boolean {
   return /^https?:\/\//i.test(value.trim())
@@ -27,10 +30,15 @@ export function SourcesList({
   sources,
   readOnly,
   onRemove,
+  reliabilities,
+  onRate,
 }: {
   sources: string[]
   readOnly: boolean
   onRemove?: (index: number) => void
+  /** ADMIRALTY reliability rating (STANAG 2511) per `sources[index]`, 1:1 (ADR 0006, E2.9). */
+  reliabilities?: (AdmiraltyReliability | null)[]
+  onRate?: (index: number, reliability: AdmiraltyReliability | null) => void
 }) {
   if (sources.length === 0) return null
 
@@ -63,6 +71,20 @@ export function SourcesList({
               </span>
             )}
           </div>
+          {!readOnly && onRate != null && (
+            <select
+              value={reliabilities?.[index] ?? ""}
+              onChange={(e) => onRate(index, (e.target.value || null) as AdmiraltyReliability | null)}
+              aria-label="Source reliability (ADMIRALTY)"
+              title="ADMIRALTY reliability rating"
+              className="h-7 shrink-0 rounded border bg-background px-1 text-xs"
+            >
+              <option value="">—</option>
+              {RELIABILITY_OPTIONS.map((r) => (
+                <option key={r} value={r}>{r}</option>
+              ))}
+            </select>
+          )}
           {!readOnly && onRemove != null && (
             <Button
               type="button"

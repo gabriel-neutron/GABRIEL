@@ -218,8 +218,15 @@ export function EntityInspector({ readOnly = false, enrichedOverlay = {} }: Prop
     handleSelectOsmRelation,
     sourceEditor,
   } = useEntityInspector()
-  const { sources, draft: newSource, setDraft: setNewSource, add: handleAddSource, remove: handleRemoveSource } =
-    sourceEditor
+  const {
+    sources,
+    reliabilities,
+    draft: newSource,
+    setDraft: setNewSource,
+    add: handleAddSource,
+    remove: handleRemoveSource,
+    rate: handleRateSource,
+  } = sourceEditor
 
   const [draft, setDraft] = useState<FieldDraft>(() =>
     entity != null ? draftFromEntity(entity) : { name: "", militaryUnitId: "", notes: "", osmRelationId: "" },
@@ -297,7 +304,13 @@ export function EntityInspector({ readOnly = false, enrichedOverlay = {} }: Prop
         </Field>
         <Field>
           <FieldLabel>Sources</FieldLabel>
-          <SourcesList sources={sources} readOnly={false} onRemove={handleRemoveSource} />
+          <SourcesList
+            sources={sources}
+            readOnly={false}
+            onRemove={handleRemoveSource}
+            reliabilities={reliabilities}
+            onRate={handleRateSource}
+          />
           <div className="flex gap-2">
             <Input
               placeholder="Add source URL or note"

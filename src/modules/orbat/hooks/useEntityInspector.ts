@@ -5,6 +5,7 @@ import type { OrganisationType } from "@/types/organisation.types"
 import { useProjectStore } from "@/store/useProjectStore"
 import { useProvenanceStore } from "@/store/useProvenanceStore"
 import { GENERAL_CITATION_FIELD, type Claim } from "@/core/provenance/claim"
+import type { AdmiraltyReliability } from "@/core/provenance/admiralty"
 
 function detectEchelonFromName(name: string): SymbolEchelon | null {
   const n = name.toLowerCase()
@@ -33,10 +34,13 @@ export type EntityInspectorState = {
   isEchelonLayerSelected: boolean
   sourceEditor: {
     sources: string[]
+    /** ADMIRALTY reliability rating (STANAG 2511) per `sources[index]`, 1:1 (ADR 0006, E2.9). */
+    reliabilities: (AdmiraltyReliability | null)[]
     draft: string
     setDraft: (value: string) => void
     add: () => void
     remove: (index: number) => void
+    rate: (index: number, reliability: AdmiraltyReliability | null) => void
   }
   findDialogOpen: boolean
   setFindDialogOpen: (open: boolean) => void
@@ -63,6 +67,7 @@ export function useEntityInspector(): EntityInspectorState {
   } = useProjectStore()
   const provenanceSources = useProvenanceStore((s) => s.sources)
   const mergeUrls = useProvenanceStore((s) => s.mergeUrls)
+  const rateSourceReliability = useProvenanceStore((s) => s.rateSourceReliability)
 
   const [findDialogOpen, setFindDialogOpen] = useState(false)
   const [newSource, setNewSource] = useState("")
@@ -108,12 +113,17 @@ export function useEntityInspector(): EntityInspectorState {
         : [],
     [entity, claims],
   )
-  const sources = useMemo(() => {
+  // sources/reliabilities/entityClaims (after the `sources` filter below) stay
+  // 1:1-indexed with each other — computed from the same filtered join so `rate`/
+  // `remove` can index into `entityClaims` by the same position the UI renders.
+  const resolvedClaims = useMemo(() => {
     const sourceById = new Map(provenanceSources.map((s) => [s.id, s]))
     return entityClaims
-      .map((c) => sourceById.get(c.sourceId)?.url)
-      .filter((url): url is string => url != null)
+      .map((c) => ({ claim: c, source: sourceById.get(c.sourceId) }))
+      .filter((r): r is { claim: Claim; source: NonNullable<typeof r.source> } => r.source != null)
   }, [entityClaims, provenanceSources])
+  const sources = useMemo(() => resolvedClaims.map((r) => r.source.url), [resolvedClaims])
+  const reliabilities = useMemo(() => resolvedClaims.map((r) => r.source.reliability), [resolvedClaims])
 
   const handleNameChange = useCallback(
     (name: string) => {
@@ -220,11 +230,20 @@ export function useEntityInspector(): EntityInspectorState {
 
   const handleRemoveSource = useCallback(
     (index: number) => {
-      const claim = entityClaims[index]
+      const claim = resolvedClaims[index]?.claim
       if (!claim) return
       removeClaim(claim.id)
     },
-    [entityClaims, removeClaim],
+    [resolvedClaims, removeClaim],
+  )
+
+  const handleRateSource = useCallback(
+    (index: number, reliability: AdmiraltyReliability | null) => {
+      const source = resolvedClaims[index]?.source
+      if (!source) return
+      rateSourceReliability(source.id, reliability)
+    },
+    [resolvedClaims, rateSourceReliability],
   )
 
   return {
@@ -243,10 +262,12 @@ export function useEntityInspector(): EntityInspectorState {
     isEchelonLayerSelected,
     sourceEditor: {
       sources,
+      reliabilities,
       draft: newSource,
       setDraft: setNewSource,
       add: handleAddSource,
       remove: handleRemoveSource,
+      rate: handleRateSource,
     },
     findDialogOpen,
     setFindDialogOpen,
