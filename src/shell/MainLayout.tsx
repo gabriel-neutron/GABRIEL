@@ -33,6 +33,7 @@ function entityFromGeometry(
   const id = crypto.randomUUID()
   const layerId = geom.layerId ?? defaultLayerId
   return {
+    kind: "unit",
     id,
     name: "New entity",
     layerId,

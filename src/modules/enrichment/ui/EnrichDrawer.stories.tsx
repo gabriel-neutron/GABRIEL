@@ -7,6 +7,7 @@ const meta = {
   args: {
     open: true,
     entity: {
+      kind: "unit",
       id: "entity-1",
       name: "1st Infantry Brigade",
       layerId: "layer-1",

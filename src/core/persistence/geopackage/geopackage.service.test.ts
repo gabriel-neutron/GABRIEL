@@ -34,6 +34,7 @@ describe("coordinate round-trip", () => {
       ]
       const entities: MapEntity[] = [
         {
+          kind: "unit",
           id: "e-1",
           name: "1st Test Division",
           layerId: "division",
@@ -168,6 +169,7 @@ describe("coordinate round-trip", () => {
       const layers: GpkgLayer[] = [{ id: "division", name: "Division", visible: true, kind: "echelon" }]
       const entities: MapEntity[] = [
         {
+          kind: "unit",
           id: "e-1",
           name: "Old Schema Unit",
           layerId: "division",

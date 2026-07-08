@@ -7,6 +7,7 @@ const layers: Layer[] = [{ id: "layer-tree", name: "Tree Layer", visible: true, 
 
 const entities: MapEntity[] = [
   {
+    kind: "unit",
     id: "hq",
     name: "HQ",
     layerId: "layer-tree",
@@ -15,6 +16,7 @@ const entities: MapEntity[] = [
     domain: "Ground",
   },
   {
+    kind: "unit",
     id: "alpha",
     name: "Alpha Company",
     layerId: "layer-tree",
@@ -23,6 +25,7 @@ const entities: MapEntity[] = [
     domain: "Ground",
   },
   {
+    kind: "unit",
     id: "bravo",
     name: "Bravo Company",
     layerId: "layer-tree",

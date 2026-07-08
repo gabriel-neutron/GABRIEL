@@ -11,6 +11,7 @@ const layer: Layer = {
 }
 
 const entity: MapEntity = {
+  kind: "unit",
   id: "entity-1",
   name: "1st Infantry Company",
   layerId: layer.id,

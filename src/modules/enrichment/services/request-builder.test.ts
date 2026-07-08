@@ -5,6 +5,7 @@ import type { DrawnGeometry, MapEntity } from "@/types/domain.types"
 
 function makeEntity(overrides: Partial<MapEntity> = {}): MapEntity {
   return {
+    kind: "unit",
     id: "e1",
     name: "1st Army",
     layerId: "layer1",

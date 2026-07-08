@@ -49,8 +49,8 @@ describe("selectPersistableSnapshot", () => {
       { id: "custom-1", name: "Custom", visible: true, kind: "custom" },
     ]
     const entities: MapEntity[] = [
-      { id: "e-osm", name: "On OSM layer", layerId: "osm-1", parentId: null },
-      { id: "e-custom", name: "On custom layer", layerId: "custom-1", parentId: null },
+      { kind: "unit", id: "e-osm", name: "On OSM layer", layerId: "osm-1", parentId: null },
+      { kind: "unit", id: "e-custom", name: "On custom layer", layerId: "custom-1", parentId: null },
     ]
     const drawnGeometries: DrawnGeometry[] = [
       { id: "g-osm", layerId: "osm-1", entityId: null, type: "point", lat: 0, lng: 0 },
@@ -78,7 +78,7 @@ describe("selectPersistableSnapshot", () => {
 
   it("trims blank entity and organisation names to 'Untitled'", () => {
     const layers: Layer[] = [{ id: "custom-1", name: "Custom", visible: true, kind: "custom" }]
-    const entities: MapEntity[] = [{ id: "e-1", name: "   ", layerId: "custom-1", parentId: null }]
+    const entities: MapEntity[] = [{ kind: "unit", id: "e-1", name: "   ", layerId: "custom-1", parentId: null }]
     const organisations: Organisation[] = [
       {
         id: "org-1",

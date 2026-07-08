@@ -4,6 +4,7 @@ import type { MapEntity } from "@/types/domain.types"
 
 const entities: MapEntity[] = [
   {
+    kind: "unit",
     id: "entity-1",
     name: "1st Brigade",
     type: "Land Unit",

@@ -4,6 +4,7 @@ import { MilitarySymbolNode, type MilitarySymbolNodeData } from "./MilitarySymbo
 import type { MapEntity } from "@/types/domain.types"
 
 const entity: MapEntity = {
+  kind: "unit",
   id: "entity-symbol",
   name: "Recon Platoon",
   layerId: "layer-tree",

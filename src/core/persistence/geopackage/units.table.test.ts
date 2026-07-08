@@ -30,6 +30,7 @@ describe("units.table", () => {
       try {
         createUnitsTable(geoPackage)
         const entity: MapEntity = {
+          kind: "unit",
           id: "e-1",
           name: "Test Unit",
           layerId: "layer-1",
@@ -70,7 +71,7 @@ describe("units.table", () => {
       const geoPackage = await createTestGeoPackage()
       try {
         createUnitsTable(geoPackage)
-        const entity: MapEntity = { id: "e-2", name: "Minimal Unit", layerId: "layer-1", parentId: null }
+        const entity: MapEntity = { kind: "unit", id: "e-2", name: "Minimal Unit", layerId: "layer-1", parentId: null }
         writeEntities(geoPackage, [entity])
         const [loaded] = readEntities(geoPackage)
 

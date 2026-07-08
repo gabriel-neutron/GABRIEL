@@ -1,4 +1,5 @@
 import type { LatLng } from "@/core/coordinates"
+import type { Entity } from "@/core/entity/entity"
 
 /**
  * Domain types for the application.
@@ -24,40 +25,15 @@ export type Layer = {
   sourceQuery?: string
 }
 
-/** Unit/entity in the project; persisted in GeoPackage `units` table. */
-export type MapEntity = {
-  id: string
-  name: string
-  /** Required: every entity sits on a layer. New geometry uses `getDefaultEntityLayerId` when picking a layer. */
-  layerId: string
-  parentId: string | null
-  /** Unit type for symbol derivation (e.g. infantry, armored, artillery). */
-  type?: string
-  /** Stored 20-digit SIDC when present; otherwise derived from type/echelon. */
-  natoSymbolCode?: string | null
-  /** Echelon for symbol amplifier (e.g. Division, Regiment). */
-  echelon?: string
-  /** Affiliation for frame (Friend, Hostile, etc.). */
-  affiliation?: "Friend" | "Hostile" | "Neutral" | "Unknown" | "Assumed Friend" | "Suspect"
-  /** Battle dimension (default Ground). */
-  domain?: "Ground" | "Air" | "Sea" | "Subsurface" | "Space"
-  /** OSM relation id (e.g. multipolygon for military base). */
-  osmRelationId?: number | null
-  /** Military unit identifier (MUN)*/
-  militaryUnitId?: string | null
-  /** Free-form notes. */
-  notes?: string | null
-  /** Sources for this entity as a newline-delimited list of URLs/citations. */
-  sources?: string | null
-  /** ISO timestamp of the latest completed batch analysis for this entity. */
-  analyzedAt?: string | null
-  /** How the entity is positioned: own geometry, linked to parent, or unknown. Defaults to "own". */
-  positionMode?: PositionMode
-  /** Whether the entity position is considered exact. Defaults to false. */
-  isExactPosition?: boolean
-}
+export type { Entity } from "@/core/entity/entity"
 
-export type PositionMode = "own" | "parent" | "none"
+/**
+ * @deprecated Use `Entity` (ADR 0004). Kept as an alias so existing call sites
+ * stay green — the runtime type is identical, just under its pre-generalisation name.
+ */
+export type MapEntity = Entity
+
+export type { PositionMode } from "@/core/entity/entity"
 
 /** An OSM node, way, or relation selected on the map for inspection. */
 export type SelectedOsmObject =

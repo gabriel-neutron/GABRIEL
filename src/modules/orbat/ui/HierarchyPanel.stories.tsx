@@ -6,6 +6,7 @@ import type { MapEntity } from "@/types/domain.types"
 
 const entities: MapEntity[] = [
   {
+    kind: "unit",
     id: "entity-hq",
     name: "HQ 1st Brigade",
     layerId: "layer-custom-1",
@@ -14,6 +15,7 @@ const entities: MapEntity[] = [
     domain: "Ground",
   },
   {
+    kind: "unit",
     id: "entity-l1",
     name: "1st Battalion",
     layerId: "layer-custom-1",
@@ -22,6 +24,7 @@ const entities: MapEntity[] = [
     domain: "Ground",
   },
   {
+    kind: "unit",
     id: "entity-l2",
     name: "A Company",
     layerId: "layer-custom-1",
@@ -30,6 +33,7 @@ const entities: MapEntity[] = [
     domain: "Ground",
   },
   {
+    kind: "unit",
     id: "entity-l3",
     name: "1st Platoon",
     layerId: "layer-custom-1",
@@ -38,6 +42,7 @@ const entities: MapEntity[] = [
     domain: "Ground",
   },
   {
+    kind: "unit",
     id: "entity-l4",
     name: "1st Squad",
     layerId: "layer-custom-1",
@@ -46,6 +51,7 @@ const entities: MapEntity[] = [
     domain: "Ground",
   },
   {
+    kind: "unit",
     id: "entity-l5",
     name: "Fire Team Alpha",
     layerId: "layer-custom-1",
@@ -54,6 +60,7 @@ const entities: MapEntity[] = [
     domain: "Ground",
   },
   {
+    kind: "unit",
     id: "entity-l6",
     name: "Marksman Cell",
     layerId: "layer-custom-1",
@@ -62,6 +69,7 @@ const entities: MapEntity[] = [
     domain: "Ground",
   },
   {
+    kind: "unit",
     id: "entity-b",
     name: "B Company",
     layerId: "layer-custom-1",
@@ -70,6 +78,7 @@ const entities: MapEntity[] = [
     domain: "Ground",
   },
   {
+    kind: "unit",
     id: "entity-log",
     name: "Logistics Detachment",
     layerId: "layer-custom-1",

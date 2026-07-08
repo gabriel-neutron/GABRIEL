@@ -93,7 +93,8 @@ Rule: a subject moves **with** its `./`-importing test and its `@/`-importing st
 
 ### Phase B — type rename (low-risk semantic, shimmed)
 
-- [ ] **B1** — `MapEntity → Entity` behind `export type MapEntity = Entity`; add `kind: "unit"` discriminant. 📎 ADR [0004](../adr/0004-entity-profile-tagged-union.md).
+- [x] **B1** — `MapEntity → Entity` behind `export type MapEntity = Entity`; add `kind: "unit"` discriminant. 📎 ADR [0004](../adr/0004-entity-profile-tagged-union.md).
+  > note: real definition landed at `core/entity/entity.ts`; `types/domain.types.ts` re-exports `Entity`/`PositionMode` and keeps `export type MapEntity = Entity` (marked `@deprecated`) so all 39 existing `@/types/domain.types` importers stay untouched, per the ADR's explicit intent. `kind` is a runtime-only discriminant, not a persisted column (`GpkgEntity`/the `units` table are unchanged) — `readEntities` in `units.table.ts` now injects `kind: "unit"` after `decodeRow` (order matters: spreading decodeRow's result *after* the literal would let TS's structural type silently "win" and overwrite it). ~30 entity object literals across 15 test/story files needed `kind: "unit"` added since it's a required field on the type — `tsc -b` was used to find every one exhaustively rather than trusting a grep sweep. `npm run verify` and `storybook build` both green; zero on-disk/behavioural change.
 - [ ] **B2** — Introduce `Profile` as a **flat** tagged union at the type level only (no storage change). 📎 ADR 0004 (*flat, not nested* — non-negotiable).
 
 ✅ **Phase B success criteria**

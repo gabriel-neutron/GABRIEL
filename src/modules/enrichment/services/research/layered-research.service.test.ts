@@ -12,6 +12,7 @@ const mockedRunEnrichment = vi.mocked(runEnrichment)
 function makeEntities(): MapEntity[] {
   return [
     {
+      kind: "unit",
       id: "entity-1",
       name: "Root",
       layerId: "layer-1",
@@ -92,7 +93,7 @@ describe("runLayeredResearch", () => {
 
 describe("buildBfsLayers", () => {
   function entity(id: string, parentId: string | null): MapEntity {
-    return { id, name: id, layerId: "layer-1", parentId }
+    return { kind: "unit", id, name: id, layerId: "layer-1", parentId }
   }
 
   it("treats an orphan (parentId set but absent) as a root, so it is still enriched", () => {

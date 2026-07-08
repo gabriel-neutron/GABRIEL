@@ -4,6 +4,7 @@ import type { MapEntity } from "@/types/domain.types"
 import type { EnrichmentProposal } from "@/types/enrichment.types"
 
 const baseEntity: MapEntity = {
+  kind: "unit",
   id: "e1",
   name: "Test",
   layerId: "l1",

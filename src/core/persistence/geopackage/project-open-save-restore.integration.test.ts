@@ -20,6 +20,7 @@ describe("project open/save/session-restore flow", () => {
     ]
     const entities: MapEntity[] = [
       {
+        kind: "unit",
         id: "e-1",
         name: "Headquarters Alpha",
         layerId: "custom-1",

@@ -85,7 +85,9 @@ export function readEntities(geoPackage: GeoPackage): MapEntity[] {
   const rows = geoPackage.connection.all(
     `SELECT ${buildSelectClause(unitColumns, availableColumns)} FROM ${UNITS_TABLE}`,
   ) as Record<string, unknown>[]
-  return rows.map((row) => decodeRow(unitColumns, row))
+  // `kind` is a runtime discriminant (ADR 0004), not a persisted column — every row in this
+  // table is a unit, so it's injected here rather than round-tripped through decodeRow.
+  return rows.map((row) => ({ ...decodeRow(unitColumns, row), kind: "unit" as const }))
 }
 
 export function writeEntities(geoPackage: GeoPackage, entities: MapEntity[]): void {
