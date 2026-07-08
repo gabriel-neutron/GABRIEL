@@ -8,21 +8,47 @@ import {
   insertRow,
   type ColumnDescriptor,
 } from "./columnDescriptor"
-import { decodePositionMode } from "./validation"
+import { decodeOrganisationType, decodePositionMode } from "./validation"
 
 export const UNITS_TABLE = "units"
 
 /**
- * `analyzed_at`, `position_mode`, and `is_exact_position` are `optional` because
- * they were added after the table's initial release — older projects may be
- * missing them, so `readEntities` feature-detects and falls back per-column.
+ * `analyzed_at`, `position_mode`, `is_exact_position`, and `kind` are `optional`
+ * because they were added after the table's initial release — older projects
+ * may be missing them, so `readEntities` feature-detects and falls back
+ * per-column. Every row predating `kind` was a unit (ADR 0004, E1) — the
+ * `organisations` table was where non-unit rows used to live.
+ *
+ * `kind` must be decoded before `type`/`osmRelationId`: both those columns are
+ * shared by `UnitProfile` and `CorporateProfile` with different validation
+ * rules per profile, and `DecodeContext.decoded` only has earlier-in-array
+ * props available.
  */
 export const unitColumns: ColumnDescriptor<MapEntity>[] = [
   { prop: "id", column: "id", sqlType: "TEXT", constraints: "PRIMARY KEY", encode: (v) => String(v ?? ""), decode: (raw) => String(raw ?? "") },
   { prop: "name", column: "name", sqlType: "TEXT", constraints: "NOT NULL", encode: (v) => String(v ?? ""), decode: (raw) => String(raw ?? "") },
   { prop: "layerId", column: "layer_id", sqlType: "TEXT", constraints: "NOT NULL", encode: (v) => String(v ?? ""), decode: (raw) => String(raw ?? "") },
   { prop: "parentId", column: "parent_id", sqlType: "TEXT", encode: (v) => (v != null ? String(v) : null), decode: (raw) => (raw != null ? String(raw) : null) },
-  { prop: "type", column: "type", sqlType: "TEXT", encode: (v) => (v != null ? String(v) : null), decode: (raw) => (raw != null ? String(raw) : undefined) },
+  {
+    prop: "kind",
+    column: "kind",
+    sqlType: "TEXT",
+    constraints: "NOT NULL DEFAULT 'unit'",
+    optional: true,
+    fallbackSql: "'unit'",
+    encode: (v) => String(v ?? "unit"),
+    decode: (raw) => (raw === "corporate" ? "corporate" : "unit"),
+  },
+  {
+    prop: "type",
+    column: "type",
+    sqlType: "TEXT",
+    encode: (v, row) => (row.kind === "corporate" ? String(v ?? "other") : (v != null ? String(v) : null)),
+    decode: (raw, ctx) =>
+      ctx.decoded.kind === "corporate"
+        ? decodeOrganisationType(raw)
+        : (raw != null ? String(raw) : undefined),
+  },
   { prop: "natoSymbolCode", column: "nato_symbol_code", sqlType: "TEXT", encode: (v) => (v != null ? String(v) : null), decode: (raw) => (raw != null ? String(raw) : null) },
   { prop: "echelon", column: "echelon", sqlType: "TEXT", encode: (v) => (v != null ? String(v) : null), decode: (raw) => (raw != null ? String(raw) : undefined) },
   {
@@ -85,9 +111,7 @@ export function readEntities(geoPackage: GeoPackage): MapEntity[] {
   const rows = geoPackage.connection.all(
     `SELECT ${buildSelectClause(unitColumns, availableColumns)} FROM ${UNITS_TABLE}`,
   ) as Record<string, unknown>[]
-  // `kind` is a runtime discriminant (ADR 0004), not a persisted column — every row in this
-  // table is a unit, so it's injected here rather than round-tripped through decodeRow.
-  return rows.map((row) => ({ ...decodeRow(unitColumns, row), kind: "unit" as const }))
+  return rows.map((row) => decodeRow(unitColumns, row))
 }
 
 export function writeEntities(geoPackage: GeoPackage, entities: MapEntity[]): void {
