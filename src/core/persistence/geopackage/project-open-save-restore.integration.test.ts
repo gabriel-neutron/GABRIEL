@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest"
 import { asLatLng } from "@/types/coordinates"
 import type { MapEntity } from "@/types/domain.types"
 import { applyGeoPackageResult, loadGeoPackage, saveGeoPackage, type GpkgGeometry, type GpkgLayer } from "./index"
-import { clearProject, loadProject, saveProject } from "../projectStorage.service"
+import { clearProject, loadProject, saveProject } from "@/services/projectStorage.service"
 
 describe("project open/save/session-restore flow", () => {
   beforeEach(async () => {

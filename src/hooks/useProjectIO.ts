@@ -8,7 +8,7 @@ import {
   type GpkgEntity,
   type GpkgOrganisation,
   type GpkgGeometry,
-} from "@/services/geopackage"
+} from "@/core/persistence/geopackage"
 import { INDUSTRY_LAYER_ID } from "@/types/organisation.types"
 import { loadProject, saveProject, clearProject, type LoadedProject } from "@/services/projectStorage.service"
 import { useProjectStore, selectPersistableSnapshot } from "@/store/useProjectStore"

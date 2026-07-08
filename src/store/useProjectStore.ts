@@ -1,6 +1,6 @@
 import { create } from "zustand"
 import { devtools } from "zustand/middleware"
-import { getDefaultEchelonLayers } from "@/services/geopackage"
+import { getDefaultEchelonLayers } from "@/core/persistence/geopackage"
 import type { Layer, MapEntity, DrawnGeometry, SelectedOsmObject } from "@/types/domain.types"
 import type { Organisation } from "@/types/organisation.types"
 import { INDUSTRY_LAYER_ID } from "@/types/organisation.types"
