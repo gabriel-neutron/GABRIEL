@@ -155,3 +155,52 @@ describe("useProjectStore claims cascade", () => {
     expect(useProjectStore.getState().claims.map((c) => c.id)).toEqual(["c-2"])
   })
 })
+
+describe("useProjectStore mergeEntities (ADR 0006, E3)", () => {
+  beforeEach(() => {
+    useProjectStore.getState().resetProject()
+  })
+
+  it("collapses the secondary into the primary atomically, preserving claims and geometries", () => {
+    useProjectStore.getState().setProject({
+      layers: [{ id: "custom-1", name: "Custom", visible: true, kind: "custom" }],
+      entities: [
+        { kind: "unit", id: "a", name: "Wagner", layerId: "custom-1", parentId: null },
+        { kind: "unit", id: "b", name: "Вагнер", layerId: "custom-1", parentId: null },
+        { kind: "unit", id: "child", name: "Sub", layerId: "custom-1", parentId: "b" },
+      ],
+      drawnGeometries: [
+        { id: "g-1", layerId: "custom-1", entityId: "b", type: "point", lat: 1, lng: 2 },
+      ],
+      claims: [
+        { id: "c-1", entityId: "b", field: "sources", value: null, sourceId: "src-1", credibility: null, timestamp: null },
+      ],
+      selectedEntityId: "b",
+    })
+    useProjectStore.getState().mergeEntities("a", "b")
+    const s = useProjectStore.getState()
+
+    expect(s.entities.map((e) => e.id).sort()).toEqual(["a", "child"])
+    expect(s.entities.find((e) => e.id === "a")!.aliases).toEqual(["Вагнер"])
+    expect(s.entities.find((e) => e.id === "child")!.parentId).toBe("a")
+    expect(s.drawnGeometries[0].entityId).toBe("a")
+    expect(s.claims[0].entityId).toBe("a")
+    // A selection pointing at the now-gone secondary follows the surviving primary.
+    expect(s.selectedEntityId).toBe("a")
+  })
+
+  it("is a no-op on a cross-kind merge", () => {
+    useProjectStore.getState().setProject({
+      layers: [{ id: "custom-1", name: "Custom", visible: true, kind: "custom" }],
+      entities: [
+        { kind: "unit", id: "a", name: "Wagner", layerId: "custom-1", parentId: null },
+        { kind: "corporate", id: "c", name: "Wagner", layerId: "industry", parentId: null, type: "other" },
+      ],
+      drawnGeometries: [],
+      claims: [],
+      selectedEntityId: null,
+    })
+    useProjectStore.getState().mergeEntities("a", "c")
+    expect(useProjectStore.getState().entities.map((e) => e.id).sort()).toEqual(["a", "c"])
+  })
+})

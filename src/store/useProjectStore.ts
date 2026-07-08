@@ -5,6 +5,7 @@ import type { Layer, MapEntity, DrawnGeometry } from "@/types/domain.types"
 import { INDUSTRY_LAYER_ID } from "@/types/organisation.types"
 import type { Claim } from "@/core/provenance/claim"
 import type { Source } from "@/core/provenance/source"
+import { mergeEntities as mergeIdentityGraph } from "@/core/identity/merge"
 
 // ---------------------------------------------------------------------------
 // State
@@ -66,6 +67,8 @@ export interface ProjectActions {
   addEntity(entity: MapEntity): void
   updateEntity(entityId: string, patch: Partial<MapEntity>): void
   deleteEntity(entityId: string): void
+  /** Collapse two records for one real-world entity into `primaryId` (ADR 0006, E3). */
+  mergeEntities(primaryId: string, secondaryId: string): void
 
   addGeometry(geom: DrawnGeometry): void
   deleteGeometry(geometryId: string): void
@@ -208,6 +211,23 @@ export const useProjectStore = create<ProjectState & ProjectActions>()(
           claims: s.claims.filter((c) => c.entityId !== entityId),
           selectedEntityId: s.selectedEntityId === entityId ? null : s.selectedEntityId,
         }), false, "deleteEntity")
+      },
+
+      mergeEntities(primaryId, secondaryId) {
+        set((s) => {
+          const { entities, claims, geometries } = mergeIdentityGraph(
+            { entities: s.entities, claims: s.claims, geometries: s.drawnGeometries },
+            primaryId,
+            secondaryId,
+          )
+          // The primary survives; a selection pointing at the now-gone secondary follows it.
+          return {
+            entities,
+            claims,
+            drawnGeometries: geometries,
+            selectedEntityId: s.selectedEntityId === secondaryId ? primaryId : s.selectedEntityId,
+          }
+        }, false, "mergeEntities")
       },
 
       addGeometry(geom) {
