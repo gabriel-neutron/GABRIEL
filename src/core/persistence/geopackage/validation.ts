@@ -15,6 +15,23 @@ export function decodeOrganisationType(raw: unknown): OrganisationType {
     : "other"
 }
 
+/**
+ * Decodes the JSON-encoded `aliases` column (ADR 0006 / E3). A missing, non-JSON, or
+ * wrong-shaped value decodes to `undefined` (never throws) — only an array of non-empty
+ * strings survives, mirroring the defaulting other decoders use for corrupt/future data.
+ */
+export function decodeAliases(raw: unknown): string[] | undefined {
+  if (typeof raw !== "string" || !raw) return undefined
+  try {
+    const parsed: unknown = JSON.parse(raw)
+    if (!Array.isArray(parsed)) return undefined
+    const aliases = parsed.filter((v): v is string => typeof v === "string" && v.trim().length > 0)
+    return aliases.length ? aliases : undefined
+  } catch {
+    return undefined
+  }
+}
+
 const VALID_LAYER_KINDS = new Set<NonNullable<Layer["kind"]>>(["echelon", "custom", "osm", "organisation"])
 
 export function decodeLayerKind(raw: unknown): Layer["kind"] {

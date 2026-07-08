@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { decodeLayerKind, decodeOrganisationType, decodePositionMode } from "./validation"
+import { decodeAliases, decodeLayerKind, decodeOrganisationType, decodePositionMode } from "./validation"
 
 describe("decodePositionMode", () => {
   it("passes through valid values", () => {
@@ -26,6 +26,25 @@ describe("decodeOrganisationType", () => {
     expect(decodeOrganisationType("bogus")).toBe("other")
     expect(decodeOrganisationType(null)).toBe("other")
     expect(decodeOrganisationType(undefined)).toBe("other")
+  })
+})
+
+describe("decodeAliases", () => {
+  it("parses a JSON array of non-empty strings", () => {
+    expect(decodeAliases('["Вагнер","PMC Wagner"]')).toEqual(["Вагнер", "PMC Wagner"])
+  })
+
+  it("returns undefined for missing, empty, non-array, or corrupt values", () => {
+    expect(decodeAliases(null)).toBeUndefined()
+    expect(decodeAliases("")).toBeUndefined()
+    expect(decodeAliases("[]")).toBeUndefined()
+    expect(decodeAliases('"a string"')).toBeUndefined()
+    expect(decodeAliases("not json")).toBeUndefined()
+    expect(decodeAliases(42)).toBeUndefined()
+  })
+
+  it("filters out non-string and blank entries", () => {
+    expect(decodeAliases('["ok", 1, "", "  ", "also ok"]')).toEqual(["ok", "also ok"])
   })
 })
 

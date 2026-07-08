@@ -8,7 +8,7 @@ import {
   insertRow,
   type ColumnDescriptor,
 } from "./columnDescriptor"
-import { decodeOrganisationType, decodePositionMode } from "./validation"
+import { decodeAliases, decodeOrganisationType, decodePositionMode } from "./validation"
 
 export const UNITS_TABLE = "units"
 
@@ -29,6 +29,17 @@ export const unitColumns: ColumnDescriptor<MapEntity>[] = [
   { prop: "name", column: "name", sqlType: "TEXT", constraints: "NOT NULL", encode: (v) => String(v ?? ""), decode: (raw) => String(raw ?? "") },
   { prop: "layerId", column: "layer_id", sqlType: "TEXT", constraints: "NOT NULL", encode: (v) => String(v ?? ""), decode: (raw) => String(raw ?? "") },
   { prop: "parentId", column: "parent_id", sqlType: "TEXT", encode: (v) => (v != null ? String(v) : null), decode: (raw) => (raw != null ? String(raw) : null) },
+  {
+    prop: "aliases",
+    column: "aliases",
+    sqlType: "TEXT",
+    optional: true,
+    fallbackSql: "NULL",
+    // ADR 0006 / E3: alternate names, JSON-encoded. `null` when absent/empty so an
+    // un-merged row stays clean; a corrupt value decodes back to undefined, never throws.
+    encode: (v) => (Array.isArray(v) && v.length ? JSON.stringify(v) : null),
+    decode: (raw) => decodeAliases(raw),
+  },
   {
     prop: "kind",
     column: "kind",

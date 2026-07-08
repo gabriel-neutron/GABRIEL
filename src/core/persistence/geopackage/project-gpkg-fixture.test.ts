@@ -82,6 +82,30 @@ describe("public/project.gpkg round-trip (real pre-E1 fixture)", () => {
   )
 
   it(
+    "persists merge aliases through a reopen-and-save against the real pre-E3 fixture (ADR 0006, E3)",
+    async () => {
+      // The real fixture predates the `aliases` column — this drives ensureOptionalColumns'
+      // ALTER path (reopen via baseBuffer), the exact shape E1.7's crash-on-save bug lived in.
+      const fileBytes = readFileSync(resolve(process.cwd(), "public/project.gpkg"))
+      const buffer = Uint8Array.from(fileBytes).buffer
+      const first = await loadGeoPackage(buffer)
+
+      const target = first.entities.find((e) => e.kind === "unit")!
+      const aliased = first.entities.map((e) =>
+        e.id === target.id ? { ...e, aliases: ["Вагнер", "PMC Wagner"] } : e,
+      )
+
+      const bytes = await saveGeoPackage(first.layers, aliased, first.geometries, first.sourceCache, buffer)
+      const second = await loadGeoPackage(Uint8Array.from(bytes).buffer)
+
+      expect(second.entities.find((e) => e.id === target.id)!.aliases).toEqual(["Вагнер", "PMC Wagner"])
+      // Every other row stays clean (undefined) — aliases are opt-in, not defaulted to [].
+      expect(second.entities.filter((e) => e.aliases != null)).toHaveLength(1)
+    },
+    60_000,
+  )
+
+  it(
     "derives Source/Claim provenance from the real fixture's legacy sources strings, and a double round-trip doesn't duplicate them (ADR 0006, E2 Slice A)",
     async () => {
       const buffer = Uint8Array.from(readFileSync(resolve(process.cwd(), "public/project.gpkg"))).buffer
