@@ -1,6 +1,6 @@
 import { GeoPackageAPI, type GeoPackage } from "@ngageoint/geopackage"
 import { readEntities, readLegacyUnitSourcesColumn } from "./units.table"
-import { migrateLegacyOrganisations, readLegacyOrganisationSources } from "./organisations.table"
+import { readOrganisations, organisationsToCorporateEntities, organisationSourcesMap } from "./organisations.table"
 import { readLayers } from "./layers.table"
 import { readGeometries } from "./geometries.table"
 import { readSourceCache } from "./researchSources.table"
@@ -17,21 +17,28 @@ export async function loadGeoPackage(buffer: ArrayBuffer): Promise<GeoPackageLoa
     const layers = readLayers(geoPackage)
     // Legacy organisations (pre-E1 files) fold into the same unified entities array,
     // tagged kind: "corporate" — see organisations.table.ts's migrateLegacyOrganisations.
-    const entities = [...readEntities(geoPackage), ...migrateLegacyOrganisations(geoPackage)]
+    // Read once and reused for both the entity mapping and the legacy sources map below
+    // (rather than calling migrateLegacyOrganisations + readLegacyOrganisationSources
+    // separately, which would scan/decode the same table twice on every load).
+    const unitEntities = readEntities(geoPackage)
+    const legacyOrganisations = readOrganisations(geoPackage)
+    const corporateEntities = organisationsToCorporateEntities(legacyOrganisations)
+    const entities = [...unitEntities, ...corporateEntities]
     const geometries = await readGeometries(geoPackage)
     const sourceCache = readSourceCache(geoPackage)
     // ADR 0006, E2.6: entity.sources no longer exists — derive from the legacy raw
     // sources columns on both units and organisations (the only two places a
     // pre-cutover file could have stored citations), merged with whatever provenance
-    // was already persisted from a prior save.
-    const legacySources = new Map([
-      ...readLegacyUnitSourcesColumn(geoPackage),
-      ...readLegacyOrganisationSources(geoPackage),
-    ])
-    const ledgerInputs: EntityLedgerInput[] = entities.map((e) => ({
-      id: e.id,
-      sources: legacySources.get(e.id) ?? null,
-    }))
+    // was already persisted from a prior save. Kept as two separate lookups rather
+    // than one merged Map: units and legacy organisations are independent tables with
+    // independently-assigned ids, and merging into one Map would silently drop one
+    // table's citation string on an (unenforced, if unlikely) id collision.
+    const unitLegacySources = readLegacyUnitSourcesColumn(geoPackage)
+    const organisationLegacySources = organisationSourcesMap(legacyOrganisations)
+    const ledgerInputs: EntityLedgerInput[] = [
+      ...unitEntities.map((e) => ({ id: e.id, sources: unitLegacySources.get(e.id) ?? null })),
+      ...corporateEntities.map((e) => ({ id: e.id, sources: organisationLegacySources.get(e.id) ?? null })),
+    ]
     const { sources, claims } = deriveProvenanceFromEntities(
       ledgerInputs,
       readProvenanceSources(geoPackage),

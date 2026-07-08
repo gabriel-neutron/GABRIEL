@@ -28,6 +28,7 @@ import { FindOsmAtPointDialog } from "@/modules/osm/ui/FindOsmAtPointDialog"
 import { useEntityInspector } from "@/modules/orbat/hooks/useEntityInspector"
 import { useProjectStore } from "@/store/useProjectStore"
 import { ReadOnlyField, SourcesList, LinkedGeometriesList } from "@/components/shared/InspectorFields"
+import type { AdmiraltyReliability } from "@/core/provenance/admiralty"
 
 const POSITION_MODE_OPTIONS: { value: PositionMode; label: string }[] = [
   { value: "own", label: "Own geometry" },
@@ -111,6 +112,7 @@ type EntityInspectorReadOnlyViewProps = {
   parentName: string | null
   linkedGeometries: DrawnGeometry[]
   sources: string[]
+  reliabilities: (AdmiraltyReliability | null)[]
   enrichedOverlay: Record<string, unknown>
 }
 
@@ -120,6 +122,7 @@ function EntityInspectorReadOnlyView({
   parentName,
   linkedGeometries,
   sources,
+  reliabilities,
   enrichedOverlay,
 }: EntityInspectorReadOnlyViewProps) {
   const isCorporate = entity.kind === "corporate"
@@ -140,7 +143,7 @@ function EntityInspectorReadOnlyView({
       )}
       {sources.length > 0 && (
         <ReadOnlyField label="Sources">
-          <SourcesList sources={sources} readOnly />
+          <SourcesList sources={sources} readOnly reliabilities={reliabilities} />
         </ReadOnlyField>
       )}
       <EnrichedSessionBlock overlay={enrichedOverlay} variant="readonly" />
@@ -255,6 +258,7 @@ export function EntityInspector({ readOnly = false, enrichedOverlay = {} }: Prop
         parentName={parentName}
         linkedGeometries={linkedGeometries}
         sources={sources}
+        reliabilities={reliabilities}
         enrichedOverlay={enrichedOverlay}
       />
     )

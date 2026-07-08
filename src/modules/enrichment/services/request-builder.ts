@@ -1,7 +1,7 @@
 import type { DrawnGeometry, MapEntity } from "@/types/domain.types"
 import type { EnrichmentRequest } from "@/types/enrichment.types"
 import type { Claim } from "@/core/provenance/claim"
-import { GENERAL_CITATION_FIELD } from "@/core/provenance/claim"
+import { filterCitationClaims } from "@/core/provenance/claim"
 import { toEnrichmentFeature, toEnrichmentContext } from "./enrichmentAdapters"
 import { buildDefaultEnrichmentPrompt } from "./promptTemplate"
 import { buildEnrichmentOutputSchema } from "./schema.fixtures"
@@ -25,9 +25,7 @@ export function buildEnrichmentRequest(
   const feature = toEnrichmentFeature(entity, drawnGeometries)
   const context = toEnrichmentContext(entity, entities)
   const prompt = opts?.prompt ?? buildDefaultEnrichmentPrompt(feature, context, opts?.poolHintUrls)
-  const hasExistingSources = (opts?.claims ?? []).some(
-    (c) => c.entityId === entity.id && c.field === GENERAL_CITATION_FIELD,
-  )
+  const hasExistingSources = filterCitationClaims(opts?.claims ?? [], entity.id).length > 0
   return {
     prompt,
     feature,

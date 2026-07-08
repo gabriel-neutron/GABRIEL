@@ -22,9 +22,10 @@ export interface GeoPackageLoadResult {
   /** URL → cached snippet map loaded from the `research_sources` table. Empty map for older projects. */
   sourceCache: Map<string, string>
   /**
-   * First-class provenance records (ADR 0006, E2 Slice A) — additive alongside the still-
-   * authoritative `entity.sources` string, derived from it on every load if not already
-   * persisted. Not yet the source of truth for UI rendering (that's Slice B).
+   * First-class provenance records (ADR 0006). `entity.sources` no longer exists (removed
+   * in Slice B, E2.6) — these are the sole source of truth for every consumer, derived on
+   * every load from the legacy raw `sources` columns (units/organisations) if not already
+   * persisted, merged idempotently with whatever was already persisted from a prior save.
    */
   sources: GpkgSource[]
   claims: GpkgClaim[]

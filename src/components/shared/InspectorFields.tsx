@@ -2,9 +2,7 @@ import type { ReactNode } from "react"
 import { Trash2 } from "lucide-react"
 import { Button } from "@/ui/button"
 import type { DrawnGeometry } from "@/types/domain.types"
-import type { AdmiraltyReliability } from "@/core/provenance/admiralty"
-
-const RELIABILITY_OPTIONS: AdmiraltyReliability[] = ["A", "B", "C", "D", "E", "F"]
+import { RELIABILITY_RATINGS, type AdmiraltyReliability } from "@/core/provenance/admiralty"
 
 function isUrl(value: string): boolean {
   return /^https?:\/\//i.test(value.trim())
@@ -71,6 +69,14 @@ export function SourcesList({
               </span>
             )}
           </div>
+          {readOnly && reliabilities?.[index] != null && (
+            <span
+              title="ADMIRALTY reliability rating"
+              className="h-7 shrink-0 rounded border bg-muted px-1.5 text-xs font-medium leading-7"
+            >
+              {reliabilities[index]}
+            </span>
+          )}
           {!readOnly && onRate != null && (
             <select
               value={reliabilities?.[index] ?? ""}
@@ -80,7 +86,7 @@ export function SourcesList({
               className="h-7 shrink-0 rounded border bg-background px-1 text-xs"
             >
               <option value="">—</option>
-              {RELIABILITY_OPTIONS.map((r) => (
+              {RELIABILITY_RATINGS.map((r) => (
                 <option key={r} value={r}>{r}</option>
               ))}
             </select>

@@ -1,10 +1,10 @@
-import { useEffect, useRef } from "react"
+import { useEffect, useMemo, useRef } from "react"
 import { Button } from "@/ui/button"
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/ui/dialog"
 import { shouldSkipEntity } from "@/modules/enrichment/services/research/entity-richness"
 import type { MapEntity } from "@/types/domain.types"
 import type { Claim } from "@/core/provenance/claim"
-import { GENERAL_CITATION_FIELD } from "@/core/provenance/claim"
+import { groupCitationClaimsByEntityId } from "@/core/provenance/claim"
 import type { EntityResearchStatus } from "@/modules/enrichment/hooks/useLayeredResearch"
 import type { LayeredResearchResult } from "@/modules/enrichment/services/research/layered-research.service"
 
@@ -139,10 +139,20 @@ export function ResearchDialog({
   const isRunning = runStatus === "running"
   const totalTokens = totalUsage.inputTokens + totalUsage.outputTokens
   const progressPct = progress ? Math.round(((progress.done + 1) / progress.total) * 100) : 0
-  const eligibleEntities = entities.filter(
-    (entity) =>
-      !shouldSkipEntity(entity, claims, richnessThreshold) &&
-      !isAnalyzedRecently(entity, skipAnalyzedWithinDays),
+
+  // Grouped once per `claims` change instead of re-filtering the full array per entity
+  // per render — this dialog is always mounted (MainLayout renders it unconditionally,
+  // not gated by `open`), so an unmemoized per-entity claims.filter() here used to be
+  // an O(entities x claims) computation re-run on every unrelated store mutation.
+  const claimsByEntityId = useMemo(() => groupCitationClaimsByEntityId(claims), [claims])
+  const eligibleEntities = useMemo(
+    () =>
+      entities.filter(
+        (entity) =>
+          !shouldSkipEntity(entity, claimsByEntityId.get(entity.id) ?? [], richnessThreshold) &&
+          !isAnalyzedRecently(entity, skipAnalyzedWithinDays),
+      ),
+    [entities, claimsByEntityId, richnessThreshold, skipAnalyzedWithinDays],
   )
   const hasEligibleEntities = eligibleEntities.length > 0
 
@@ -280,9 +290,7 @@ export function ResearchDialog({
                   {eligibleEntities.map((entity) => {
                     const st = entityStatuses[entity.id]
                     const isCurrentEntity = progress?.entityId === entity.id
-                    const sourceCount = claims.filter(
-                      (c) => c.entityId === entity.id && c.field === GENERAL_CITATION_FIELD,
-                    ).length
+                    const sourceCount = claimsByEntityId.get(entity.id)?.length ?? 0
                     return (
                       <tr
                         key={entity.id}

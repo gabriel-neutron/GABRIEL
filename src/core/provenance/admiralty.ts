@@ -6,7 +6,9 @@ export type AdmiraltyReliability = "A" | "B" | "C" | "D" | "E" | "F"
 /** NATO STANAG 2511 (ADMIRALTY) information-credibility rating. */
 export type AdmiraltyCredibility = 1 | 2 | 3 | 4 | 5 | 6
 
-const RELIABILITY_VALUES = new Set<AdmiraltyReliability>(["A", "B", "C", "D", "E", "F"])
+/** The closed ADMIRALTY reliability rating set, in canonical order (best to worst) — the single definition consumers (e.g. a rating `<select>`) should iterate rather than hand-copying. */
+export const RELIABILITY_RATINGS: AdmiraltyReliability[] = ["A", "B", "C", "D", "E", "F"]
+const RELIABILITY_VALUES = new Set<AdmiraltyReliability>(RELIABILITY_RATINGS)
 const CREDIBILITY_VALUES = new Set<AdmiraltyCredibility>([1, 2, 3, 4, 5, 6])
 
 /** A persisted value outside the closed rating set (corrupt/future file) defaults to null. */

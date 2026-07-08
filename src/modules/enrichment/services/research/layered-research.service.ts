@@ -8,7 +8,6 @@ import { runEnrichment } from "@/modules/enrichment/services/enrichment.service"
 import { buildEnrichmentRequest } from "@/modules/enrichment/services/request-builder"
 import type { Claim } from "@/core/provenance/claim"
 import type { Source } from "@/core/provenance/source"
-import { projectEntityLedger } from "@/core/provenance/ledgerProjection"
 import {
   createLayeredResearchProviderBundle,
   type ProviderBundle,
@@ -101,6 +100,35 @@ function isAbortError(error: unknown): boolean {
   )
 }
 
+function groupClaimsByEntityId(claims: Claim[]): Map<string, Claim[]> {
+  const byEntityId = new Map<string, Claim[]>()
+  for (const claim of claims) {
+    const list = byEntityId.get(claim.entityId)
+    if (list) list.push(claim)
+    else byEntityId.set(claim.entityId, [claim])
+  }
+  return byEntityId
+}
+
+/**
+ * Same dedup-by-URL semantics as `core/provenance/ledgerProjection.ts::projectEntityLedger`,
+ * but takes claims already pre-filtered to one entity and a pre-built `sourceById` map —
+ * both computed once outside the BFS loop below rather than re-scanned per entity, which
+ * would otherwise make every batch O(entities x claims) + O(entities x sources) on the
+ * main thread between each entity's (awaited) network call.
+ */
+function projectLedgerUrls(entityClaims: Claim[], sourceById: Map<string, Source>): string[] {
+  const seen = new Set<string>()
+  const urls: string[] = []
+  for (const claim of entityClaims) {
+    const source = sourceById.get(claim.sourceId)
+    if (!source || seen.has(source.url)) continue
+    seen.add(source.url)
+    urls.push(source.url)
+  }
+  return urls
+}
+
 /**
  * Runs enrichment for all entities in BFS order (parent → children).
  *
@@ -120,6 +148,8 @@ export async function runLayeredResearch(
   const sourceCache = options.sourceCache ?? new Map<string, string>()
   const claims = options.claims ?? []
   const sources = options.sources ?? []
+  const claimsByEntityId = groupClaimsByEntityId(claims)
+  const sourceById = new Map(sources.map((s) => [s.id, s]))
   const delayMs = options.delayBetweenEntitiesMs ?? 500
   const richnessThreshold = options.richnessThreshold ?? DEFAULT_RICHNESS_THRESHOLD
   const maxEntities = options.maxEntities ?? Infinity
@@ -164,8 +194,10 @@ export async function runLayeredResearch(
         continue
       }
 
+      const entityClaims = claimsByEntityId.get(entity.id) ?? []
+
       // Skip richly-sourced entities
-      if (shouldSkipEntity(entity, claims, richnessThreshold)) {
+      if (shouldSkipEntity(entity, entityClaims, richnessThreshold)) {
         skippedRichEntityIds.push(entity.id)
         continue
       }
@@ -189,10 +221,10 @@ export async function runLayeredResearch(
       })
 
       try {
-        const poolHintUrls = projectEntityLedger(entity.id, claims, sources)
+        const poolHintUrls = projectLedgerUrls(entityClaims, sourceById)
 
         const { response, usage } = await runEnrichment(
-          buildEnrichmentRequest(entity, entities, drawnGeometries, { poolHintUrls, claims }),
+          buildEnrichmentRequest(entity, entities, drawnGeometries, { poolHintUrls, claims: entityClaims }),
           { providers: bundle, signal: options.signal },
         )
 

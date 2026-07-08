@@ -4,7 +4,7 @@ import type { SymbolAffiliation, SymbolDomain, SymbolEchelon } from "@/types/sym
 import type { OrganisationType } from "@/types/organisation.types"
 import { useProjectStore } from "@/store/useProjectStore"
 import { useProvenanceStore } from "@/store/useProvenanceStore"
-import { GENERAL_CITATION_FIELD, type Claim } from "@/core/provenance/claim"
+import { createCitationClaim, filterCitationClaims, type Claim } from "@/core/provenance/claim"
 import type { AdmiraltyReliability } from "@/core/provenance/admiralty"
 
 function detectEchelonFromName(name: string): SymbolEchelon | null {
@@ -54,17 +54,19 @@ export type EntityInspectorState = {
 }
 
 export function useEntityInspector(): EntityInspectorState {
-  const {
-    selectedEntityId,
-    entities,
-    layers,
-    drawnGeometries,
-    claims,
-    updateEntity,
-    deleteGeometry,
-    addClaims,
-    removeClaim,
-  } = useProjectStore()
+  // Granular selectors (CONSTRAINTS.md: no leaf selects the whole root) — a whole-store
+  // useProjectStore() here would re-render this hook (and its entityClaims/resolvedClaims/
+  // sources/reliabilities memo chain) on every mutation anywhere in the store, not just
+  // ones relevant to the inspected entity's claims.
+  const selectedEntityId = useProjectStore((s) => s.selectedEntityId)
+  const entities = useProjectStore((s) => s.entities)
+  const layers = useProjectStore((s) => s.layers)
+  const drawnGeometries = useProjectStore((s) => s.drawnGeometries)
+  const claims = useProjectStore((s) => s.claims)
+  const updateEntity = useProjectStore((s) => s.updateEntity)
+  const deleteGeometry = useProjectStore((s) => s.deleteGeometry)
+  const addClaims = useProjectStore((s) => s.addClaims)
+  const removeClaim = useProjectStore((s) => s.removeClaim)
   const provenanceSources = useProvenanceStore((s) => s.sources)
   const mergeUrls = useProvenanceStore((s) => s.mergeUrls)
   const rateSourceReliability = useProvenanceStore((s) => s.rateSourceReliability)
@@ -107,10 +109,7 @@ export function useEntityInspector(): EntityInspectorState {
   // position. Two manually-added duplicate URLs must stay two distinct, independently
   // removable rows (the deliberate asymmetry vs. the AI-accept flow, which does dedupe).
   const entityClaims: Claim[] = useMemo(
-    () =>
-      entity
-        ? claims.filter((c) => c.entityId === entity.id && c.field === GENERAL_CITATION_FIELD)
-        : [],
+    () => (entity ? filterCitationClaims(claims, entity.id) : []),
     [entity, claims],
   )
   // sources/reliabilities/entityClaims (after the `sources` filter below) stay
@@ -214,17 +213,7 @@ export function useEntityInspector(): EntityInspectorState {
     const merged = mergeUrls([value])
     const source = merged.find((s) => s.url === value)
     if (!source) return
-    addClaims([
-      {
-        id: crypto.randomUUID(),
-        entityId: entity.id,
-        field: GENERAL_CITATION_FIELD,
-        value: null,
-        sourceId: source.id,
-        credibility: null,
-        timestamp: null,
-      },
-    ])
+    addClaims([createCitationClaim(entity.id, source.id)])
     setNewSource("")
   }, [entity, newSource, mergeUrls, addClaims])
 

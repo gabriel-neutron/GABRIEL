@@ -3,7 +3,7 @@ import type { MapEntity } from "@/types/domain.types"
 import type { EnrichmentProposal } from "@/types/enrichment.types"
 import { parse } from "@/core/provenance/ledger"
 import { dedupeSources, type Source } from "@/core/provenance/source"
-import { GENERAL_CITATION_FIELD, type Claim } from "@/core/provenance/claim"
+import { createCitationClaim, type Claim } from "@/core/provenance/claim"
 import { projectEntityLedger } from "@/core/provenance/ledgerProjection"
 import { selectTopCitations } from "@/modules/enrichment/services/citation-rating"
 
@@ -70,15 +70,7 @@ export function buildAcceptedPatch(args: {
     for (const url of trulyNewUrls) {
       const source = sourceByUrl.get(url)
       if (!source) continue
-      newClaims.push({
-        id: crypto.randomUUID(),
-        entityId: entity.id,
-        field: GENERAL_CITATION_FIELD,
-        value: null,
-        sourceId: source.id,
-        credibility: null,
-        timestamp: null,
-      })
+      newClaims.push(createCitationClaim(entity.id, source.id))
     }
   }
 

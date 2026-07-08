@@ -63,14 +63,11 @@ export function readOrganisations(geoPackage: GeoPackage): Organisation[] {
   return rows.map((row) => decodeRow(organisationColumns, row))
 }
 
-/**
- * Migration-on-read (E1, ADR 0004): folds a legacy `organisations` table's rows into the
- * unified `Entity` shape, tagged `kind: "corporate"` and pinned to the fixed synthetic
- * `INDUSTRY_LAYER_ID` layer (organisations never had their own `layerId`). Returns `[]`
- * for any file that already migrated (no `organisations` table) or never had one.
- */
-export function migrateLegacyOrganisations(geoPackage: GeoPackage): MapEntity[] {
-  return readOrganisations(geoPackage).map((o): MapEntity => ({
+/** Pure mapping half of `migrateLegacyOrganisations`, split out so a caller that already
+ *  has the rows (e.g. `load.ts`, deriving both entities and legacy sources) can reuse
+ *  them instead of paying a second `readOrganisations` table scan. */
+export function organisationsToCorporateEntities(organisations: Organisation[]): MapEntity[] {
+  return organisations.map((o): MapEntity => ({
     kind: "corporate",
     id: o.id,
     name: o.name,
@@ -85,6 +82,26 @@ export function migrateLegacyOrganisations(geoPackage: GeoPackage): MapEntity[] 
 }
 
 /**
+ * Migration-on-read (E1, ADR 0004): folds a legacy `organisations` table's rows into the
+ * unified `Entity` shape, tagged `kind: "corporate"` and pinned to the fixed synthetic
+ * `INDUSTRY_LAYER_ID` layer (organisations never had their own `layerId`). Returns `[]`
+ * for any file that already migrated (no `organisations` table) or never had one.
+ */
+export function migrateLegacyOrganisations(geoPackage: GeoPackage): MapEntity[] {
+  return organisationsToCorporateEntities(readOrganisations(geoPackage))
+}
+
+/** Pure mapping half of `readLegacyOrganisationSources` — see `organisationsToCorporateEntities`
+ *  for why this is split from its own table read. */
+export function organisationSourcesMap(organisations: Organisation[]): Map<string, string> {
+  const result = new Map<string, string>()
+  for (const o of organisations) {
+    if (o.sources) result.set(o.id, o.sources)
+  }
+  return result
+}
+
+/**
  * Raw read of the legacy `organisations` table's `sources` string column, keyed by
  * entity id (ADR 0006, E2.6) — the corporate-entity sibling of `units.table.ts`'s
  * `readLegacyUnitSourcesColumn`. `migrateLegacyOrganisations` no longer copies `sources`
@@ -93,11 +110,7 @@ export function migrateLegacyOrganisations(geoPackage: GeoPackage): MapEntity[] 
  * derivation in `load.ts`.
  */
 export function readLegacyOrganisationSources(geoPackage: GeoPackage): Map<string, string> {
-  const result = new Map<string, string>()
-  for (const o of readOrganisations(geoPackage)) {
-    if (o.sources) result.set(o.id, o.sources)
-  }
-  return result
+  return organisationSourcesMap(readOrganisations(geoPackage))
 }
 
 /**

@@ -1,6 +1,6 @@
 import type { MapEntity } from "@/types/domain.types"
 import type { Claim } from "@/core/provenance/claim"
-import { GENERAL_CITATION_FIELD } from "@/core/provenance/claim"
+import { filterCitationClaims } from "@/core/provenance/claim"
 
 /**
  * Default richness threshold. An entity scoring >= this value is considered
@@ -17,9 +17,7 @@ export const DEFAULT_RICHNESS_THRESHOLD = 6
  * where a raw-string split counted duplicate lines too.
  */
 export function computeEntityRichness(entity: MapEntity, claims: Claim[]): number {
-  const sourceCount = claims.filter(
-    (c) => c.entityId === entity.id && c.field === GENERAL_CITATION_FIELD,
-  ).length
+  const sourceCount = filterCitationClaims(claims, entity.id).length
   let score = sourceCount * 2
   if (entity.notes?.trim()) score += 1
   if (entity.militaryUnitId?.trim()) score += 1
