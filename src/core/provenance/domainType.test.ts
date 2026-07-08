@@ -1,0 +1,44 @@
+import { describe, expect, it } from "vitest"
+import { getDomainTypeFromUrl } from "./domainType"
+
+describe("getDomainTypeFromUrl", () => {
+  it("classifies wikipedia", () => {
+    expect(getDomainTypeFromUrl("https://en.wikipedia.org/wiki/Test")).toBe("wikipedia")
+  })
+
+  it("classifies government and military domains as official", () => {
+    expect(getDomainTypeFromUrl("https://army.mil")).toBe("official")
+    expect(getDomainTypeFromUrl("https://state.gov")).toBe("official")
+    expect(getDomainTypeFromUrl("https://mil.ru")).toBe("official")
+  })
+
+  it("classifies known OSINT domains", () => {
+    expect(getDomainTypeFromUrl("https://www.bellingcat.com/x")).toBe("osint")
+    expect(getDomainTypeFromUrl("https://www.oryxspioenkop.com/x")).toBe("osint")
+    expect(getDomainTypeFromUrl("https://uawardata.com/x")).toBe("osint")
+  })
+
+  it("classifies social platforms", () => {
+    expect(getDomainTypeFromUrl("https://vk.com/wall1")).toBe("social")
+    expect(getDomainTypeFromUrl("https://telegram.me/somechannel")).toBe("social")
+  })
+
+  it("classifies forums", () => {
+    expect(getDomainTypeFromUrl("https://reddit.com/r/test")).toBe("forum")
+    expect(getDomainTypeFromUrl("https://some.forum.example/thread")).toBe("forum")
+  })
+
+  it("classifies known news domains", () => {
+    expect(getDomainTypeFromUrl("https://www.bbc.com/news")).toBe("news")
+    expect(getDomainTypeFromUrl("https://www.rferl.org/a")).toBe("news")
+    expect(getDomainTypeFromUrl("https://meduza.io/news")).toBe("news")
+  })
+
+  it("falls back to web for an unrecognized domain", () => {
+    expect(getDomainTypeFromUrl("https://example.com/page")).toBe("web")
+  })
+
+  it("falls back to web for an unparseable URL rather than throwing", () => {
+    expect(getDomainTypeFromUrl("not a url")).toBe("web")
+  })
+})

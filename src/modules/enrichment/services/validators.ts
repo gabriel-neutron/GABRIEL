@@ -8,7 +8,10 @@ import type {
   UnresolvedReason,
 } from "@/types/enrichment.types"
 import { ENRICHMENT_DOMAIN_TYPES } from "@/types/enrichment.types"
+import { getDomainTypeFromUrl } from "@/core/provenance/domainType"
 import { ENRICHMENT_MAX_DEPTH_HARD_LIMIT } from "./enrichment.constants"
+
+export { getDomainTypeFromUrl }
 
 /** Minimum URLs attached to each accepted proposal (citation contract). */
 export const MIN_SOURCES_PER_PROPOSAL = 1
@@ -31,35 +34,6 @@ export function isValidAbsoluteUrl(value: string): boolean {
   } catch {
     return false
   }
-}
-
-export function getDomainTypeFromUrl(url: string): SourceDomainType {
-  let hostname = ""
-  try {
-    hostname = new URL(url).hostname.toLowerCase()
-  } catch {
-    return "web"
-  }
-
-  if (hostname.endsWith("wikipedia.org")) return "wikipedia"
-  if (hostname.endsWith("mil.ru") || hostname.endsWith(".gov") || hostname.endsWith(".mil")) return "official"
-  if (
-    hostname.endsWith("bellingcat.com") ||
-    hostname.endsWith("oryxspioenkop.com") ||
-    hostname.endsWith("uawardata.com")
-  ) {
-    return "osint"
-  }
-  if (hostname.endsWith("vk.com") || hostname.includes("telegram")) return "social"
-  if (hostname.includes("reddit.com") || hostname.includes("forum")) return "forum"
-  if (
-    hostname.endsWith("bbc.com") ||
-    hostname.endsWith("rferl.org") ||
-    hostname.endsWith("meduza.io")
-  ) {
-    return "news"
-  }
-  return "web"
 }
 
 export function getAuthorityWeight(domainType: SourceDomainType): number {
