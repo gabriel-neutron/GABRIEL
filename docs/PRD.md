@@ -95,5 +95,7 @@ Analysts who want to share a snapshot of their work. They access the deployed re
   point) to make permalink sharing easier, rather than an in-app toggle?
 - Should the enrichment country/region focus (currently implicit in the OpenAI system prompt)
   become a per-project setting exposed in the UI?
-- **Resolved:** `reactflow` is unused in the UI and is slated for removal to reduce bundle size,
-  as part of the Stream-1 dead-code cleanup (`timelines/ROADMAP.md`).
+- **Corrected (was wrongly marked resolved):** `reactflow` is *not* unused — it renders the live
+  "Hierarchy" tab (`modules/orbat/ui/TreeView.tsx`, `MilitarySymbolNode.tsx`), reachable from both
+  `EditPage` and `ViewPage` via `AppShell`'s map/tree toggle. This note was inaccurate since it was
+  first written; see `timelines/ROADMAP.md` item A10 for the correction and the blocked status.
