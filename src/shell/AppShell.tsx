@@ -34,7 +34,6 @@ type Props = {
   headerSecondarySlot?: ReactNode
   headerMenuSlot?: ReactNode
   selectedEntityId: string | null
-  selectedOrganisationId?: string | null
   selectedOsmObject?: { type: "node" | "way" | "relation"; id: number } | null
   onCloseDetail: () => void
   busy: boolean
@@ -69,7 +68,6 @@ export function AppShell({
   headerSecondarySlot,
   headerMenuSlot,
   selectedEntityId,
-  selectedOrganisationId,
   selectedOsmObject,
   onCloseDetail,
   busy,
@@ -86,7 +84,7 @@ export function AppShell({
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const { theme } = useTheme()
   const isMobile = useIsMobile()
-  const rightPanelOpen = selectedEntityId !== null || selectedOrganisationId != null || selectedOsmObject !== null
+  const rightPanelOpen = selectedEntityId !== null || selectedOsmObject !== null
 
   useEffect(() => {
     if (rightPanelOpen) setMobileDetailOpen(true)

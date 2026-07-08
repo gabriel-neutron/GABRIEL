@@ -2,9 +2,9 @@ import { useMemo, useLayoutEffect, useState } from "react"
 import L from "leaflet"
 import { Marker, Popup } from "react-leaflet"
 import { makeOrganisationIcon } from "@/modules/orbat/services/organisation-icons"
-import { computeAllOrganisationPositions } from "@/core/map/geometry"
+import { computeAllEntityPositions } from "@/core/map/geometry"
 import { useProjectStore } from "@/store/useProjectStore"
-import { INDUSTRY_LAYER_ID } from "@/types/organisation.types"
+import { INDUSTRY_LAYER_ID, type OrganisationType } from "@/types/organisation.types"
 import type { LatLng } from "@/core/coordinates"
 import type { MapBounds } from "@/core/map/MapBoundsReporter"
 
@@ -23,12 +23,13 @@ export function OrganisationsLayer({
   mapBounds,
   interactive = true,
 }: Props): React.ReactElement {
-  const organisations = useProjectStore((s) => s.organisations)
+  const allEntities = useProjectStore((s) => s.entities)
+  const organisations = useMemo(() => allEntities.filter((e) => e.kind === "corporate"), [allEntities])
   const drawnGeometries = useProjectStore((s) => s.drawnGeometries)
 
   const positionMap = useMemo(() => {
-    const all = computeAllOrganisationPositions(organisations, drawnGeometries)
-    return new Map(all.map(({ organisation, position }) => [organisation.id, position]))
+    const all = computeAllEntityPositions(organisations, drawnGeometries)
+    return new Map(all.map(({ entity, position }) => [entity.id, position]))
   }, [organisations, drawnGeometries])
 
   const visible = useMemo(() => {
@@ -59,7 +60,9 @@ export function OrganisationsLayer({
       visibleInBounds.map(({ org, position }) => ({
         org,
         position,
-        cacheKey: org.type,
+        // Corporate entities always carry a type (CorporateProfile.type is required); the
+        // fallback only guards Entity's necessarily-widened `type?: string` at the type level.
+        cacheKey: (org.type as OrganisationType | undefined) ?? "other",
       })),
     [visibleInBounds],
   )
@@ -71,7 +74,7 @@ export function OrganisationsLayer({
       const next = new Map<string, L.Icon>()
       for (const item of markerItems) {
         let icon = prev.get(item.cacheKey)
-        if (!icon) icon = makeOrganisationIcon(item.org.type)
+        if (!icon) icon = makeOrganisationIcon(item.cacheKey)
         next.set(item.cacheKey, icon)
       }
       return next

@@ -1,16 +1,21 @@
 import { GeoPackageAPI, type GeoPackage } from "@ngageoint/geopackage"
 import { UNITS_TABLE, createUnitsTable, writeEntities } from "./units.table"
-import { ORGANISATIONS_TABLE, createOrganisationsTable, writeOrganisations } from "./organisations.table"
 import { LAYERS_TABLE, createLayersTable, writeLayers } from "./layers.table"
 import { GEOMETRIES_TABLE, createGeometriesTable, writeGeometries } from "./geometries.table"
 import { RESEARCH_SOURCES_TABLE, createResearchSourcesTable, writeSourceCache } from "./researchSources.table"
 import { createGeoPackageWithRetry } from "./browserSaveFile"
-import type { GpkgLayer, GpkgEntity, GpkgOrganisation, GpkgGeometry } from "./types"
+import type { GpkgLayer, GpkgEntity, GpkgGeometry } from "./types"
 
+/**
+ * A legacy `organisations` table (pre-E1, ADR 0004) is never re-created or written to —
+ * every corporate entity is folded into `entities` and persisted through `units` (with
+ * its `kind` column) instead. An old file's `organisations` table, if present, is left
+ * in place untouched as harmless orphaned schema debris rather than dropped, to avoid
+ * adding an extra, untested destructive step to the save path for a cosmetic win.
+ */
 export async function saveGeoPackage(
   layers: GpkgLayer[],
   entities: GpkgEntity[],
-  organisations: GpkgOrganisation[],
   geometries: GpkgGeometry[],
   researchSources?: Map<string, string>,
   baseBuffer?: ArrayBuffer,
@@ -25,14 +30,12 @@ export async function saveGeoPackage(
 
     createLayersTable(geoPackage)
     createUnitsTable(geoPackage)
-    createOrganisationsTable(geoPackage)
     createGeometriesTable(geoPackage)
     createResearchSourcesTable(geoPackage)
 
     // Replace persisted app data with the current in-memory project snapshot.
     geoPackage.connection.run(`DELETE FROM ${LAYERS_TABLE}`)
     geoPackage.connection.run(`DELETE FROM ${UNITS_TABLE}`)
-    geoPackage.connection.run(`DELETE FROM ${ORGANISATIONS_TABLE}`)
     geoPackage.connection.run(`DELETE FROM ${GEOMETRIES_TABLE}`)
     geoPackage.connection.run(`DELETE FROM ${RESEARCH_SOURCES_TABLE}`)
 
@@ -41,8 +44,6 @@ export async function saveGeoPackage(
     writeLayers(geoPackage, layers)
 
     writeEntities(geoPackage, entities)
-
-    writeOrganisations(geoPackage, organisations)
 
     writeGeometries(geoPackage, geometries)
 

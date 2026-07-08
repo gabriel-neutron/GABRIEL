@@ -3,7 +3,6 @@ import { GeoPackageAPI } from "@ngageoint/geopackage"
 import { describe, expect, it, afterEach } from "vitest"
 import { toLeafletCoord, toGeoJsonCoord, asLatLng } from "@/core/coordinates"
 import type { MapEntity } from "@/types/domain.types"
-import type { Organisation } from "@/types/organisation.types"
 import { loadGeoPackage, saveGeoPackage, type GpkgLayer } from "./index"
 import type { GpkgGeometry } from "./index"
 
@@ -61,7 +60,7 @@ describe("coordinate round-trip", () => {
         ["https://example.org/source-b", "cached snippet B"],
       ])
 
-      const bytes = await saveGeoPackage(layers, entities, [], geometries, sourceCache)
+      const bytes = await saveGeoPackage(layers, entities, geometries, sourceCache)
       const persistedBuffer = Uint8Array.from(bytes).buffer
       const loaded = await loadGeoPackage(persistedBuffer)
 
@@ -100,14 +99,16 @@ describe("coordinate round-trip", () => {
   )
 
   it(
-    "saveGeoPackage -> loadGeoPackage round-trips organisations",
+    "saveGeoPackage -> loadGeoPackage round-trips corporate entities (kind: 'corporate')",
     async () => {
       const layers: GpkgLayer[] = [{ id: "industry", name: "Industry", visible: true, kind: "organisation" }]
-      const organisations: Organisation[] = [
+      const entities: MapEntity[] = [
         {
+          kind: "corporate",
           id: "org-1",
           name: "Test Holding",
           type: "holding",
+          layerId: "industry",
           parentId: null,
           notes: "Parent org note",
           sources: "https://example.org/org-source",
@@ -116,9 +117,11 @@ describe("coordinate round-trip", () => {
           isExactPosition: true,
         },
         {
+          kind: "corporate",
           id: "org-2",
           name: "Test Factory",
           type: "factory",
+          layerId: "industry",
           parentId: "org-1",
           notes: null,
           sources: null,
@@ -128,14 +131,15 @@ describe("coordinate round-trip", () => {
         },
       ]
 
-      const bytes = await saveGeoPackage(layers, [], organisations, [], undefined)
+      const bytes = await saveGeoPackage(layers, entities, [], undefined)
       const persistedBuffer = Uint8Array.from(bytes).buffer
       const loaded = await loadGeoPackage(persistedBuffer)
 
-      expect(loaded.organisations).toHaveLength(2)
-      expect(loaded.organisations).toEqual(
+      expect(loaded.entities).toHaveLength(2)
+      expect(loaded.entities).toEqual(
         expect.arrayContaining([
           expect.objectContaining({
+            kind: "corporate",
             id: "org-1",
             name: "Test Holding",
             type: "holding",
@@ -147,13 +151,19 @@ describe("coordinate round-trip", () => {
             isExactPosition: true,
           }),
           expect.objectContaining({
+            kind: "corporate",
             id: "org-2",
             name: "Test Factory",
             type: "factory",
             parentId: "org-1",
-            notes: null,
-            sources: null,
-            osmRelationId: null,
+            // The shared units-table columns decode a null column to undefined (the
+            // Unit convention), not null (the old, now-retired Organisation table's
+            // convention) — a cosmetic difference nothing in the app distinguishes
+            // (every read site checks `!= null`), not lossy: SQL NULL round-trips
+            // either way since the encode side treats undefined and null identically.
+            notes: undefined,
+            sources: undefined,
+            osmRelationId: undefined,
             positionMode: "parent",
             isExactPosition: false,
           }),
@@ -177,7 +187,7 @@ describe("coordinate round-trip", () => {
           notes: "predates the analyzed_at/position_mode/is_exact_position columns",
         },
       ]
-      const bytes = await saveGeoPackage(layers, entities, [], [])
+      const bytes = await saveGeoPackage(layers, entities, [])
       const geoPackage = await GeoPackageAPI.open(new Uint8Array(bytes))
       try {
         geoPackage.connection.run("ALTER TABLE units DROP COLUMN analyzed_at")

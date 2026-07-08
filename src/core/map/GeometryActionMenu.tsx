@@ -10,11 +10,10 @@ import {
 import { Separator } from "@/ui/separator"
 import { FilterableSelect } from "@/components/shared/FilterableSelect"
 import type { MapEntity } from "@/types/domain.types"
-import type { Organisation } from "@/types/organisation.types"
 
 type Props = {
   entities: MapEntity[]
-  organisations: Organisation[]
+  organisations: MapEntity[]
   onCreateNew: () => void
   onCreateNewOrganisation: () => void
   onLinkToExisting: (entityId: string) => void

@@ -11,7 +11,6 @@ export type {
   GpkgLayer,
   GpkgEntity,
   GpkgGeometry,
-  GpkgOrganisation,
   GeoPackageLoadResult,
   ApplyGeoPackageResultState,
 } from "./types"

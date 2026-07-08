@@ -1,7 +1,6 @@
 import { useState, useCallback, useRef } from "react"
 import { MapView } from "@/core/map/MapView"
 import { EntityInspector } from "@/modules/orbat/ui/EntityInspector"
-import { OrganisationInspector } from "@/components/inspector/OrganisationInspector"
 import { EnrichDrawer } from "@/modules/enrichment/ui/EnrichDrawer"
 import { OsmObjectInspector } from "@/modules/osm/ui/OsmObjectInspector"
 import { ResearchDialog } from "@/components/shared/ResearchDialog"
@@ -92,7 +91,6 @@ export function MainLayout({
     layers,
     entities,
     selectedEntityId,
-    selectedOrganisationId,
     addLayer,
     closeDetail,
   } = useProjectStore()
@@ -131,15 +129,8 @@ export function MainLayout({
     const s = useProjectStore.getState()
     s.addGeometry({ ...geom, entityId })
     useOsmViewStore.getState().setSelectedOsmObject(null)
-    const isOrg = s.organisations.some((o) => o.id === entityId)
-    if (isOrg) {
-      s.updateOrganisation(entityId, { positionMode: "own" })
-      s.setSelectedOrganisationId(entityId)
-      s.setSelectedEntityId(null)
-    } else {
-      s.updateEntity(entityId, { positionMode: "own" })
-      s.setSelectedEntityId(entityId)
-    }
+    s.updateEntity(entityId, { positionMode: "own" })
+    s.setSelectedEntityId(entityId)
   }, [])
 
   const defaultLayerId = getDefaultEntityLayerId(layers)
@@ -227,7 +218,6 @@ export function MainLayout({
         }
         headerMenuSlot={!readOnly ? <OsmQueryMenu layers={layers} onAddLayer={addLayer} /> : null}
         selectedEntityId={selectedEntityId}
-        selectedOrganisationId={selectedOrganisationId}
         selectedOsmObject={selectedOsmObject}
         onCloseDetail={handleCloseDetail}
         detailHeaderActions={
@@ -249,8 +239,6 @@ export function MainLayout({
               id={selectedOsmObject.id}
               cachedFeature={selectedOsmObject.cachedFeature}
             />
-          ) : selectedOrganisationId != null ? (
-            <OrganisationInspector key={selectedOrganisationId} readOnly={readOnly} />
           ) : (
             <EntityInspector
               key={selectedEntityId ?? "none"}

@@ -2,7 +2,6 @@ import { create } from "zustand"
 import { devtools } from "zustand/middleware"
 import { getDefaultEchelonLayers } from "@/core/persistence/geopackage"
 import type { Layer, MapEntity, DrawnGeometry } from "@/types/domain.types"
-import type { Organisation } from "@/types/organisation.types"
 import { INDUSTRY_LAYER_ID } from "@/types/organisation.types"
 
 // ---------------------------------------------------------------------------
@@ -11,11 +10,10 @@ import { INDUSTRY_LAYER_ID } from "@/types/organisation.types"
 
 export interface ProjectState {
   layers: Layer[]
+  /** Both military units and corporate entities (kind-discriminated, ADR 0004 / E1) share this array. */
   entities: MapEntity[]
-  organisations: Organisation[]
   drawnGeometries: DrawnGeometry[]
   selectedEntityId: string | null
-  selectedOrganisationId: string | null
 }
 
 const INDUSTRY_LAYER = {
@@ -29,10 +27,8 @@ function initialState(): ProjectState {
   return {
     layers: [...getDefaultEchelonLayers(), INDUSTRY_LAYER],
     entities: [],
-    organisations: [],
     drawnGeometries: [],
     selectedEntityId: null,
-    selectedOrganisationId: null,
   }
 }
 
@@ -44,10 +40,8 @@ export interface ProjectActions {
   setProject(p: {
     layers: Layer[]
     entities: MapEntity[]
-    organisations: Organisation[]
     drawnGeometries: DrawnGeometry[]
     selectedEntityId: string | null
-    selectedOrganisationId: string | null
   }): void
   resetProject(): void
 
@@ -62,15 +56,10 @@ export interface ProjectActions {
   updateEntity(entityId: string, patch: Partial<MapEntity>): void
   deleteEntity(entityId: string): void
 
-  addOrganisation(org: Organisation): void
-  updateOrganisation(orgId: string, patch: Partial<Organisation>): void
-  deleteOrganisation(orgId: string): void
-
   addGeometry(geom: DrawnGeometry): void
   deleteGeometry(geometryId: string): void
 
   setSelectedEntityId(id: string | null): void
-  setSelectedOrganisationId(id: string | null): void
   closeDetail(): void
 }
 
@@ -91,7 +80,6 @@ export function selectPersistableSnapshot(state: ProjectState, sourceCache: Map<
     entities: state.entities
       .filter((e) => nonOsmLayerIds.has(e.layerId))
       .map((e) => ({ ...e, name: e.name.trim() || "Untitled" })),
-    organisations: state.organisations.map((o) => ({ ...o, name: o.name.trim() || "Untitled" })),
     geometries: state.drawnGeometries.filter((g) => nonOsmLayerIds.has(g.layerId)),
     sourceCache,
   }
@@ -102,8 +90,8 @@ export const useProjectStore = create<ProjectState & ProjectActions>()(
     (set, get) => ({
       ...initialState(),
 
-      setProject({ layers, entities, organisations, drawnGeometries, selectedEntityId, selectedOrganisationId }) {
-        set({ layers, entities, organisations, drawnGeometries, selectedEntityId, selectedOrganisationId }, false, "setProject")
+      setProject({ layers, entities, drawnGeometries, selectedEntityId }) {
+        set({ layers, entities, drawnGeometries, selectedEntityId }, false, "setProject")
       },
 
       resetProject() {
@@ -196,26 +184,6 @@ export const useProjectStore = create<ProjectState & ProjectActions>()(
         }), false, "deleteEntity")
       },
 
-      addOrganisation(org) {
-        set((s) => ({ organisations: [...s.organisations, org] }), false, "addOrganisation")
-      },
-
-      updateOrganisation(orgId, patch) {
-        set(
-          (s) => ({ organisations: s.organisations.map((o) => (o.id === orgId ? { ...o, ...patch } : o)) }),
-          false,
-          "updateOrganisation",
-        )
-      },
-
-      deleteOrganisation(orgId) {
-        set((s) => ({
-          organisations: s.organisations.filter((o) => o.id !== orgId),
-          drawnGeometries: s.drawnGeometries.filter((g) => g.entityId !== orgId),
-          selectedOrganisationId: s.selectedOrganisationId === orgId ? null : s.selectedOrganisationId,
-        }), false, "deleteOrganisation")
-      },
-
       addGeometry(geom) {
         set((s) => ({ drawnGeometries: [...s.drawnGeometries, geom] }), false, "addGeometry")
       },
@@ -232,12 +200,8 @@ export const useProjectStore = create<ProjectState & ProjectActions>()(
         set({ selectedEntityId: id }, false, "setSelectedEntityId")
       },
 
-      setSelectedOrganisationId(id) {
-        set({ selectedOrganisationId: id }, false, "setSelectedOrganisationId")
-      },
-
       closeDetail() {
-        set({ selectedEntityId: null, selectedOrganisationId: null }, false, "closeDetail")
+        set({ selectedEntityId: null }, false, "closeDetail")
       },
     }),
     { name: "GabrielProjectStore", enabled: import.meta.env.DEV },

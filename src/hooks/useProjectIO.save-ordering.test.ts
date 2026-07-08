@@ -5,7 +5,6 @@ function makeInput(): ProjectSaveInput {
   return {
     layers: [{ id: "division", name: "Division", visible: true, kind: "echelon" }],
     entities: [],
-    organisations: [],
     geometries: [],
     sourceCache: new Map(),
   }
@@ -49,7 +48,7 @@ describe("performProjectSave", () => {
     })
     await performProjectSave(makeInput(), deps)
     const saveGeoPackageMock = deps.saveGeoPackage as ReturnType<typeof vi.fn>
-    expect(saveGeoPackageMock.mock.calls[0]?.[5]).toBe(existingBuffer)
+    expect(saveGeoPackageMock.mock.calls[0]?.[4]).toBe(existingBuffer)
   })
 
   it("passes a fresh copied ArrayBuffer (not the saved Uint8Array's own buffer) to saveProject", async () => {

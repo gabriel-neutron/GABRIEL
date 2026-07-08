@@ -13,9 +13,11 @@ const H_SPACING = 110
 const V_SPACING = 130
 
 export function TreeView() {
-  const { entities, selectedEntityId } = useProjectStore(
+  const { entities: allEntities, selectedEntityId } = useProjectStore(
     useShallow((s) => ({ entities: s.entities, selectedEntityId: s.selectedEntityId }))
   )
+  /** Military only — this tab has never shown corporate entities (those live in HierarchyPanel's "Industry" section). */
+  const entities = useMemo(() => allEntities.filter((e) => e.kind === "unit"), [allEntities])
 
   const { nodes, edges } = useMemo(() => {
     const nodeList: Node[] = []

@@ -68,10 +68,8 @@ const meta = {
       useProjectStore.getState().setProject({
         layers,
         entities,
-        organisations: [],
         drawnGeometries: geometries,
         selectedEntityId: "entity-hq",
-        selectedOrganisationId: null,
       })
 
       return (

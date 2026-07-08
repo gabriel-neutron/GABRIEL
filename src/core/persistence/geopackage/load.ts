@@ -1,6 +1,6 @@
 import { GeoPackageAPI, type GeoPackage } from "@ngageoint/geopackage"
 import { readEntities } from "./units.table"
-import { readOrganisations } from "./organisations.table"
+import { migrateLegacyOrganisations } from "./organisations.table"
 import { readLayers } from "./layers.table"
 import { readGeometries } from "./geometries.table"
 import { readSourceCache } from "./researchSources.table"
@@ -12,15 +12,14 @@ export async function loadGeoPackage(buffer: ArrayBuffer): Promise<GeoPackageLoa
     geoPackage = await GeoPackageAPI.open(new Uint8Array(buffer))
 
     const layers = readLayers(geoPackage)
-    const entities = readEntities(geoPackage)
-    const organisations = readOrganisations(geoPackage)
+    // Legacy organisations (pre-E1 files) fold into the same unified entities array,
+    // tagged kind: "corporate" — see organisations.table.ts's migrateLegacyOrganisations.
+    const entities = [...readEntities(geoPackage), ...migrateLegacyOrganisations(geoPackage)]
     const geometries = await readGeometries(geoPackage)
     const sourceCache = readSourceCache(geoPackage)
 
     const layerIds = new Set(layers.map((l) => l.id))
     const entityIds = new Set(entities.map((e) => e.id))
-    const organisationIds = new Set(organisations.map((o) => o.id))
-    const allEntityIds = new Set([...entityIds, ...organisationIds])
     for (const e of entities) {
       if (!layerIds.has(e.layerId)) {
         throw new Error("Unsupported schema: entity references missing layer.")
@@ -29,21 +28,16 @@ export async function loadGeoPackage(buffer: ArrayBuffer): Promise<GeoPackageLoa
         throw new Error("Unsupported schema: entity references missing parent.")
       }
     }
-    for (const o of organisations) {
-      if (o.parentId != null && !organisationIds.has(o.parentId)) {
-        throw new Error("Unsupported schema: organisation references missing parent.")
-      }
-    }
     for (const g of geometries) {
       if (!layerIds.has(g.layerId)) {
         throw new Error("Unsupported schema: geometry references missing layer.")
       }
-      if (g.entityId != null && !allEntityIds.has(g.entityId)) {
+      if (g.entityId != null && !entityIds.has(g.entityId)) {
         throw new Error("Unsupported schema: geometry references missing entity.")
       }
     }
 
-    return { layers, entities, organisations, geometries, sourceCache }
+    return { layers, entities, geometries, sourceCache }
   } catch (e) {
     if (e instanceof Error && e.message.startsWith("Unsupported schema")) throw e
     const errorMsg = e instanceof Error ? e.message : String(e)

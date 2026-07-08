@@ -3,7 +3,6 @@ import { Eye, EyeOff } from "lucide-react"
 import { Button } from "@/ui/button"
 import { Separator } from "@/ui/separator"
 import type { MapEntity } from "@/types/domain.types"
-import type { Organisation } from "@/types/organisation.types"
 import { ORGANISATION_TYPE_LABELS } from "@/types/organisation.types"
 import { useProjectStore } from "@/store/useProjectStore"
 import { useOsmViewStore } from "@/store/useOsmViewStore"
@@ -74,6 +73,12 @@ function HierarchyPanelHeader({ anyVisible, onToggleAllVisibility }: HierarchyPa
   )
 }
 
+/**
+ * Shared by the unit tree and the "Industry" (corporate) tree. Corporate entities never had a
+ * per-item visibility toggle (only units did, driven by `MainLayout`'s `hiddenEntityIds`), so the
+ * toggle and hidden-state are suppressed for `kind === "corporate"` — same behaviour as the two
+ * formerly-separate `EntityNode`/`OrgNode` components, just one component now.
+ */
 function EntityNode({
   entity,
   depth,
@@ -86,6 +91,7 @@ function EntityNode({
   onToggleExpanded,
 }: NodeProps) {
   const isRoot = depth === 0
+  const isCorporate = entity.kind === "corporate"
   const childPath = new Set(ancestorPath).add(entity.id)
   const children = getOrderedEntities(
     orbat.childrenOf(entity.id).filter((child) => !childPath.has(child.id)),
@@ -93,14 +99,17 @@ function EntityNode({
   )
   const hasKids = children.length > 0
   const expanded = expandedIds.has(entity.id)
-  const isHidden = hiddenEntityIds.has(entity.id)
-  const ancestorHidden = isAncestorHidden(entity, orbat, hiddenEntityIds)
+  const isHidden = !isCorporate && hiddenEntityIds.has(entity.id)
+  const ancestorHidden = !isCorporate && isAncestorHidden(entity, orbat, hiddenEntityIds)
   const effectivelyHidden = isHidden || ancestorHidden
   const isSelected = selectedEntityId === entity.id
+  const title =
+    isCorporate && entity.type
+      ? `${entity.name} — ${ORGANISATION_TYPE_LABELS[entity.type as keyof typeof ORGANISATION_TYPE_LABELS]}`
+      : entity.name
 
   function handleSelectEntity() {
-    const s = useProjectStore.getState()
-    s.setSelectedEntityId(entity.id)
+    useProjectStore.getState().setSelectedEntityId(entity.id)
     useOsmViewStore.getState().setSelectedOsmObject(null)
   }
 
@@ -127,34 +136,36 @@ function EntityNode({
             className={`min-w-0 flex-1 truncate text-left text-sm font-medium transition-colors ${
               isSelected ? "text-foreground" : ""
             } ${effectivelyHidden ? "opacity-40" : ""}`}
-            title={entity.name}
+            title={title}
           >
             {entity.name}
           </button>
         </div>
 
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon-xs"
-          className="h-5 w-5 shrink-0 text-muted-foreground transition-transform duration-150 active:scale-95"
-          onClick={() => onToggleEntityVisible(entity.id, isHidden)}
-          title={isHidden ? "Show" : "Hide"}
-          disabled={ancestorHidden}
-        >
-          <span className="relative h-3 w-3">
-            <Eye
-              className={`absolute inset-0 h-3 w-3 transition-all duration-150 ${
-                isHidden || ancestorHidden ? "scale-75 opacity-0" : "scale-100 opacity-100"
-              }`}
-            />
-            <EyeOff
-              className={`absolute inset-0 h-3 w-3 transition-all duration-150 ${
-                isHidden || ancestorHidden ? "scale-100 opacity-100" : "scale-75 opacity-0"
-              }`}
-            />
-          </span>
-        </Button>
+        {!isCorporate && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-xs"
+            className="h-5 w-5 shrink-0 text-muted-foreground transition-transform duration-150 active:scale-95"
+            onClick={() => onToggleEntityVisible(entity.id, isHidden)}
+            title={isHidden ? "Show" : "Hide"}
+            disabled={ancestorHidden}
+          >
+            <span className="relative h-3 w-3">
+              <Eye
+                className={`absolute inset-0 h-3 w-3 transition-all duration-150 ${
+                  isHidden || ancestorHidden ? "scale-75 opacity-0" : "scale-100 opacity-100"
+                }`}
+              />
+              <EyeOff
+                className={`absolute inset-0 h-3 w-3 transition-all duration-150 ${
+                  isHidden || ancestorHidden ? "scale-100 opacity-100" : "scale-75 opacity-0"
+                }`}
+              />
+            </span>
+          </Button>
+        )}
       </div>
 
       {hasKids && (
@@ -185,97 +196,19 @@ function EntityNode({
   )
 }
 
-type OrgNodeProps = {
-  org: Organisation
-  depth: number
-  orbat: Orbat<Organisation>
-  ancestorPath: ReadonlySet<string>
-  selectedOrganisationId: string | null
-  expandedOrgIds: Set<string>
-  onToggleExpanded: (id: string) => void
-}
-
-function OrgNode({ org, depth, orbat, ancestorPath, selectedOrganisationId, expandedOrgIds, onToggleExpanded }: OrgNodeProps) {
-  const childPath = new Set(ancestorPath).add(org.id)
-  const children = orbat
-    .childrenOf(org.id)
-    .filter((child) => !childPath.has(child.id))
-    .sort(compareByName)
-  const hasKids = children.length > 0
-  const expanded = expandedOrgIds.has(org.id)
-  const isSelected = selectedOrganisationId === org.id
-
-  function handleSelect() {
-    const s = useProjectStore.getState()
-    s.setSelectedOrganisationId(org.id)
-    s.setSelectedEntityId(null)
-    useOsmViewStore.getState().setSelectedOsmObject(null)
-  }
-
-  return (
-    <div className={depth === 0 ? "rounded-md border" : undefined}>
-      <div
-        className="flex items-center gap-2 px-3 py-2 transition-colors duration-150 hover:bg-muted/40"
-        style={{ paddingLeft: `${12 + depth * 16}px` }}
-      >
-        <button
-          type="button"
-          className="flex shrink-0 items-center justify-center text-muted-foreground transition-transform duration-150 active:scale-95 disabled:opacity-0"
-          onClick={() => onToggleExpanded(org.id)}
-          aria-label={expanded ? "Collapse" : "Expand"}
-          disabled={!hasKids}
-        >
-          {hasKids ? (expanded ? "▾" : "▸") : ""}
-        </button>
-        <button
-          type="button"
-          onClick={handleSelect}
-          className={`min-w-0 flex-1 truncate text-left text-sm font-medium transition-colors ${isSelected ? "text-foreground" : ""}`}
-          title={`${org.name} — ${ORGANISATION_TYPE_LABELS[org.type]}`}
-        >
-          {org.name}
-        </button>
-      </div>
-      {hasKids && (
-        <div
-          className={`grid overflow-hidden transition-[grid-template-rows,opacity] duration-150 ease-out ${
-            expanded ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"
-          }`}
-        >
-          <div className={`min-h-0 overflow-hidden ${depth === 0 ? "border-t bg-muted/30" : ""}`}>
-            {children.map((child) => (
-              <OrgNode
-                key={child.id}
-                org={child}
-                depth={depth + 1}
-                orbat={orbat}
-                ancestorPath={childPath}
-                selectedOrganisationId={selectedOrganisationId}
-                expandedOrgIds={expandedOrgIds}
-                onToggleExpanded={onToggleExpanded}
-              />
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
-
 export function HierarchyPanel({ hiddenEntityIds, onToggleEntityVisible }: Props) {
-  const { entities, selectedEntityId, organisations, selectedOrganisationId } = useProjectStore(
+  const { entities, selectedEntityId } = useProjectStore(
     useShallow((s) => ({
       entities: s.entities,
       selectedEntityId: s.selectedEntityId,
-      organisations: s.organisations,
-      selectedOrganisationId: s.selectedOrganisationId,
     }))
   )
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
-  const [expandedOrgIds, setExpandedOrgIds] = useState<Set<string>>(new Set())
-  const orbat = useMemo(() => buildOrbat(entities), [entities])
-  const orgOrbat = useMemo(() => buildOrbat(organisations), [organisations])
-  const anyVisible = entities.some(
+  const units = useMemo(() => entities.filter((e) => e.kind === "unit"), [entities])
+  const corporateEntities = useMemo(() => entities.filter((e) => e.kind === "corporate"), [entities])
+  const orbat = useMemo(() => buildOrbat(units), [units])
+  const orgOrbat = useMemo(() => buildOrbat(corporateEntities), [corporateEntities])
+  const anyVisible = units.some(
     (e) => !hiddenEntityIds.has(e.id) && !isAncestorHidden(e, orbat, hiddenEntityIds),
   )
 
@@ -287,21 +220,12 @@ export function HierarchyPanel({ hiddenEntityIds, onToggleEntityVisible }: Props
     })
   }
 
-  function handleToggleOrgExpanded(id: string) {
-    setExpandedOrgIds((prev) => {
-      const next = new Set(prev)
-      if (next.has(id)) { next.delete(id) } else { next.add(id) }
-      return next
-    })
-  }
-
   function handleToggleAllVisibility() {
     const visible = !anyVisible
-    for (const entity of entities) onToggleEntityVisible(entity.id, visible)
+    for (const entity of units) onToggleEntityVisible(entity.id, visible)
   }
 
   const orderedRoots = getOrderedEntities(orbat.roots(), orbat)
-
   const orgRoots = [...orgOrbat.roots()].sort(compareByName)
 
   return (
@@ -329,22 +253,24 @@ export function HierarchyPanel({ hiddenEntityIds, onToggleEntityVisible }: Props
           ))
         )}
 
-        {organisations.length > 0 && (
+        {corporateEntities.length > 0 && (
           <>
             <Separator className="my-2" />
             <div className="px-1 pb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               Industry
             </div>
             {orgRoots.map((root) => (
-              <OrgNode
+              <EntityNode
                 key={root.id}
-                org={root}
+                entity={root}
                 depth={0}
                 orbat={orgOrbat}
                 ancestorPath={EMPTY_PATH}
-                selectedOrganisationId={selectedOrganisationId}
-                expandedOrgIds={expandedOrgIds}
-                onToggleExpanded={handleToggleOrgExpanded}
+                selectedEntityId={selectedEntityId}
+                hiddenEntityIds={hiddenEntityIds}
+                expandedIds={expandedIds}
+                onToggleEntityVisible={onToggleEntityVisible}
+                onToggleExpanded={handleToggleExpanded}
               />
             ))}
           </>

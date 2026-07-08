@@ -6,7 +6,6 @@ import {
   applyGeoPackageResult,
   type GpkgLayer,
   type GpkgEntity,
-  type GpkgOrganisation,
   type GpkgGeometry,
 } from "@/core/persistence/geopackage"
 import { INDUSTRY_LAYER_ID } from "@/types/organisation.types"
@@ -45,7 +44,6 @@ async function loadSeedGeoPackageBuffer(): Promise<ArrayBuffer | null> {
 export interface ProjectSaveInput {
   layers: GpkgLayer[]
   entities: GpkgEntity[]
-  organisations: GpkgOrganisation[]
   geometries: GpkgGeometry[]
   sourceCache: Map<string, string>
 }
@@ -55,7 +53,6 @@ export interface ProjectSaveDeps {
   saveGeoPackage: (
     layers: GpkgLayer[],
     entities: GpkgEntity[],
-    organisations: GpkgOrganisation[],
     geometries: GpkgGeometry[],
     researchSources: Map<string, string> | undefined,
     baseBuffer: ArrayBuffer | undefined,
@@ -74,7 +71,6 @@ export async function performProjectSave(input: ProjectSaveInput, deps: ProjectS
   const bytes = await deps.saveGeoPackage(
     input.layers,
     input.entities,
-    input.organisations,
     input.geometries,
     input.sourceCache,
     existing?.buffer,
@@ -102,10 +98,8 @@ export function useProjectIO() {
           useProjectStore.getState().setProject({
             layers: next.layers,
             entities: next.entities,
-            organisations: next.organisations,
             drawnGeometries: next.drawnGeometries,
             selectedEntityId: next.selectedEntityId,
-            selectedOrganisationId: next.selectedOrganisationId,
           })
           useSourceCacheStore.getState().setSourceCache(result.sourceCache)
           setRestoredFromSession(true)
@@ -155,7 +149,7 @@ export function useProjectIO() {
         ...defaultLayers.map((l) => ({ id: l.id, name: l.name, visible: l.visible, kind: l.kind })),
         industryLayer,
       ]
-      const bytes = await saveGeoPackage(gpkgLayers, [], [], [], undefined, seedBuffer ?? undefined)
+      const bytes = await saveGeoPackage(gpkgLayers, [], [], undefined, seedBuffer ?? undefined)
       await writeGeoPackageToFile(bytes)
       window.alert("New project created.")
     } catch (e) {
@@ -177,10 +171,8 @@ export function useProjectIO() {
       useProjectStore.getState().setProject({
         layers: next.layers,
         entities: next.entities,
-        organisations: next.organisations,
         drawnGeometries: next.drawnGeometries,
         selectedEntityId: next.selectedEntityId,
-        selectedOrganisationId: next.selectedOrganisationId,
       })
       useSourceCacheStore.getState().setSourceCache(result.sourceCache)
       await saveProject(buffer)
@@ -193,7 +185,7 @@ export function useProjectIO() {
   }, [])
 
   const handleSave = useCallback(async (): Promise<void> => {
-    const { layers, entities, organisations, geometries, sourceCache } = selectPersistableSnapshot(
+    const { layers, entities, geometries, sourceCache } = selectPersistableSnapshot(
       useProjectStore.getState(),
       useSourceCacheStore.getState().sourceCache,
     )
@@ -201,7 +193,7 @@ export function useProjectIO() {
     setError(null)
     try {
       await performProjectSave(
-        { layers, entities, organisations, geometries, sourceCache },
+        { layers, entities, geometries, sourceCache },
         { loadProject, saveGeoPackage, writeGeoPackageToFile, saveProject },
       )
       window.alert("Saved successfully")

@@ -1,6 +1,5 @@
 import { useState, useCallback, useEffect, useLayoutEffect, useRef } from "react"
-import type { DrawnGeometry } from "@/types/domain.types"
-import type { Organisation } from "@/types/organisation.types"
+import type { DrawnGeometry, MapEntity } from "@/types/domain.types"
 import { INDUSTRY_LAYER_ID } from "@/types/organisation.types"
 import { MainLayout } from "@/shell/MainLayout"
 import { ToastStack, type ToastItem } from "@/components/shared/ToastStack"
@@ -16,17 +15,19 @@ export type EditPageProps = {
 }
 
 export function EditPage({ onViewMode, onOpenAbout }: EditPageProps): React.ReactElement {
-  const { entities, drawnGeometries, selectedEntityId, updateEntity, addOrganisation, addGeometry, setSelectedOrganisationId, setSelectedEntityId } =
+  const { entities, drawnGeometries, selectedEntityId, updateEntity, addEntity, addGeometry, setSelectedEntityId } =
     useProjectStore()
   const { sourceCache, mergeSourceCache } = useSourceCacheStore()
 
   const { busy, error, restoredFromSession, handleNew, handleOpen, handleSave } = useProjectIO()
 
   const handleCreateNewOrganisation = useCallback((geom: DrawnGeometry) => {
-    const org: Organisation = {
+    const org: MapEntity = {
+      kind: "corporate",
       id: crypto.randomUUID(),
       name: "New organisation",
       type: "company",
+      layerId: INDUSTRY_LAYER_ID,
       parentId: null,
       notes: null,
       sources: null,
@@ -34,11 +35,10 @@ export function EditPage({ onViewMode, onOpenAbout }: EditPageProps): React.Reac
       positionMode: "own",
       isExactPosition: false,
     }
-    addOrganisation(org)
+    addEntity(org)
     addGeometry({ ...geom, layerId: INDUSTRY_LAYER_ID, entityId: org.id })
-    setSelectedOrganisationId(org.id)
-    setSelectedEntityId(null)
-  }, [addOrganisation, addGeometry, setSelectedOrganisationId, setSelectedEntityId])
+    setSelectedEntityId(org.id)
+  }, [addEntity, addGeometry, setSelectedEntityId])
 
   const [toasts, setToasts] = useState<ToastItem[]>([])
 

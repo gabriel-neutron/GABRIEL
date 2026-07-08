@@ -1,5 +1,4 @@
 import type { DrawnGeometry, MapEntity, PositionMode } from "@/types/domain.types"
-import type { Organisation } from "@/types/organisation.types"
 import { type LatLng, asLatLng } from "@/core/coordinates"
 import { buildOrbat } from "@/core/entity/hierarchy"
 
@@ -35,11 +34,6 @@ const CHILD_SCALE = 0.35
 
 export interface PositionedEntity {
   entity: MapEntity
-  position: LatLng
-}
-
-export interface PositionedOrganisation {
-  organisation: Organisation
   position: LatLng
 }
 
@@ -132,14 +126,4 @@ export function computeAllEntityPositions(
   return entities
     .filter((e) => positionById.has(e.id))
     .map((e) => ({ entity: e, position: positionById.get(e.id)! }))
-}
-
-export function computeAllOrganisationPositions(
-  organisations: Organisation[],
-  drawnGeometries: DrawnGeometry[],
-): PositionedOrganisation[] {
-  const positionById = computePositions(organisations, drawnGeometries)
-  return organisations
-    .filter((o) => positionById.has(o.id))
-    .map((o) => ({ organisation: o, position: positionById.get(o.id)! }))
 }

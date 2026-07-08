@@ -22,6 +22,7 @@ import {
   type SymbolAffiliation,
   type SymbolDomain,
 } from "@/types/symbol.types"
+import { ORGANISATION_TYPE_LABELS, ORGANISATION_TYPES } from "@/types/organisation.types"
 import { UNIT_TYPE_OPTIONS_GROUPED } from "./entityInspector.options"
 import { FindOsmAtPointDialog } from "@/modules/osm/ui/FindOsmAtPointDialog"
 import { useEntityInspector } from "@/modules/orbat/hooks/useEntityInspector"
@@ -121,12 +122,13 @@ function EntityInspectorReadOnlyView({
   sources,
   enrichedOverlay,
 }: EntityInspectorReadOnlyViewProps) {
+  const isCorporate = entity.kind === "corporate"
   return (
     <div className="space-y-3 p-4">
       <ReadOnlyField label="Name">
         <span className="truncate">{entity.name}</span>
       </ReadOnlyField>
-      {entity.militaryUnitId != null && entity.militaryUnitId !== "" && (
+      {!isCorporate && entity.militaryUnitId != null && entity.militaryUnitId !== "" && (
         <ReadOnlyField label="Military unit ID">
           <span className="truncate">{entity.militaryUnitId}</span>
         </ReadOnlyField>
@@ -142,14 +144,22 @@ function EntityInspectorReadOnlyView({
         </ReadOnlyField>
       )}
       <EnrichedSessionBlock overlay={enrichedOverlay} variant="readonly" />
-      <div className="grid grid-cols-2 gap-2">
-        <ReadOnlyField label="Echelon">{entity.echelon ?? "—"}</ReadOnlyField>
-        <ReadOnlyField label="Type">{entity.type ? capitalizeFirst(entity.type) : "—"}</ReadOnlyField>
-      </div>
-      <div className="grid grid-cols-2 gap-2">
-        <ReadOnlyField label="Affiliation">{entity.affiliation ?? "—"}</ReadOnlyField>
-        <ReadOnlyField label="Domain">{entity.domain ?? "—"}</ReadOnlyField>
-      </div>
+      {isCorporate ? (
+        <ReadOnlyField label="Type">
+          {entity.type ? ORGANISATION_TYPE_LABELS[entity.type as keyof typeof ORGANISATION_TYPE_LABELS] : "—"}
+        </ReadOnlyField>
+      ) : (
+        <>
+          <div className="grid grid-cols-2 gap-2">
+            <ReadOnlyField label="Echelon">{entity.echelon ?? "—"}</ReadOnlyField>
+            <ReadOnlyField label="Type">{entity.type ? capitalizeFirst(entity.type) : "—"}</ReadOnlyField>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <ReadOnlyField label="Affiliation">{entity.affiliation ?? "—"}</ReadOnlyField>
+            <ReadOnlyField label="Domain">{entity.domain ?? "—"}</ReadOnlyField>
+          </div>
+        </>
+      )}
       <div className="grid grid-cols-2 gap-2">
         <ReadOnlyField label="Position">
           <span>{positionModeLabel(entity.positionMode)}</span>
@@ -163,9 +173,11 @@ function EntityInspectorReadOnlyView({
           {entity.osmRelationId != null ? entity.osmRelationId : "—"}
         </ReadOnlyField>
       </div>
-      <ReadOnlyField label="Layer">
-        <span className="truncate">{layerName}</span>
-      </ReadOnlyField>
+      {!isCorporate && (
+        <ReadOnlyField label="Layer">
+          <span className="truncate">{layerName}</span>
+        </ReadOnlyField>
+      )}
       <ReadOnlyField label="Parent">
         <span className="truncate">{parentName ?? "—"}</span>
       </ReadOnlyField>
@@ -198,6 +210,7 @@ export function EntityInspector({ readOnly = false, enrichedOverlay = {} }: Prop
     findDialogOpen,
     setFindDialogOpen,
     handleNameChange,
+    handleTypeChange,
     handleEchelonChange,
     handlePositionModeChange,
     handleIsExactPositionChange,
@@ -218,7 +231,8 @@ export function EntityInspector({ readOnly = false, enrichedOverlay = {} }: Prop
   }, [entity?.id])
 
   function handleDeleteEntity(entityId: string): void {
-    if (!window.confirm("Delete this entity and all its linked geometries?")) return
+    const noun = entity?.kind === "corporate" ? "organisation" : "entity"
+    if (!window.confirm(`Delete this ${noun} and all its linked geometries?`)) return
     useProjectStore.getState().deleteEntity(entityId)
   }
 
@@ -239,6 +253,7 @@ export function EntityInspector({ readOnly = false, enrichedOverlay = {} }: Prop
     )
   }
 
+  const isCorporate = entity.kind === "corporate"
   const hasParent = entity.parentId != null
 
   return (
@@ -253,18 +268,20 @@ export function EntityInspector({ readOnly = false, enrichedOverlay = {} }: Prop
             onBlur={() => handleNameChange(draft.name)}
           />
         </Field>
-        <Field>
-          <FieldLabel>Military unit ID</FieldLabel>
-          <Input
-            value={draft.militaryUnitId}
-            onChange={(e) => setDraft((d) => ({ ...d, militaryUnitId: e.target.value }))}
-            onBlur={() =>
-              updateEntity(entity.id, {
-                militaryUnitId: draft.militaryUnitId === "" ? null : draft.militaryUnitId,
-              })
-            }
-          />
-        </Field>
+        {!isCorporate && (
+          <Field>
+            <FieldLabel>Military unit ID</FieldLabel>
+            <Input
+              value={draft.militaryUnitId}
+              onChange={(e) => setDraft((d) => ({ ...d, militaryUnitId: e.target.value }))}
+              onBlur={() =>
+                updateEntity(entity.id, {
+                  militaryUnitId: draft.militaryUnitId === "" ? null : draft.militaryUnitId,
+                })
+              }
+            />
+          </Field>
+        )}
         <Field>
           <FieldLabel>Notes</FieldLabel>
           <Textarea
@@ -304,97 +321,115 @@ export function EntityInspector({ readOnly = false, enrichedOverlay = {} }: Prop
             </Button>
           </div>
         </Field>
-        <div className="grid grid-cols-2 gap-2">
-          <Field>
-            <FieldLabel>Echelon</FieldLabel>
-            <Select value={echelonValue} onValueChange={handleEchelonChange}>
-              <SelectTrigger className="h-8 text-sm">
-                <SelectValue placeholder="Echelon" />
-              </SelectTrigger>
-              <SelectContent>
-                {ECHELON_OPTIONS.map((opt) => (
-                  <SelectItem key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </Field>
+        {isCorporate ? (
           <Field>
             <FieldLabel>Type</FieldLabel>
-            <Select value={typeValue} onValueChange={(v) => updateEntity(entity.id, { type: v })}>
+            <Select value={typeValue} onValueChange={handleTypeChange}>
               <SelectTrigger className="h-8 text-sm">
                 <SelectValue placeholder="Type" />
               </SelectTrigger>
               <SelectContent>
-                {UNIT_TYPE_OPTIONS_GROUPED.map((group) => (
-                  <SelectGroup key={group.label}>
-                    <SelectLabel>{group.label}</SelectLabel>
-                    {group.options.map((opt) => (
+                {ORGANISATION_TYPES.map((t) => (
+                  <SelectItem key={t} value={t}>{ORGANISATION_TYPE_LABELS[t]}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </Field>
+        ) : (
+          <>
+            <div className="grid grid-cols-2 gap-2">
+              <Field>
+                <FieldLabel>Echelon</FieldLabel>
+                <Select value={echelonValue} onValueChange={handleEchelonChange}>
+                  <SelectTrigger className="h-8 text-sm">
+                    <SelectValue placeholder="Echelon" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ECHELON_OPTIONS.map((opt) => (
                       <SelectItem key={opt.value} value={opt.value}>
                         {opt.label}
                       </SelectItem>
                     ))}
-                  </SelectGroup>
-                ))}
-              </SelectContent>
-            </Select>
-          </Field>
-        </div>
-        <div className="grid grid-cols-2 gap-2">
-          <Field>
-            <FieldLabel>Affiliation</FieldLabel>
-            <Select
-              value={affiliationValue}
-              onValueChange={(v) => updateEntity(entity.id, { affiliation: v as SymbolAffiliation })}
-            >
-              <SelectTrigger className="h-8 text-sm">
-                <SelectValue placeholder="Affiliation" />
-              </SelectTrigger>
-              <SelectContent>
-                {AFFILIATION_OPTIONS.map((opt) => (
-                  <SelectItem key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </Field>
-          <Field>
-            <FieldLabel>Domain</FieldLabel>
-            <Select
-              value={domainValue}
-              onValueChange={(v) => updateEntity(entity.id, { domain: v as SymbolDomain })}
-            >
-              <SelectTrigger className="h-8 text-sm">
-                <SelectValue placeholder="Domain" />
-              </SelectTrigger>
-              <SelectContent>
-                {DOMAIN_OPTIONS.map((opt) => (
-                  <SelectItem key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </Field>
-        </div>
-        {!isEchelonLayerSelected && (
-          <Field>
-            <FieldLabel>Layer</FieldLabel>
-            <Select value={entity.layerId} onValueChange={(v) => updateEntity(entity.id, { layerId: v })}>
-              <SelectTrigger className="h-8 text-sm">
-                <SelectValue placeholder="Select layer" />
-              </SelectTrigger>
-              <SelectContent>
-                {assignableLayers.map((layer) => (
-                  <SelectItem key={layer.id} value={layer.id}>
-                    {layer.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </Field>
+                  </SelectContent>
+                </Select>
+              </Field>
+              <Field>
+                <FieldLabel>Type</FieldLabel>
+                <Select value={typeValue} onValueChange={handleTypeChange}>
+                  <SelectTrigger className="h-8 text-sm">
+                    <SelectValue placeholder="Type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {UNIT_TYPE_OPTIONS_GROUPED.map((group) => (
+                      <SelectGroup key={group.label}>
+                        <SelectLabel>{group.label}</SelectLabel>
+                        {group.options.map((opt) => (
+                          <SelectItem key={opt.value} value={opt.value}>
+                            {opt.label}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <Field>
+                <FieldLabel>Affiliation</FieldLabel>
+                <Select
+                  value={affiliationValue}
+                  onValueChange={(v) => updateEntity(entity.id, { affiliation: v as SymbolAffiliation })}
+                >
+                  <SelectTrigger className="h-8 text-sm">
+                    <SelectValue placeholder="Affiliation" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {AFFILIATION_OPTIONS.map((opt) => (
+                      <SelectItem key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+              <Field>
+                <FieldLabel>Domain</FieldLabel>
+                <Select
+                  value={domainValue}
+                  onValueChange={(v) => updateEntity(entity.id, { domain: v as SymbolDomain })}
+                >
+                  <SelectTrigger className="h-8 text-sm">
+                    <SelectValue placeholder="Domain" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {DOMAIN_OPTIONS.map((opt) => (
+                      <SelectItem key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+            </div>
+            {!isEchelonLayerSelected && (
+              <Field>
+                <FieldLabel>Layer</FieldLabel>
+                <Select value={entity.layerId} onValueChange={(v) => updateEntity(entity.id, { layerId: v })}>
+                  <SelectTrigger className="h-8 text-sm">
+                    <SelectValue placeholder="Select layer" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {assignableLayers.map((layer) => (
+                      <SelectItem key={layer.id} value={layer.id}>
+                        {layer.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+            )}
+          </>
         )}
         <div className="grid grid-cols-2 gap-2">
           <Field>
@@ -481,7 +516,11 @@ export function EntityInspector({ readOnly = false, enrichedOverlay = {} }: Prop
             <LinkedGeometriesList
               linkedGeometries={linkedGeometries}
               onDeleteGeometry={deleteGeometry}
-              emptyEditMessage="No geometries linked. The symbol is placed at the first linked geometry. Draw on the map and link to this entity to add one."
+              emptyEditMessage={
+                isCorporate
+                  ? "No geometries linked. Draw on the map and link to this organisation."
+                  : "No geometries linked. The symbol is placed at the first linked geometry. Draw on the map and link to this entity to add one."
+              }
             />
           </Field>
         )}
@@ -492,7 +531,7 @@ export function EntityInspector({ readOnly = false, enrichedOverlay = {} }: Prop
             className="w-full"
             onClick={() => handleDeleteEntity(entity.id)}
           >
-            Delete entity
+            {isCorporate ? "Delete organisation" : "Delete entity"}
           </Button>
         </Field>
       </FieldGroup>

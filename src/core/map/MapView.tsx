@@ -144,7 +144,7 @@ export function MapView({
 }: Props): React.ReactElement {
   const layers = useProjectStore((s) => s.layers)
   const entities = useProjectStore((s) => s.entities)
-  const organisations = useProjectStore((s) => s.organisations)
+  const organisations = useMemo(() => entities.filter((e) => e.kind === "corporate"), [entities])
   const drawnGeometries = useProjectStore((s) => s.drawnGeometries)
   const entityOsmGeometries = useOsmViewStore((s) => s.entityOsmGeometries)
   const selectedEntityId = useProjectStore((s) => s.selectedEntityId)
@@ -290,8 +290,8 @@ export function MapView({
         <OrganisationsLayer
           visibleLayerIds={visibleLayerIds}
           onSelectOrganisation={(id) => {
-            useProjectStore.getState().setSelectedOrganisationId(id)
-            useProjectStore.getState().setSelectedEntityId(null)
+            useOsmViewStore.getState().setSelectedOsmObject(null)
+            useProjectStore.getState().setSelectedEntityId(id)
           }}
           mapBounds={mapBounds}
           interactive={!isDrawing}

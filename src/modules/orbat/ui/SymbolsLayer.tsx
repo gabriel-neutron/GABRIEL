@@ -39,7 +39,9 @@ export function SymbolsLayer({
   mapBounds,
   interactive = true,
 }: Props): React.ReactElement {
-  const entities = useProjectStore((s) => s.entities)
+  const allEntities = useProjectStore((s) => s.entities)
+  /** Military only — corporate entities render via OrganisationsLayer's Lucide icons, not NATO symbols. */
+  const entities = useMemo(() => allEntities.filter((e) => e.kind === "unit"), [allEntities])
 
   const visible = useMemo(() => {
     return entities.flatMap((entity) => {

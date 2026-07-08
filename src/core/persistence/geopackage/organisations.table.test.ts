@@ -1,8 +1,14 @@
 import { readdirSync, rmSync } from "node:fs"
 import { GeoPackageAPI, type GeoPackage } from "@ngageoint/geopackage"
 import { afterEach, describe, expect, it } from "vitest"
+import { INDUSTRY_LAYER_ID } from "@/types/organisation.types"
+import {
+  organisationColumns,
+  readOrganisations,
+  migrateLegacyOrganisations,
+} from "./organisations.table"
+import { buildCreateTableColumnDefs, insertRow } from "./columnDescriptor"
 import type { Organisation } from "@/types/organisation.types"
-import { createOrganisationsTable, readOrganisations, writeOrganisations } from "./organisations.table"
 
 async function createTestGeoPackage(): Promise<GeoPackage> {
   const geoPackage = await GeoPackageAPI.create(`gabriel-test-${crypto.randomUUID()}.gpkg`)
@@ -10,7 +16,25 @@ async function createTestGeoPackage(): Promise<GeoPackage> {
   return geoPackage
 }
 
-describe("organisations.table", () => {
+/**
+ * Nothing in production code creates or writes to the `organisations` table anymore
+ * (E1, ADR 0004) — it only ever gets read for migration. These two helpers replicate
+ * the deleted `createOrganisationsTable`/`writeOrganisations` purely so tests can set
+ * up a genuine pre-E1 fixture to migrate from.
+ */
+function createLegacyOrganisationsTable(geoPackage: GeoPackage): void {
+  geoPackage.connection.run(
+    `CREATE TABLE IF NOT EXISTS organisations (\n  ${buildCreateTableColumnDefs(organisationColumns).join(",\n  ")}\n)`,
+  )
+}
+
+function writeLegacyOrganisations(geoPackage: GeoPackage, organisations: Organisation[]): void {
+  for (const organisation of organisations) {
+    insertRow(geoPackage.connection, "organisations", organisationColumns, organisation)
+  }
+}
+
+describe("organisations.table (legacy, read-only)", () => {
   afterEach(() => {
     for (const file of readdirSync(process.cwd())) {
       if (file.startsWith("gabriel-test-") && file.endsWith(".gpkg")) {
@@ -24,11 +48,11 @@ describe("organisations.table", () => {
   })
 
   it(
-    "round-trips every field of an organisation through write -> read",
+    "round-trips every field of a legacy organisation through write -> read",
     async () => {
       const geoPackage = await createTestGeoPackage()
       try {
-        createOrganisationsTable(geoPackage)
+        createLegacyOrganisationsTable(geoPackage)
         const organisation: Organisation = {
           id: "org-1",
           name: "Test Holding",
@@ -40,12 +64,9 @@ describe("organisations.table", () => {
           positionMode: "parent",
           isExactPosition: true,
         }
-        writeOrganisations(geoPackage, [organisation])
+        writeLegacyOrganisations(geoPackage, [organisation])
         const [loaded] = readOrganisations(geoPackage)
 
-        // Iterate the fixture's OWN keys, not organisationColumns — asserting against
-        // the descriptor list under test would let a deleted descriptor row silently
-        // shrink this loop instead of failing it.
         for (const key of Object.keys(organisation) as (keyof Organisation)[]) {
           expect(loaded[key]).toEqual(organisation[key])
         }
@@ -68,7 +89,7 @@ describe("organisations.table", () => {
   it("defaults invalid/legacy type and positionMode values on read", async () => {
     const geoPackage = await createTestGeoPackage()
     try {
-      createOrganisationsTable(geoPackage)
+      createLegacyOrganisationsTable(geoPackage)
       geoPackage.connection.run(
         `INSERT INTO organisations (id, name, type, position_mode, is_exact_position) VALUES (?, ?, ?, ?, ?)`,
         ["org-legacy", "Legacy Org", "bogus_type", "bogus_mode", 0],
@@ -80,5 +101,52 @@ describe("organisations.table", () => {
     } finally {
       geoPackage.close()
     }
+  })
+
+  describe("migrateLegacyOrganisations", () => {
+    it("folds a legacy organisation into an Entity tagged kind: 'corporate' on the fixed Industry layer", async () => {
+      const geoPackage = await createTestGeoPackage()
+      try {
+        createLegacyOrganisationsTable(geoPackage)
+        writeLegacyOrganisations(geoPackage, [
+          {
+            id: "org-1",
+            name: "Test Holding",
+            type: "holding",
+            parentId: null,
+            notes: "org note",
+            sources: null,
+            osmRelationId: 42,
+            positionMode: "own",
+            isExactPosition: true,
+          },
+        ])
+        const [migrated] = migrateLegacyOrganisations(geoPackage)
+        expect(migrated).toEqual(
+          expect.objectContaining({
+            kind: "corporate",
+            id: "org-1",
+            name: "Test Holding",
+            type: "holding",
+            layerId: INDUSTRY_LAYER_ID,
+            parentId: null,
+            osmRelationId: 42,
+            positionMode: "own",
+            isExactPosition: true,
+          }),
+        )
+      } finally {
+        geoPackage.close()
+      }
+    })
+
+    it("returns an empty array when there is no legacy organisations table to migrate", async () => {
+      const geoPackage = await createTestGeoPackage()
+      try {
+        expect(migrateLegacyOrganisations(geoPackage)).toEqual([])
+      } finally {
+        geoPackage.close()
+      }
+    })
   })
 })

@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState } from "react"
 import type { DrawnGeometry, MapEntity, PositionMode } from "@/types/domain.types"
 import type { SymbolAffiliation, SymbolDomain, SymbolEchelon } from "@/types/symbol.types"
+import type { OrganisationType } from "@/types/organisation.types"
 import { useProjectStore } from "@/store/useProjectStore"
 import { parse as parseSources } from "@/core/provenance/ledger"
 
@@ -41,6 +42,7 @@ export type EntityInspectorState = {
   findDialogOpen: boolean
   setFindDialogOpen: (open: boolean) => void
   handleNameChange: (name: string) => void
+  handleTypeChange: (type: string) => void
   handleEchelonChange: (v: string) => void
   handlePositionModeChange: (mode: PositionMode) => void
   handleIsExactPositionChange: (value: boolean) => void
@@ -77,13 +79,16 @@ export function useEntityInspector(): EntityInspectorState {
       ? entities.find((e) => e.id === entity.parentId)?.name ?? entity.parentId
       : null
 
-  const typeValue = entity?.type ?? "unknown"
+  const typeValue = entity?.type ?? (entity?.kind === "corporate" ? "other" : "unknown")
   const echelonValue = (entity?.echelon as SymbolEchelon | undefined) ?? ""
   const affiliationValue = (entity?.affiliation as SymbolAffiliation) ?? "Hostile"
   const domainValue = (entity?.domain as SymbolDomain) ?? "Ground"
   const positionModeValue: PositionMode = entity?.positionMode ?? "own"
   const isExactPositionValue = entity?.isExactPosition ?? false
-  const parentOptions = entity ? entities.filter((e) => e.id !== entity.id) : []
+  /** Parenting stays within the same Profile: a unit can't parent a corporate entity or vice versa. */
+  const parentOptions = entity
+    ? entities.filter((e) => e.id !== entity.id && e.kind === entity.kind)
+    : []
   const firstPoint = linkedGeometries.find((g) => g.type === "point")
   const isEchelonLayerSelected =
     entity != null &&
@@ -94,13 +99,21 @@ export function useEntityInspector(): EntityInspectorState {
     (name: string) => {
       if (!entity) return
       const patch: Partial<MapEntity> = { name }
-      if (!entity.echelon || entity.echelon === "") {
+      if (entity.kind === "unit" && (!entity.echelon || entity.echelon === "")) {
         const detected = detectEchelonFromName(name)
         if (detected) {
           patch.echelon = detected
         }
       }
       updateEntity(entity.id, patch)
+    },
+    [entity, updateEntity],
+  )
+
+  const handleTypeChange = useCallback(
+    (type: string) => {
+      if (!entity) return
+      updateEntity(entity.id, { type: type as OrganisationType })
     },
     [entity, updateEntity],
   )
@@ -203,6 +216,7 @@ export function useEntityInspector(): EntityInspectorState {
     findDialogOpen,
     setFindDialogOpen,
     handleNameChange,
+    handleTypeChange,
     handleEchelonChange,
     handlePositionModeChange,
     handleIsExactPositionChange,

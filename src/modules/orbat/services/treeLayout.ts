@@ -2,8 +2,7 @@ import type { Orbat, OrbatNode } from "@/core/entity/hierarchy"
 
 /**
  * Horizontal position for each item in a top-down tree layout: leaves get sequential
- * x-indexes; a parent is centered over the span of its own children. Shared by
- * TreeView and OrganisationTreeView so the two hierarchies lay out identically.
+ * x-indexes; a parent is centered over the span of its own children. Used by TreeView.
  *
  * Recursion guards against re-entering an already-visited id so a cyclic Orbat root
  * (see `buildOrbat`'s cycle policy) can't recurse forever.
