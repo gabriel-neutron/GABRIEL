@@ -1,3 +1,5 @@
+import type { OrganisationType } from "@/types/organisation.types"
+
 export type PositionMode = "own" | "parent" | "none"
 
 /**
@@ -25,10 +27,9 @@ export type EntityCore = {
 }
 
 /**
- * The military Unit Profile — the only Profile populated today (ADR 0004).
- * `kind` is a runtime-only discriminant, not a persisted GeoPackage column
- * (every stored `units` row is a unit) — it's injected at read time in
- * `core/persistence/geopackage/units.table.ts`.
+ * The military Unit Profile (ADR 0004). `kind` is a persisted GeoPackage
+ * column (`core/persistence/geopackage/units.table.ts`) — every row predating
+ * this column defaults to `"unit"`, since that's all the `units` table ever held.
  */
 export type UnitProfile = {
   kind: "unit"
@@ -49,12 +50,56 @@ export type UnitProfile = {
 }
 
 /**
- * Flat tagged union of every Entity profile, discriminated by `kind` (ADR 0004
- * — flat, never nested: `entity.echelon`, not `entity.profile.echelon`). Only
- * `UnitProfile` exists today; future profiles (vessel, company, person) are a
- * modelling exercise deferred to the investigation that needs them.
+ * The Corporate Profile (ADR 0004's E1 pilot — the collapsed `Organisation`).
+ * Always sits on the fixed synthetic `INDUSTRY_LAYER_ID` layer, never an
+ * arbitrary one (unlike `UnitProfile`, which can sit on any layer).
  */
-export type Profile = UnitProfile
+export type CorporateProfile = {
+  kind: "corporate"
+  type: OrganisationType
+  /** OSM relation id (e.g. multipolygon for an industrial site). */
+  osmRelationId?: number | null
+}
 
-/** A sourced, source-rated, geolocated, hierarchable node — core + a flat Profile (ADR 0004). */
-export type Entity = EntityCore & Profile
+/**
+ * Flat tagged union of every Entity profile, discriminated by `kind` (ADR 0004
+ * — flat, never nested: `entity.echelon`, not `entity.profile.echelon`). Future
+ * profiles (vessel, person) are a modelling exercise deferred to the
+ * investigation that needs them.
+ */
+export type Profile = UnitProfile | CorporateProfile
+
+/**
+ * A sourced, source-rated, geolocated, hierarchable node — core + a flat
+ * Profile (ADR 0004). Deliberately **not** a strict discriminated union at
+ * this type: every profile-specific field is optional regardless of `kind`
+ * ("D1-loose", see ROADMAP.md E1 note) so the ~15 direct `entity.echelon`-style
+ * reads across the orbat module keep compiling without narrowing on `kind`
+ * first. Use `Profile`, `asUnitProfile`, or `asCorporateProfile` wherever
+ * exhaustive, kind-safe field access is actually required (persistence
+ * encode/decode, symbol rendering, the Corporate Profile's required `type`).
+ */
+export type Entity = EntityCore & {
+  kind: Profile["kind"]
+  /**
+   * Widened to plain `string` rather than `UnitProfile["type"] & CorporateProfile["type"]`:
+   * TypeScript intersects same-named properties across an intersection type, which would
+   * otherwise narrow this to `OrganisationType` only and reject free-form unit type keys
+   * (e.g. "infantry"). `OrganisationType` is already a subtype of `string`, so nothing is lost.
+   */
+  type?: string
+  natoSymbolCode?: string | null
+  echelon?: string
+  affiliation?: UnitProfile["affiliation"]
+  domain?: UnitProfile["domain"]
+  osmRelationId?: number | null
+  militaryUnitId?: string | null
+}
+
+export function asUnitProfile(entity: Entity): UnitProfile | null {
+  return entity.kind === "unit" ? (entity as unknown as UnitProfile) : null
+}
+
+export function asCorporateProfile(entity: Entity): CorporateProfile | null {
+  return entity.kind === "corporate" ? (entity as unknown as CorporateProfile) : null
+}
