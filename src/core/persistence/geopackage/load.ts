@@ -1,12 +1,12 @@
 import { GeoPackageAPI, type GeoPackage } from "@ngageoint/geopackage"
-import { readEntities } from "./units.table"
-import { migrateLegacyOrganisations } from "./organisations.table"
+import { readEntities, readLegacyUnitSourcesColumn } from "./units.table"
+import { migrateLegacyOrganisations, readLegacyOrganisationSources } from "./organisations.table"
 import { readLayers } from "./layers.table"
 import { readGeometries } from "./geometries.table"
 import { readSourceCache } from "./researchSources.table"
 import { readProvenanceSources } from "./provenanceSources.table"
 import { readProvenanceClaims } from "./provenanceClaims.table"
-import { deriveProvenanceFromEntities } from "@/core/provenance/deriveFromEntities"
+import { deriveProvenanceFromEntities, type EntityLedgerInput } from "@/core/provenance/deriveFromEntities"
 import type { GeoPackageLoadResult } from "./types"
 
 export async function loadGeoPackage(buffer: ArrayBuffer): Promise<GeoPackageLoadResult> {
@@ -20,10 +20,20 @@ export async function loadGeoPackage(buffer: ArrayBuffer): Promise<GeoPackageLoa
     const entities = [...readEntities(geoPackage), ...migrateLegacyOrganisations(geoPackage)]
     const geometries = await readGeometries(geoPackage)
     const sourceCache = readSourceCache(geoPackage)
-    // ADR 0006, E2 Slice A: additive, derived from entity.sources (untouched by this
-    // step) merged with whatever provenance was already persisted from a prior save.
+    // ADR 0006, E2.6: entity.sources no longer exists — derive from the legacy raw
+    // sources columns on both units and organisations (the only two places a
+    // pre-cutover file could have stored citations), merged with whatever provenance
+    // was already persisted from a prior save.
+    const legacySources = new Map([
+      ...readLegacyUnitSourcesColumn(geoPackage),
+      ...readLegacyOrganisationSources(geoPackage),
+    ])
+    const ledgerInputs: EntityLedgerInput[] = entities.map((e) => ({
+      id: e.id,
+      sources: legacySources.get(e.id) ?? null,
+    }))
     const { sources, claims } = deriveProvenanceFromEntities(
-      entities,
+      ledgerInputs,
       readProvenanceSources(geoPackage),
       readProvenanceClaims(geoPackage),
     )

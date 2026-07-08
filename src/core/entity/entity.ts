@@ -16,8 +16,6 @@ export type EntityCore = {
   parentId: string | null
   /** Free-form notes. */
   notes?: string | null
-  /** Sources for this entity as a newline-delimited list of URLs/citations. */
-  sources?: string | null
   /** ISO timestamp of the latest completed batch analysis for this entity. */
   analyzedAt?: string | null
   /** How the entity is positioned: own geometry, linked to parent, or unknown. Defaults to "own". */

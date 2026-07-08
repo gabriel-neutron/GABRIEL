@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest"
 import { buildAcceptedPatch } from "./enrichmentApply"
 import type { MapEntity } from "@/types/domain.types"
 import type { EnrichmentProposal } from "@/types/enrichment.types"
+import { GENERAL_CITATION_FIELD, type Claim } from "@/core/provenance/claim"
+import type { Source } from "@/core/provenance/source"
 
 const baseEntity: MapEntity = {
   kind: "unit",
@@ -11,8 +13,17 @@ const baseEntity: MapEntity = {
   parentId: null,
   affiliation: "Hostile",
   isExactPosition: false,
-  sources: "https://a.example\nhttps://b.example",
 }
+
+const existingSources: Source[] = [
+  { id: "s-a", url: "https://a.example", domainType: null, reliability: null },
+  { id: "s-b", url: "https://b.example", domainType: null, reliability: null },
+]
+
+const existingClaims: Claim[] = [
+  { id: "cl-a", entityId: "e1", field: GENERAL_CITATION_FIELD, value: null, sourceId: "s-a", credibility: null, timestamp: null },
+  { id: "cl-b", entityId: "e1", field: GENERAL_CITATION_FIELD, value: null, sourceId: "s-b", credibility: null, timestamp: null },
+]
 
 function proposal(
   field: string,
@@ -30,60 +41,69 @@ function proposal(
 
 describe("buildAcceptedPatch", () => {
   it("returns null when no decisions are accepted", () => {
-    const patch = buildAcceptedPatch({
+    const result = buildAcceptedPatch({
       decisions: { notes: "pending", sources: "rejected" },
       overlay: { notes: "x" },
       proposals: [proposal("notes", "x", ["https://ev.example"])],
       entity: baseEntity,
+      existingClaims: [],
+      existingSources: [],
     })
-    expect(patch).toBeNull()
+    expect(result).toBeNull()
   })
 
-  it("merges existing sources with proposed sources and evidence URLs", () => {
-    const patch = buildAcceptedPatch({
-      decisions: {
-        notes: "accepted",
-        sources: "accepted",
-      },
-      overlay: {
-        notes: "HQ note",
-        sources: "https://c.example",
-      },
+  it("returns null when entity is null", () => {
+    const result = buildAcceptedPatch({
+      decisions: { notes: "accepted" },
+      overlay: { notes: "x" },
+      proposals: [],
+      entity: null,
+      existingClaims: [],
+      existingSources: [],
+    })
+    expect(result).toBeNull()
+  })
+
+  it("creates claims for proposed sources and evidence URLs not already known to the entity", () => {
+    const result = buildAcceptedPatch({
+      decisions: { notes: "accepted", sources: "accepted" },
+      overlay: { notes: "HQ note", sources: "https://c.example" },
       proposals: [
         proposal("notes", "HQ note", ["https://ev1.example", "https://ev2.example"]),
         proposal("sources", "https://c.example", []),
       ],
       entity: baseEntity,
+      existingClaims,
+      existingSources,
     })
-    expect(patch).not.toBeNull()
-    const urls = (patch!.sources as string).split("\n").map((s) => s.trim()).filter(Boolean)
-    expect(urls).toEqual(
-      expect.arrayContaining([
-        "https://a.example",
-        "https://b.example",
-        "https://c.example",
-        "https://ev1.example",
-        "https://ev2.example",
-      ]),
+    expect(result).not.toBeNull()
+    expect(result!.patch).toEqual({ notes: "HQ note" })
+    expect(result!.newSources.map((s) => s.url).sort()).toEqual(
+      ["https://c.example", "https://ev1.example", "https://ev2.example"].sort(),
     )
-    expect(urls.length).toBe(5)
-    expect(patch!.notes).toBe("HQ note")
+    const sourceById = new Map(result!.newSources.map((s) => [s.id, s]))
+    const claimedUrls = result!.newClaims.map((c) => sourceById.get(c.sourceId)?.url).sort()
+    expect(claimedUrls).toEqual(["https://c.example", "https://ev1.example", "https://ev2.example"].sort())
+    expect(result!.newClaims.every((c) => c.entityId === "e1" && c.field === GENERAL_CITATION_FIELD)).toBe(true)
   })
 
   it("adds evidence URLs from accepted non-source fields without accepted sources field", () => {
-    const patch = buildAcceptedPatch({
+    const result = buildAcceptedPatch({
       decisions: { militaryUnitId: "accepted" },
       overlay: { militaryUnitId: "42" },
       proposals: [proposal("militaryUnitId", "42", ["https://mil.example"])],
-      entity: { ...baseEntity, sources: null },
+      entity: baseEntity,
+      existingClaims: [],
+      existingSources: [],
     })
-    expect(patch).toEqual({
-      militaryUnitId: "42",
-      sources: "https://mil.example",
-    })
+    expect(result!.patch).toEqual({ militaryUnitId: "42" })
+    expect(result!.newSources).toHaveLength(1)
+    expect(result!.newSources[0].url).toBe("https://mil.example")
+    expect(result!.newClaims).toHaveLength(1)
+    expect(result!.newClaims[0].sourceId).toBe(result!.newSources[0].id)
   })
 
-  it("excludes a wikipedia citation from the merged ledger even when it ranks highest by weight", () => {
+  it("excludes a wikipedia citation from the new sources even when it ranks highest by weight", () => {
     const notesProposal: EnrichmentProposal = {
       field: "notes",
       currentValue: null,
@@ -94,16 +114,42 @@ describe("buildAcceptedPatch", () => {
         { url: "https://news.example/article", title: "", snippet: "", domainType: "news" },
       ],
     }
-    const patch = buildAcceptedPatch({
+    const result = buildAcceptedPatch({
       decisions: { notes: "accepted" },
       overlay: { notes: "HQ note" },
       proposals: [notesProposal],
-      entity: { ...baseEntity, sources: null },
+      entity: baseEntity,
+      existingClaims: [],
+      existingSources: [],
     })
-    expect(patch).toEqual({
-      notes: "HQ note",
-      sources: "https://news.example/article",
-    })
+    expect(result!.patch).toEqual({ notes: "HQ note" })
+    expect(result!.newSources.map((s) => s.url)).toEqual(["https://news.example/article"])
   })
 
+  it("reuses an existing global Source when a different entity already cited the URL, without duplicating the Source record", () => {
+    const sharedSource: Source = { id: "s-shared", url: "https://shared.example", domainType: null, reliability: null }
+    const result = buildAcceptedPatch({
+      decisions: { sources: "accepted" },
+      overlay: { sources: "https://shared.example" },
+      proposals: [],
+      entity: baseEntity,
+      existingClaims: [], // no claim from THIS entity yet, even though the Source already exists
+      existingSources: [sharedSource],
+    })
+    expect(result!.newSources).toHaveLength(0)
+    expect(result!.newClaims).toHaveLength(1)
+    expect(result!.newClaims[0].sourceId).toBe("s-shared")
+  })
+
+  it("mints no new claim when the entity already has a claim to that exact source", () => {
+    const result = buildAcceptedPatch({
+      decisions: { sources: "accepted" },
+      overlay: { sources: "https://a.example" },
+      proposals: [],
+      entity: baseEntity,
+      existingClaims,
+      existingSources,
+    })
+    expect(result).toBeNull()
+  })
 })

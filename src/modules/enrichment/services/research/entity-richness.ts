@@ -1,4 +1,6 @@
 import type { MapEntity } from "@/types/domain.types"
+import type { Claim } from "@/core/provenance/claim"
+import { GENERAL_CITATION_FIELD } from "@/core/provenance/claim"
 
 /**
  * Default richness threshold. An entity scoring >= this value is considered
@@ -10,12 +12,14 @@ export const DEFAULT_RICHNESS_THRESHOLD = 6
 
 /**
  * Computes a richness score for a MapEntity based on how much information it
- * already carries. Higher = more information already present.
+ * already carries. Higher = more information already present. Source count is
+ * a raw claim count, not deduplicated by URL — preserves the pre-E2.6 behavior
+ * where a raw-string split counted duplicate lines too.
  */
-export function computeEntityRichness(entity: MapEntity): number {
-  const sourceCount = entity.sources
-    ? entity.sources.split("\n").filter((s) => s.trim()).length
-    : 0
+export function computeEntityRichness(entity: MapEntity, claims: Claim[]): number {
+  const sourceCount = claims.filter(
+    (c) => c.entityId === entity.id && c.field === GENERAL_CITATION_FIELD,
+  ).length
   let score = sourceCount * 2
   if (entity.notes?.trim()) score += 1
   if (entity.militaryUnitId?.trim()) score += 1
@@ -26,8 +30,9 @@ export function computeEntityRichness(entity: MapEntity): number {
 /** Returns true if the entity should be skipped based on the richness threshold. */
 export function shouldSkipEntity(
   entity: MapEntity,
+  claims: Claim[],
   threshold = DEFAULT_RICHNESS_THRESHOLD,
 ): boolean {
   if (threshold <= 0) return false
-  return computeEntityRichness(entity) >= threshold
+  return computeEntityRichness(entity, claims) >= threshold
 }

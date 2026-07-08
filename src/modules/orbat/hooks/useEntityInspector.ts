@@ -3,9 +3,8 @@ import type { DrawnGeometry, MapEntity, PositionMode } from "@/types/domain.type
 import type { SymbolAffiliation, SymbolDomain, SymbolEchelon } from "@/types/symbol.types"
 import type { OrganisationType } from "@/types/organisation.types"
 import { useProjectStore } from "@/store/useProjectStore"
-import { parse as parseSources } from "@/core/provenance/ledger"
-
-const SOURCES_DELIMITER = "\n"
+import { useProvenanceStore } from "@/store/useProvenanceStore"
+import { GENERAL_CITATION_FIELD, type Claim } from "@/core/provenance/claim"
 
 function detectEchelonFromName(name: string): SymbolEchelon | null {
   const n = name.toLowerCase()
@@ -56,9 +55,14 @@ export function useEntityInspector(): EntityInspectorState {
     entities,
     layers,
     drawnGeometries,
+    claims,
     updateEntity,
     deleteGeometry,
+    addClaims,
+    removeClaim,
   } = useProjectStore()
+  const provenanceSources = useProvenanceStore((s) => s.sources)
+  const mergeUrls = useProvenanceStore((s) => s.mergeUrls)
 
   const [findDialogOpen, setFindDialogOpen] = useState(false)
   const [newSource, setNewSource] = useState("")
@@ -93,7 +97,23 @@ export function useEntityInspector(): EntityInspectorState {
   const isEchelonLayerSelected =
     entity != null &&
     layers.some((l) => l.kind === "echelon" && l.id === entity.layerId)
-  const sources = useMemo(() => (entity ? parseSources(entity.sources) : []), [entity])
+  // Own, non-deduping 1:1 claim->URL projection — deliberately NOT `projectEntityLedger`
+  // (which dedupes by URL), because this list is what `add`/`remove` index into by
+  // position. Two manually-added duplicate URLs must stay two distinct, independently
+  // removable rows (the deliberate asymmetry vs. the AI-accept flow, which does dedupe).
+  const entityClaims: Claim[] = useMemo(
+    () =>
+      entity
+        ? claims.filter((c) => c.entityId === entity.id && c.field === GENERAL_CITATION_FIELD)
+        : [],
+    [entity, claims],
+  )
+  const sources = useMemo(() => {
+    const sourceById = new Map(provenanceSources.map((s) => [s.id, s]))
+    return entityClaims
+      .map((c) => sourceById.get(c.sourceId)?.url)
+      .filter((url): url is string => url != null)
+  }, [entityClaims, provenanceSources])
 
   const handleNameChange = useCallback(
     (name: string) => {
@@ -177,19 +197,34 @@ export function useEntityInspector(): EntityInspectorState {
     if (!entity) return
     const value = newSource.trim()
     if (value === "") return
-    const next = entity.sources ? `${entity.sources}${SOURCES_DELIMITER}${value}` : value
-    updateEntity(entity.id, { sources: next })
+    // Never dedupes against this entity's existing claims — the deliberate asymmetry
+    // vs. the AI-accept flow (`enrichmentApply.ts`), which always does. `mergeUrls`
+    // itself dedupes only at the *Source*-identity layer (reuse a Source another entity
+    // already cited), an orthogonal concern from "does this entity already cite it".
+    const merged = mergeUrls([value])
+    const source = merged.find((s) => s.url === value)
+    if (!source) return
+    addClaims([
+      {
+        id: crypto.randomUUID(),
+        entityId: entity.id,
+        field: GENERAL_CITATION_FIELD,
+        value: null,
+        sourceId: source.id,
+        credibility: null,
+        timestamp: null,
+      },
+    ])
     setNewSource("")
-  }, [entity, newSource, updateEntity])
+  }, [entity, newSource, mergeUrls, addClaims])
 
   const handleRemoveSource = useCallback(
     (index: number) => {
-      if (!entity) return
-      const updated = sources.filter((_, i) => i !== index)
-      const next = updated.join(SOURCES_DELIMITER)
-      updateEntity(entity.id, { sources: next === "" ? null : next })
+      const claim = entityClaims[index]
+      if (!claim) return
+      removeClaim(claim.id)
     },
-    [entity, updateEntity, sources],
+    [entityClaims, removeClaim],
   )
 
   return {

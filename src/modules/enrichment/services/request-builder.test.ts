@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest"
 import { buildEnrichmentRequest } from "./request-builder"
 import { ENRICHMENT_MAX_DEPTH_DEFAULT } from "./enrichment.constants"
 import type { DrawnGeometry, MapEntity } from "@/types/domain.types"
+import { GENERAL_CITATION_FIELD, type Claim } from "@/core/provenance/claim"
 
 function makeEntity(overrides: Partial<MapEntity> = {}): MapEntity {
   return {
@@ -15,10 +16,21 @@ function makeEntity(overrides: Partial<MapEntity> = {}): MapEntity {
     affiliation: "Friend",
     domain: "Ground",
     notes: null,
-    sources: null,
     militaryUnitId: null,
     osmRelationId: null,
     ...overrides,
+  }
+}
+
+function makeClaim(entityId: string): Claim {
+  return {
+    id: "c1",
+    entityId,
+    field: GENERAL_CITATION_FIELD,
+    value: null,
+    sourceId: "s1",
+    credibility: null,
+    timestamp: null,
   }
 }
 
@@ -54,15 +66,15 @@ describe("buildEnrichmentRequest", () => {
     expect(request.prompt).not.toContain("Already known sources")
   })
 
-  it("includes the sources field in outputSchema when the ledger is empty", () => {
-    const entity = makeEntity({ sources: null })
+  it("includes the sources field in outputSchema when there are no existing claims", () => {
+    const entity = makeEntity()
     const request = buildEnrichmentRequest(entity, [entity], geometries)
     expect(request.outputSchema.properties.sources).toBeDefined()
   })
 
-  it("omits the sources field from outputSchema when the ledger already has entries", () => {
-    const entity = makeEntity({ sources: "https://example.com/a" })
-    const request = buildEnrichmentRequest(entity, [entity], geometries)
+  it("omits the sources field from outputSchema when the entity already has a citation claim", () => {
+    const entity = makeEntity()
+    const request = buildEnrichmentRequest(entity, [entity], geometries, { claims: [makeClaim(entity.id)] })
     expect(request.outputSchema.properties.sources).toBeUndefined()
   })
 

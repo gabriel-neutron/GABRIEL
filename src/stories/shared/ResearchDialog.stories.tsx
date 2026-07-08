@@ -21,6 +21,7 @@ const meta = {
           open={open}
           onClose={() => setOpen(false)}
           entities={[]}
+          claims={[]}
           entityStatuses={{}}
           totalUsage={{ inputTokens: 0, outputTokens: 0 }}
           cacheAdditions={[]}
@@ -52,6 +53,7 @@ export const Default: Story = {
     open: true,
     onClose: () => undefined,
     entities: [],
+    claims: [],
     entityStatuses: {},
     totalUsage: { inputTokens: 0, outputTokens: 0 },
     cacheAdditions: [],

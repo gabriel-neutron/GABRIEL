@@ -7,6 +7,8 @@ import {
 import { DEFAULT_RICHNESS_THRESHOLD } from "@/modules/enrichment/services/research/entity-richness"
 import type { DrawnGeometry, MapEntity } from "@/types/domain.types"
 import type { EnrichmentResponse } from "@/types/enrichment.types"
+import { useProjectStore } from "@/store/useProjectStore"
+import { useProvenanceStore } from "@/store/useProvenanceStore"
 import {
   advanceReviewQueue,
   applyBatchOutcome,
@@ -43,6 +45,8 @@ export function useLayeredResearch(
   options: UseLayeredResearchOptions = {},
 ) {
   const { onEntityAnalyzed } = options
+  const claims = useProjectStore((s) => s.claims)
+  const provenanceSources = useProvenanceStore((s) => s.sources)
   const [status, setStatus] = useState<LayeredResearchStatus>("idle")
   const [progress, setProgress] = useState<ProgressState | null>(null)
   const [batchResults, setBatchResults] = useState<Record<string, EnrichmentResponse>>({})
@@ -103,6 +107,8 @@ export function useLayeredResearch(
       try {
         const result = await runLayeredResearch(entities, drawnGeometries, {
           sourceCache,
+          claims,
+          sources: provenanceSources,
           maxEntities: batchSize,
           skipEntityIds: combinedSkipEntityIds,
           richnessThreshold,
@@ -147,6 +153,8 @@ export function useLayeredResearch(
     [
       entities,
       drawnGeometries,
+      claims,
+      provenanceSources,
       batchSize,
       richnessThreshold,
       onEntityAnalyzed,

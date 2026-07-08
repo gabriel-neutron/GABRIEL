@@ -1,5 +1,4 @@
 import type { EnrichmentOutputSchema } from "@/types/enrichment.types"
-import { shouldPropose } from "@/core/provenance/ledger"
 
 export const DEFAULT_ENRICHMENT_OUTPUT_SCHEMA: EnrichmentOutputSchema = {
   type: "object",
@@ -14,13 +13,13 @@ export const DEFAULT_ENRICHMENT_OUTPUT_SCHEMA: EnrichmentOutputSchema = {
 }
 
 /**
- * Returns an output schema that includes the `sources` field only when the entity's
- * provenance ledger (`sources`, the raw newline-delimited value) is empty. When sources
- * already exist, the ledger is populated automatically via accepted-proposal citation
- * accumulation and no independent proposal is needed.
+ * Returns an output schema that includes the `sources` field only when the entity has
+ * no existing provenance claims. When sources already exist, the ledger is populated
+ * automatically via accepted-proposal citation accumulation and no independent proposal
+ * is needed.
  */
-export function buildEnrichmentOutputSchema(sources?: string | null): EnrichmentOutputSchema {
-  if (!shouldPropose(sources)) {
+export function buildEnrichmentOutputSchema(hasExistingSources: boolean): EnrichmentOutputSchema {
+  if (hasExistingSources) {
     return {
       type: "object",
       properties: {

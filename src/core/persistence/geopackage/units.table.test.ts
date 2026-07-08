@@ -43,7 +43,6 @@ describe("units.table", () => {
           osmRelationId: 42,
           militaryUnitId: "mun-1",
           notes: "some notes",
-          sources: "https://example.org",
           analyzedAt: "2026-01-01T00:00:00.000Z",
           positionMode: "parent",
           isExactPosition: true,
@@ -186,10 +185,16 @@ describe("units.table", () => {
         const geoPackage = await createTestGeoPackage()
         try {
           createUnitsTable(geoPackage)
+          // `sources` is no longer part of `unitColumns` (E2.6) — `createUnitsTable`
+          // never creates this physical column anymore. Simulate a pre-cutover file
+          // that still has it via raw SQL, the only way this legacy-read path is
+          // exercised now.
+          geoPackage.connection.run("ALTER TABLE units ADD COLUMN sources TEXT")
           writeEntities(geoPackage, [
-            { kind: "unit", id: "e-1", name: "A", layerId: "layer-1", parentId: null, sources: "https://a.example" },
-            { kind: "unit", id: "e-2", name: "B", layerId: "layer-1", parentId: null, sources: null },
+            { kind: "unit", id: "e-1", name: "A", layerId: "layer-1", parentId: null },
+            { kind: "unit", id: "e-2", name: "B", layerId: "layer-1", parentId: null },
           ])
+          geoPackage.connection.run("UPDATE units SET sources = ? WHERE id = ?", ["https://a.example", "e-1"])
           expect(readLegacyUnitSourcesColumn(geoPackage)).toEqual(new Map([["e-1", "https://a.example"]]))
         } finally {
           geoPackage.close()
@@ -199,12 +204,11 @@ describe("units.table", () => {
     )
 
     it(
-      "returns an empty map when the sources column doesn't exist (simulating post-E2.6 schema)",
+      "returns an empty map when the sources column doesn't exist (post-E2.6 schema, the normal case)",
       async () => {
         const geoPackage = await createTestGeoPackage()
         try {
           createUnitsTable(geoPackage)
-          geoPackage.connection.run("ALTER TABLE units DROP COLUMN sources")
           expect(readLegacyUnitSourcesColumn(geoPackage)).toEqual(new Map())
         } finally {
           geoPackage.close()

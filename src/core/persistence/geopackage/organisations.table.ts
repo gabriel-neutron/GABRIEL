@@ -78,11 +78,26 @@ export function migrateLegacyOrganisations(geoPackage: GeoPackage): MapEntity[] 
     layerId: INDUSTRY_LAYER_ID,
     parentId: o.parentId,
     notes: o.notes,
-    sources: o.sources,
     osmRelationId: o.osmRelationId,
     positionMode: o.positionMode,
     isExactPosition: o.isExactPosition,
   }))
+}
+
+/**
+ * Raw read of the legacy `organisations` table's `sources` string column, keyed by
+ * entity id (ADR 0006, E2.6) — the corporate-entity sibling of `units.table.ts`'s
+ * `readLegacyUnitSourcesColumn`. `migrateLegacyOrganisations` no longer copies `sources`
+ * onto the returned `Entity` (the field was removed from `EntityCore`), so this is the
+ * only remaining way to feed a legacy organisation's citations into Source/Claim
+ * derivation in `load.ts`.
+ */
+export function readLegacyOrganisationSources(geoPackage: GeoPackage): Map<string, string> {
+  const result = new Map<string, string>()
+  for (const o of readOrganisations(geoPackage)) {
+    if (o.sources) result.set(o.id, o.sources)
+  }
+  return result
 }
 
 /**

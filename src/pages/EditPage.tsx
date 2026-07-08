@@ -30,7 +30,6 @@ export function EditPage({ onViewMode, onOpenAbout }: EditPageProps): React.Reac
       layerId: INDUSTRY_LAYER_ID,
       parentId: null,
       notes: null,
-      sources: null,
       osmRelationId: null,
       positionMode: "own",
       isExactPosition: false,

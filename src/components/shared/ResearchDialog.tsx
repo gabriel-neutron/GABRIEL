@@ -3,6 +3,8 @@ import { Button } from "@/ui/button"
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/ui/dialog"
 import { shouldSkipEntity } from "@/modules/enrichment/services/research/entity-richness"
 import type { MapEntity } from "@/types/domain.types"
+import type { Claim } from "@/core/provenance/claim"
+import { GENERAL_CITATION_FIELD } from "@/core/provenance/claim"
 import type { EntityResearchStatus } from "@/modules/enrichment/hooks/useLayeredResearch"
 import type { LayeredResearchResult } from "@/modules/enrichment/services/research/layered-research.service"
 
@@ -10,6 +12,7 @@ type ResearchDialogProps = {
   open: boolean
   onClose: () => void
   entities: MapEntity[]
+  claims: Claim[]
   entityStatuses: Record<string, EntityResearchStatus>
   totalUsage: { inputTokens: number; outputTokens: number }
   cacheAdditions: Array<{ url: string; content: string }>
@@ -105,6 +108,7 @@ export function ResearchDialog({
   open,
   onClose,
   entities,
+  claims,
   entityStatuses,
   totalUsage,
   cacheAdditions,
@@ -137,7 +141,7 @@ export function ResearchDialog({
   const progressPct = progress ? Math.round(((progress.done + 1) / progress.total) * 100) : 0
   const eligibleEntities = entities.filter(
     (entity) =>
-      !shouldSkipEntity(entity, richnessThreshold) &&
+      !shouldSkipEntity(entity, claims, richnessThreshold) &&
       !isAnalyzedRecently(entity, skipAnalyzedWithinDays),
   )
   const hasEligibleEntities = eligibleEntities.length > 0
@@ -276,9 +280,9 @@ export function ResearchDialog({
                   {eligibleEntities.map((entity) => {
                     const st = entityStatuses[entity.id]
                     const isCurrentEntity = progress?.entityId === entity.id
-                    const sourceCount = typeof entity.sources === "string"
-                      ? entity.sources.split("\n").filter((s) => s.trim()).length
-                      : Array.isArray(entity.sources) ? (entity.sources as string[]).length : 0
+                    const sourceCount = claims.filter(
+                      (c) => c.entityId === entity.id && c.field === GENERAL_CITATION_FIELD,
+                    ).length
                     return (
                       <tr
                         key={entity.id}

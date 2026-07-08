@@ -19,6 +19,8 @@ import {
 import type { DrawnGeometry, MapEntity } from "@/types/domain.types"
 import type { EnrichmentProposal, EnrichmentResponse } from "@/types/enrichment.types"
 import { buildAcceptedPatch } from "@/modules/enrichment/services/enrichmentApply"
+import { useProjectStore } from "@/store/useProjectStore"
+import { useProvenanceStore } from "@/store/useProvenanceStore"
 import { createEnrichmentRunner } from "./enrichmentRunner"
 
 export type UseEnrichmentArgs = {
@@ -39,6 +41,8 @@ export function useEnrichment({
   const [draftPrompt, setDraftPrompt] = useState("")
   const [closeNotice, setCloseNotice] = useState<string | null>(null)
   const runnerRef = useRef(createEnrichmentRunner(runEnrichment))
+  const claims = useProjectStore((s) => s.claims)
+  const addClaims = useProjectStore((s) => s.addClaims)
 
   const selectedEntity = useMemo(
     () => (selectedEntityId ? entities.find((entity) => entity.id === selectedEntityId) ?? null : null),
@@ -67,16 +71,27 @@ export function useEnrichment({
 
   const applyAcceptedProposals = useCallback(
     (runFeatureId: string) => {
+      // Preserved exactly: claims/sources are not committed at all when no callback is
+      // wired, same as the pre-E2.6 behavior of never touching `entity.sources` either.
       if (!onApplyAccepted) return
-      const patch = buildAcceptedPatch({
+      const result = buildAcceptedPatch({
         decisions: state.decisions[runFeatureId] ?? {},
         overlay: state.overlay[runFeatureId] ?? {},
         proposals: state.run.proposals,
         entity: entities.find((e) => e.id === runFeatureId) ?? null,
+        existingClaims: claims.filter((c) => c.entityId === runFeatureId),
+        existingSources: useProvenanceStore.getState().sources,
       })
-      if (patch != null) onApplyAccepted(runFeatureId, patch)
+      if (!result) return
+      if (result.newSources.length > 0) {
+        useProvenanceStore
+          .getState()
+          .setSources([...useProvenanceStore.getState().sources, ...result.newSources])
+      }
+      if (result.newClaims.length > 0) addClaims(result.newClaims)
+      if (result.patch != null) onApplyAccepted(runFeatureId, result.patch)
     },
-    [entities, onApplyAccepted, state],
+    [entities, onApplyAccepted, state, claims, addClaims],
   )
 
   const closeDrawer = useCallback(() => {
@@ -138,7 +153,7 @@ export function useEnrichment({
       }),
     )
     await runnerRef.current.run(
-      buildEnrichmentRequest(selectedEntity, entities, drawnGeometries, { prompt: draftPrompt }),
+      buildEnrichmentRequest(selectedEntity, entities, drawnGeometries, { prompt: draftPrompt, claims }),
       {
         onProgress: (progress) => {
           setState((current) => updateEnrichmentProgress(current, progress))
@@ -171,7 +186,7 @@ export function useEnrichment({
         onFinally: () => {},
       },
     )
-  }, [context, draftPrompt, drawnGeometries, entities, feature, selectedEntity, state.run.status])
+  }, [context, draftPrompt, drawnGeometries, entities, feature, selectedEntity, state.run.status, claims])
 
   const accept = useCallback(
     (proposal: EnrichmentProposal) => {

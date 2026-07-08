@@ -2,7 +2,7 @@ import { create } from "zustand"
 import { devtools } from "zustand/middleware"
 import { setSourceReliability } from "@/core/provenance/admiralty"
 import type { AdmiraltyReliability } from "@/core/provenance/admiralty"
-import type { Source } from "@/core/provenance/source"
+import { dedupeSources, type Source } from "@/core/provenance/source"
 
 /**
  * `Source` records are peripheral, not part of the entity/geometry transactional
@@ -19,6 +19,8 @@ export interface ProvenanceActions {
   setSources(sources: Source[]): void
   resetSources(): void
   rateSourceReliability(sourceId: string, reliability: AdmiraltyReliability | null): void
+  /** Creates-or-reuses a `Source` per URL by exact-match identity (ADR 0006). Returns the resulting records so a caller can resolve the id it needs (e.g. for a new Claim) without a second store read. */
+  mergeUrls(urls: string[]): Source[]
 }
 
 function initialState(): ProvenanceState {
@@ -27,7 +29,7 @@ function initialState(): ProvenanceState {
 
 export const useProvenanceStore = create<ProvenanceState & ProvenanceActions>()(
   devtools(
-    (set) => ({
+    (set, get) => ({
       ...initialState(),
 
       setSources(sources) {
@@ -40,6 +42,12 @@ export const useProvenanceStore = create<ProvenanceState & ProvenanceActions>()(
 
       rateSourceReliability(sourceId, reliability) {
         set((s) => ({ sources: setSourceReliability(s.sources, sourceId, reliability) }), false, "rateSourceReliability")
+      },
+
+      mergeUrls(urls) {
+        const sources = dedupeSources(urls, get().sources)
+        set({ sources }, false, "mergeUrls")
+        return sources
       },
     }),
     { name: "GabrielProvenanceStore", enabled: import.meta.env.DEV },

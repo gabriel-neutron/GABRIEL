@@ -68,7 +68,6 @@ export const unitColumns: ColumnDescriptor<MapEntity>[] = [
   { prop: "osmRelationId", column: "osm_relation_id", sqlType: "INTEGER", encode: (v) => (v != null ? Number(v) : null), decode: (raw) => (raw != null ? Number(raw) : undefined) },
   { prop: "militaryUnitId", column: "military_unit_id", sqlType: "TEXT", encode: (v) => (v != null ? String(v) : null), decode: (raw) => (raw != null ? String(raw) : undefined) },
   { prop: "notes", column: "notes", sqlType: "TEXT", encode: (v) => (v != null ? String(v) : null), decode: (raw) => (raw != null ? String(raw) : undefined) },
-  { prop: "sources", column: "sources", sqlType: "TEXT", encode: (v) => (v != null ? String(v) : null), decode: (raw) => (raw != null ? String(raw) : undefined) },
   {
     prop: "analyzedAt",
     column: "analyzed_at",

@@ -6,7 +6,9 @@ import type {
 } from "@/types/enrichment.types"
 import { runEnrichment } from "@/modules/enrichment/services/enrichment.service"
 import { buildEnrichmentRequest } from "@/modules/enrichment/services/request-builder"
-import { parse } from "@/core/provenance/ledger"
+import type { Claim } from "@/core/provenance/claim"
+import type { Source } from "@/core/provenance/source"
+import { projectEntityLedger } from "@/core/provenance/ledgerProjection"
 import {
   createLayeredResearchProviderBundle,
   type ProviderBundle,
@@ -45,6 +47,10 @@ export type LayeredResearchResult = {
 export type LayeredResearchOptions = {
   /** URL → cached snippet. Mutated in-place as new sources are discovered. */
   sourceCache?: Map<string, string>
+  /** This project's provenance claims (ADR 0006, E2.6) — used for richness scoring and pool hints. */
+  claims?: Claim[]
+  /** This project's provenance sources (ADR 0006, E2.6) — used to resolve claims to URLs. */
+  sources?: Source[]
   /** Stop after this many BFS layers. Default: unlimited. */
   maxLayers?: number
   /** Stop after processing this many entities total. Default: unlimited. */
@@ -112,6 +118,8 @@ export async function runLayeredResearch(
   providers?: ProviderBundle,
 ): Promise<LayeredResearchResult> {
   const sourceCache = options.sourceCache ?? new Map<string, string>()
+  const claims = options.claims ?? []
+  const sources = options.sources ?? []
   const delayMs = options.delayBetweenEntitiesMs ?? 500
   const richnessThreshold = options.richnessThreshold ?? DEFAULT_RICHNESS_THRESHOLD
   const maxEntities = options.maxEntities ?? Infinity
@@ -157,7 +165,7 @@ export async function runLayeredResearch(
       }
 
       // Skip richly-sourced entities
-      if (shouldSkipEntity(entity, richnessThreshold)) {
+      if (shouldSkipEntity(entity, claims, richnessThreshold)) {
         skippedRichEntityIds.push(entity.id)
         continue
       }
@@ -181,10 +189,10 @@ export async function runLayeredResearch(
       })
 
       try {
-        const poolHintUrls = parse(entity.sources)
+        const poolHintUrls = projectEntityLedger(entity.id, claims, sources)
 
         const { response, usage } = await runEnrichment(
-          buildEnrichmentRequest(entity, entities, drawnGeometries, { poolHintUrls }),
+          buildEnrichmentRequest(entity, entities, drawnGeometries, { poolHintUrls, claims }),
           { providers: bundle, signal: options.signal },
         )
 

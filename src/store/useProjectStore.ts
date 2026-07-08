@@ -70,6 +70,9 @@ export interface ProjectActions {
   addGeometry(geom: DrawnGeometry): void
   deleteGeometry(geometryId: string): void
 
+  addClaims(claims: Claim[]): void
+  removeClaim(claimId: string): void
+
   setSelectedEntityId(id: string | null): void
   closeDetail(): void
 }
@@ -217,6 +220,14 @@ export const useProjectStore = create<ProjectState & ProjectActions>()(
           false,
           "deleteGeometry",
         )
+      },
+
+      addClaims(claims) {
+        set((s) => ({ claims: [...s.claims, ...claims] }), false, "addClaims")
+      },
+
+      removeClaim(claimId) {
+        set((s) => ({ claims: s.claims.filter((c) => c.id !== claimId) }), false, "removeClaim")
       },
 
       setSelectedEntityId(id) {

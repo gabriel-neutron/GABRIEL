@@ -11,7 +11,6 @@ const entities: MapEntity[] = [
     layerId: "layer-1",
     parentId: null,
     notes: "",
-    sources: "",
     affiliation: "Friend",
     domain: "Ground",
     natoSymbolCode: "",

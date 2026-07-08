@@ -90,6 +90,7 @@ export function MainLayout({
   const {
     layers,
     entities,
+    claims,
     selectedEntityId,
     addLayer,
     closeDetail,
@@ -260,6 +261,7 @@ export function MainLayout({
           open={layeredResearch.dialogOpen}
           onClose={layeredResearch.closeDialog}
           entities={entities}
+          claims={claims}
           entityStatuses={layeredResearch.entityStatuses}
           totalUsage={layeredResearch.totalUsage}
           cacheAdditions={layeredResearch.cacheAdditions}

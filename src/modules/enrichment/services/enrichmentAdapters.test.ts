@@ -14,7 +14,6 @@ function makeEntity(overrides: Partial<MapEntity> = {}): MapEntity {
     affiliation: "Friend",
     domain: "Ground",
     notes: null,
-    sources: null,
     militaryUnitId: null,
     osmRelationId: null,
     ...overrides,
