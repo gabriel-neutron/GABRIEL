@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef } from "react"
-import { MapView } from "@/components/map/MapView"
+import { MapView } from "@/core/map/MapView"
 import { EntityInspector } from "@/modules/orbat/ui/EntityInspector"
 import { OrganisationInspector } from "@/components/inspector/OrganisationInspector"
 import { EnrichDrawer } from "@/modules/enrichment/ui/EnrichDrawer"

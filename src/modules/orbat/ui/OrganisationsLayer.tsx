@@ -2,11 +2,11 @@ import { useMemo, useLayoutEffect, useState } from "react"
 import L from "leaflet"
 import { Marker, Popup } from "react-leaflet"
 import { makeOrganisationIcon } from "@/utils/organisation-icons"
-import { computeAllOrganisationPositions } from "@/utils/geometry"
+import { computeAllOrganisationPositions } from "@/core/map/geometry"
 import { useProjectStore } from "@/store/useProjectStore"
 import { INDUSTRY_LAYER_ID } from "@/types/organisation.types"
 import type { LatLng } from "@/core/coordinates"
-import type { MapBounds } from "./MapBoundsReporter"
+import type { MapBounds } from "@/core/map/MapBoundsReporter"
 
 const BOUNDS_BUFFER = 0.5
 

@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite"
 import "leaflet/dist/leaflet.css"
-import { MapView } from "@/components/map/MapView"
+import { MapView } from "./MapView"
 
 const meta = {
   title: "Map/MapView",

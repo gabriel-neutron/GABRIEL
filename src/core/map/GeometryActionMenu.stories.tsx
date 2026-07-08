@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite"
-import { GeometryActionMenu } from "@/components/map/GeometryActionMenu"
+import { GeometryActionMenu } from "./GeometryActionMenu"
 import type { MapEntity } from "@/types/domain.types"
 
 const entities: MapEntity[] = [

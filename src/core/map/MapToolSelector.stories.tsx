@@ -1,17 +1,14 @@
 import type { Meta, StoryObj } from "@storybook/react-vite"
 import { MapContainer, TileLayer } from "react-leaflet"
 import "leaflet/dist/leaflet.css"
-import "leaflet-draw/dist/leaflet.draw.css"
-import { DrawControls } from "@/components/map/DrawControls"
+import { MapToolSelector } from "./MapToolSelector"
 
 const meta = {
-  title: "Map/DrawControls",
-  component: DrawControls,
+  title: "Map/MapToolSelector",
+  component: MapToolSelector,
   args: {
-    enabled: true,
-    geometryType: "polygon",
-    defaultLayerId: "layer-1",
-    onCreated: () => undefined,
+    mapTool: "pan",
+    onMapToolChange: () => undefined,
   },
   render: (args) => (
     <div className="h-[420px] w-full">
@@ -24,11 +21,11 @@ const meta = {
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
-        <DrawControls {...args} />
+        <MapToolSelector {...args} />
       </MapContainer>
     </div>
   ),
-} satisfies Meta<typeof DrawControls>
+} satisfies Meta<typeof MapToolSelector>
 
 export default meta
 type Story = StoryObj<typeof meta>
