@@ -3,8 +3,8 @@ import {
   runLayeredResearch,
   buildBfsLayers,
   type LayeredResearchResult,
-} from "@/services/research/layered-research.service"
-import { DEFAULT_RICHNESS_THRESHOLD } from "@/services/research/entity-richness"
+} from "@/modules/enrichment/services/research/layered-research.service"
+import { DEFAULT_RICHNESS_THRESHOLD } from "@/modules/enrichment/services/research/entity-richness"
 import type { DrawnGeometry, MapEntity } from "@/types/domain.types"
 import type { EnrichmentResponse } from "@/types/enrichment.types"
 import {

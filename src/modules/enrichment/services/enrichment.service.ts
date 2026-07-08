@@ -26,7 +26,7 @@ import {
   ENRICHMENT_MAX_ELAPSED_MS,
   ENRICHMENT_MAX_ESTIMATED_TOKENS,
 } from "./enrichment.constants"
-import { rankCitations } from "@/modules/enrichment/citation-rating"
+import { rankCitations } from "./citation-rating"
 
 type ServiceProgress = {
   depthUsed: number

@@ -4,14 +4,14 @@ import type {
   EnrichmentResponse,
   EnrichmentUsage,
 } from "@/types/enrichment.types"
-import { runEnrichment } from "@/services/enrichment/enrichment.service"
-import { buildEnrichmentRequest } from "@/services/enrichment/request-builder"
+import { runEnrichment } from "@/modules/enrichment/services/enrichment.service"
+import { buildEnrichmentRequest } from "@/modules/enrichment/services/request-builder"
 import { parse } from "@/core/provenance/ledger"
 import {
   createLayeredResearchProviderBundle,
   type ProviderBundle,
-} from "@/services/enrichment/providers"
-import { OverpassAdapter } from "@/services/enrichment/providers/overpass.adapter"
+} from "@/modules/enrichment/services/providers"
+import { OverpassAdapter } from "@/modules/enrichment/services/providers/overpass.adapter"
 import { shouldSkipEntity, DEFAULT_RICHNESS_THRESHOLD } from "./entity-richness"
 
 export type LayeredResearchResult = {

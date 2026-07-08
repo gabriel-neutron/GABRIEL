@@ -3,7 +3,7 @@ import { Loader2 } from "lucide-react"
 import { MainLayout } from "@/components/shared/MainLayout"
 import { loadGeoPackage, applyGeoPackageResult } from "@/core/persistence/geopackage"
 import { useProjectStore } from "@/store/useProjectStore"
-import { useEnrichment } from "@/hooks/useEnrichment"
+import { useEnrichment } from "@/modules/enrichment/hooks/useEnrichment"
 
 export type ViewPageProps = {
   onEditMode?: () => void

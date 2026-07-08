@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useRef, useState } from "react"
-import { buildDefaultEnrichmentPrompt, buildEnrichmentRequest, ENRICHMENT_MAX_DEPTH_DEFAULT, runEnrichment } from "@/services/enrichment"
+import { buildDefaultEnrichmentPrompt, buildEnrichmentRequest, ENRICHMENT_MAX_DEPTH_DEFAULT, runEnrichment } from "@/modules/enrichment/services"
 import { toEnrichmentFeature, toEnrichmentContext } from "@/utils/enrichmentAdapters"
 import {
   acceptProposalToOverlay,

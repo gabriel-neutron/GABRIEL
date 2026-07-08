@@ -5,8 +5,8 @@ import { INDUSTRY_LAYER_ID } from "@/types/organisation.types"
 import { MainLayout } from "@/components/shared/MainLayout"
 import { ToastStack, type ToastItem } from "@/components/shared/ToastStack"
 import { useProjectStore } from "@/store/useProjectStore"
-import { useEnrichment } from "@/hooks/useEnrichment"
-import { useLayeredResearch } from "@/hooks/useLayeredResearch"
+import { useEnrichment } from "@/modules/enrichment/hooks/useEnrichment"
+import { useLayeredResearch } from "@/modules/enrichment/hooks/useLayeredResearch"
 import { useProjectIO } from "@/hooks/useProjectIO"
 
 export type EditPageProps = {

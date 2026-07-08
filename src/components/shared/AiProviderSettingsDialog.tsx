@@ -7,7 +7,7 @@ import {
   getAiProviderKeys,
   saveAiProviderKeys,
   type AiProviderKeys,
-} from "@/services/enrichment/settings.service"
+} from "@/modules/enrichment/services/settings.service"
 
 type Props = {
   open: boolean

@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite"
-import { EnrichDrawer } from "@/components/enrichment/EnrichDrawer"
+import { EnrichDrawer } from "./EnrichDrawer"
 
 const meta = {
   title: "Enrichment/EnrichDrawer",

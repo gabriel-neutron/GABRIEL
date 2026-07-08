@@ -1,5 +1,5 @@
 import type { EnrichmentSource } from "@/types/enrichment.types"
-import { getAuthorityWeight } from "@/services/enrichment/validators"
+import { getAuthorityWeight } from "@/modules/enrichment/services/validators"
 
 const AGGREGATE_URL_PATTERNS = ["/feed/", "/author/", "/tag/", "/category/"]
 

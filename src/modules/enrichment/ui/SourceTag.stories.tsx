@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite"
-import { SourceTag } from "@/components/enrichment/SourceTag"
+import { SourceTag } from "./SourceTag"
 
 const meta = {
   title: "Enrichment/SourceTag",

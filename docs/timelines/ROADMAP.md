@@ -68,7 +68,8 @@ Rule: a subject moves **with** its `./`-importing test and its `@/`-importing st
   > note: `core/provenance/ledger.ts` holds storage; `modules/enrichment/citation-rating.ts` holds `isSpecificArticleUrl`/`rankCitations`/`selectTopCitations` (imports `getAuthorityWeight` from `@/services/enrichment/validators` — that file itself moves wholesale in A5, so this import gets repointed then). No shim left (unlike A1) since the roadmap only asked for one on A1; all 8 importers updated directly, dead `provenanceLedger` barrel re-export removed from `services/enrichment/index.ts` (nothing consumed it).
 - [x] **A4** — `types/coordinates.ts → core/coordinates/`. 📎 `ARCHITECTURE.md` → *Coordinate Contract*.
   > note: landed as `core/coordinates/index.ts` (barrel-style filename, matching the existing `geopackage/index.ts` convention) rather than a stuttering `core/coordinates/coordinates.ts`. All 11 importers repointed to `@/core/coordinates`. `ARCHITECTURE.md`'s Coordinate Contract section still names the old path — batching that doc update for after Stream 1, same as A2's note.
-- [ ] **A5** — `modules/enrichment/` ← `services/enrichment` + `hooks/useEnrichment` + `components/enrichment` + `services/research`. 📎 `ARCHITECTURE.md` → *AI Enrichment Pipeline*.
+- [x] **A5** — `modules/enrichment/` ← `services/enrichment` + `hooks/useEnrichment` + `components/enrichment` + `services/research`. 📎 `ARCHITECTURE.md` → *AI Enrichment Pipeline*.
+  > note: landed as `modules/enrichment/{services,hooks,ui}/`. `services/` = all of former `services/enrichment` (incl. `providers/`) plus `services/research` nested at `services/research/`, plus the A3 `citation-rating.ts` (moved in from `modules/enrichment/` root to `services/` for consistency). `hooks/` = `useEnrichment.ts`, `useLayeredResearch.ts`, `enrichmentRunner.ts`. `ui/` = the 4 `components/enrichment` files, with their 3 Storybook stories co-located from `stories/enrichement/` (lockstep story-move rule) rather than left in the old parallel `stories/` tree. `store/enrichment.store.ts` and `store/researchProgress.store.ts` were **not** moved — the roadmap line only names 4 source trees and Phase C doesn't list them either; flagged in the Execution Ledger as a possible gap. 20 internal/external importers repointed; `npm run verify` and `storybook build` both green.
 - [ ] **A6** — `modules/orbat/` ← `components/tree` + `EntityInspector` + `HierarchyPanel` + symbol code + `SymbolsLayer` + `NetworkLinksLayer`.
 - [ ] **A7** — `modules/osm/` ← OSM components/services/hooks.
 - [ ] **A8** — `core/map/` ← Leaflet substrate (`MapView`, position engine, selection dispatch); profile layers stay with their modules. **Heaviest churn — do last.**
@@ -161,7 +162,7 @@ ADMIRALTY scoring (STANAG 2511) on every entity and claim is delivered by E2, th
 
 ### Deferred / to revisit later
 
-- _(none yet)_
+- **A5**: `store/enrichment.store.ts` and `store/researchProgress.store.ts` stayed in `src/store/` rather than moving into `modules/enrichment/`, since neither the A5 roadmap line nor Phase C names them. Per CONSTRAINTS.md ("Zustand stores live with the code they serve... or a module"), these arguably belong in `modules/enrichment/store/` — revisit if Gate A validation flags it, or fold into a later Stream-2 item.
 
 ### Risks / watch
 

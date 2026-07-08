@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite"
-import { ProposalCard } from "@/components/enrichment/ProposalCard"
+import { ProposalCard } from "./ProposalCard"
 
 const meta = {
   title: "Enrichment/ProposalCard",

@@ -1,10 +1,10 @@
 import { useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { shouldSkipEntity } from "@/services/research/entity-richness"
+import { shouldSkipEntity } from "@/modules/enrichment/services/research/entity-richness"
 import type { MapEntity } from "@/types/domain.types"
-import type { EntityResearchStatus } from "@/hooks/useLayeredResearch"
-import type { LayeredResearchResult } from "@/services/research/layered-research.service"
+import type { EntityResearchStatus } from "@/modules/enrichment/hooks/useLayeredResearch"
+import type { LayeredResearchResult } from "@/modules/enrichment/services/research/layered-research.service"
 
 type ResearchDialogProps = {
   open: boolean

@@ -1,9 +1,9 @@
 import { describe, expect, it, vi, beforeEach } from "vitest"
 import { buildBfsLayers, runLayeredResearch } from "./layered-research.service"
-import { runEnrichment } from "@/services/enrichment/enrichment.service"
+import { runEnrichment } from "@/modules/enrichment/services/enrichment.service"
 import type { DrawnGeometry, MapEntity } from "@/types/domain.types"
 
-vi.mock("@/services/enrichment/enrichment.service", () => ({
+vi.mock("@/modules/enrichment/services/enrichment.service", () => ({
   runEnrichment: vi.fn(),
 }))
 

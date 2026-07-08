@@ -2,7 +2,7 @@ import type { ProposalDecision } from "@/store/enrichment.store"
 import type { MapEntity } from "@/types/domain.types"
 import type { EnrichmentProposal } from "@/types/enrichment.types"
 import { merge, parse, serialize } from "@/core/provenance/ledger"
-import { selectTopCitations } from "@/modules/enrichment/citation-rating"
+import { selectTopCitations } from "@/modules/enrichment/services/citation-rating"
 
 export function buildAcceptedPatch(args: {
   decisions: Record<string, ProposalDecision>
