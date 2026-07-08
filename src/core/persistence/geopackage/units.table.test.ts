@@ -2,7 +2,7 @@ import { readdirSync, rmSync } from "node:fs"
 import { GeoPackageAPI, type GeoPackage } from "@ngageoint/geopackage"
 import { afterEach, describe, expect, it } from "vitest"
 import type { MapEntity } from "@/types/domain.types"
-import { createUnitsTable, readEntities, writeEntities } from "./units.table"
+import { createUnitsTable, readEntities, readLegacyUnitSourcesColumn, writeEntities } from "./units.table"
 
 async function createTestGeoPackage(): Promise<GeoPackage> {
   const geoPackage = await GeoPackageAPI.create(`gabriel-test-${crypto.randomUUID()}.gpkg`)
@@ -178,4 +178,39 @@ describe("units.table", () => {
     },
     30_000,
   )
+
+  describe("readLegacyUnitSourcesColumn", () => {
+    it(
+      "reads every non-null sources value keyed by entity id",
+      async () => {
+        const geoPackage = await createTestGeoPackage()
+        try {
+          createUnitsTable(geoPackage)
+          writeEntities(geoPackage, [
+            { kind: "unit", id: "e-1", name: "A", layerId: "layer-1", parentId: null, sources: "https://a.example" },
+            { kind: "unit", id: "e-2", name: "B", layerId: "layer-1", parentId: null, sources: null },
+          ])
+          expect(readLegacyUnitSourcesColumn(geoPackage)).toEqual(new Map([["e-1", "https://a.example"]]))
+        } finally {
+          geoPackage.close()
+        }
+      },
+      30_000,
+    )
+
+    it(
+      "returns an empty map when the sources column doesn't exist (simulating post-E2.6 schema)",
+      async () => {
+        const geoPackage = await createTestGeoPackage()
+        try {
+          createUnitsTable(geoPackage)
+          geoPackage.connection.run("ALTER TABLE units DROP COLUMN sources")
+          expect(readLegacyUnitSourcesColumn(geoPackage)).toEqual(new Map())
+        } finally {
+          geoPackage.close()
+        }
+      },
+      30_000,
+    )
+  })
 })

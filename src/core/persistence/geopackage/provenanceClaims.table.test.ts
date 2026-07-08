@@ -1,0 +1,81 @@
+import { readdirSync, rmSync } from "node:fs"
+import { GeoPackageAPI, type GeoPackage } from "@ngageoint/geopackage"
+import { afterEach, describe, expect, it } from "vitest"
+import type { Claim } from "@/core/provenance/claim"
+import {
+  createProvenanceClaimsTable,
+  readProvenanceClaims,
+  writeProvenanceClaims,
+} from "./provenanceClaims.table"
+
+async function createTestGeoPackage(): Promise<GeoPackage> {
+  const geoPackage = await GeoPackageAPI.create(`gabriel-test-${crypto.randomUUID()}.gpkg`)
+  geoPackage.createRequiredTables()
+  return geoPackage
+}
+
+describe("provenanceClaims.table", () => {
+  afterEach(() => {
+    for (const file of readdirSync(process.cwd())) {
+      if (file.startsWith("gabriel-test-") && file.endsWith(".gpkg")) {
+        try {
+          rmSync(file, { force: true })
+        } catch {
+          // ignore: file is locked by another concurrently-running test worker
+        }
+      }
+    }
+  })
+
+  it(
+    "round-trips every field through write -> read",
+    async () => {
+      const geoPackage = await createTestGeoPackage()
+      try {
+        createProvenanceClaimsTable(geoPackage)
+        const claim: Claim = {
+          id: "claim-1",
+          entityId: "entity-1",
+          field: "sources",
+          value: null,
+          sourceId: "src-1",
+          credibility: 3,
+          timestamp: "2026-07-08T00:00:00.000Z",
+        }
+        writeProvenanceClaims(geoPackage, [claim])
+        expect(readProvenanceClaims(geoPackage)).toEqual([claim])
+      } finally {
+        geoPackage.close()
+      }
+    },
+    30_000,
+  )
+
+  it(
+    "preserves insertion order (rowid order), not just decode fidelity",
+    async () => {
+      const geoPackage = await createTestGeoPackage()
+      try {
+        createProvenanceClaimsTable(geoPackage)
+        const claims: Claim[] = [
+          { id: "claim-2", entityId: "e-1", field: "sources", value: null, sourceId: "src-2", credibility: null, timestamp: null },
+          { id: "claim-1", entityId: "e-1", field: "sources", value: null, sourceId: "src-1", credibility: null, timestamp: null },
+        ]
+        writeProvenanceClaims(geoPackage, claims)
+        expect(readProvenanceClaims(geoPackage).map((c) => c.id)).toEqual(["claim-2", "claim-1"])
+      } finally {
+        geoPackage.close()
+      }
+    },
+    30_000,
+  )
+
+  it("returns an empty array when the table does not exist (pre-E2 projects)", async () => {
+    const geoPackage = await createTestGeoPackage()
+    try {
+      expect(readProvenanceClaims(geoPackage)).toEqual([])
+    } finally {
+      geoPackage.close()
+    }
+  })
+})

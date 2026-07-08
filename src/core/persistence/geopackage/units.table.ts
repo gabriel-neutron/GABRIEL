@@ -119,3 +119,22 @@ export function writeEntities(geoPackage: GeoPackage, entities: MapEntity[]): vo
     insertRow(geoPackage.connection, UNITS_TABLE, unitColumns, entity)
   }
 }
+
+/**
+ * Raw read of the legacy string `sources` column, keyed by entity id (ADR 0006, E2).
+ * Standalone rather than going through `unitColumns`/`readEntities`: this exists purely
+ * to feed the Source/Claim derivation in `load.ts`, and must keep working once a later
+ * item removes `sources` from `unitColumns` entirely (E2.6) — at that point the column
+ * still physically exists on old files but is no longer part of the descriptor list.
+ */
+export function readLegacyUnitSourcesColumn(geoPackage: GeoPackage): Map<string, string> {
+  if (!getTableColumnNames(geoPackage.connection, UNITS_TABLE).has("sources")) return new Map()
+  const rows = geoPackage.connection.all(
+    `SELECT id, sources FROM ${UNITS_TABLE} WHERE sources IS NOT NULL`,
+  ) as Array<{ id: string; sources: string | null }>
+  const result = new Map<string, string>()
+  for (const row of rows) {
+    if (row.sources) result.set(row.id, row.sources)
+  }
+  return result
+}
