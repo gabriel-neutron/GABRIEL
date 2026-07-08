@@ -16,7 +16,7 @@
 | Draw tools | leaflet-draw | ^1.0 |
 | Military symbols | milsymbol (NATO MIL-STD-2525) | ^3.0 |
 | Geospatial utils | @turf/turf | ^7.3 |
-| Flow diagrams | reactflow | ^11.11 (currently unused in UI) |
+| Flow diagrams | reactflow | ^11.11 — unused in UI, slated for removal (ROADMAP Stream-1 cleanup) |
 | Class utilities | clsx + tailwind-merge | ^2.1 / ^3.4 |
 
 ## State Management
@@ -72,10 +72,18 @@ runtime and never transmitted to any Gabriel server.
 
 ## Infrastructure
 
-- Deployed as a fully static site (`vite build` → `dist/`).
+**Consumer (deployed, read-only):**
+- Deployed as a fully static site (`vite build` → `dist/`); no server-side code, no environment
+  variables in the production build.
 - `public/project.gpkg` is a bundled demo file that `ViewPage` fetches at runtime.
-- No server-side code, no environment variables in the production build.
 - All configuration (API keys, last-seen flags) is stored in `localStorage`.
+
+**Producer (local):**
+- The analyst app runs locally; heavier v2.0 pipelines run as **local sidecars** the analyst
+  launches (e.g. the Telegram FastAPI/Python sidecar on `localhost`) behind an abstract capability
+  interface (ADR [0003](adr/0003-local-first-self-hosted.md) /
+  [0005](adr/0005-feature-first-modular-architecture.md)). Sidecars are self-hosted, single-user,
+  and never part of the deployed consumer build.
 
 ## Alternatives Considered
 

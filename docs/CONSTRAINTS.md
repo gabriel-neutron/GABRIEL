@@ -2,56 +2,61 @@
 
 ## File & Folder Structure
 
+Gabriel is moving from a type-first layout to a **feature-first** `core / shell / modules` layout
+(ADR [0005](adr/0005-feature-first-modular-architecture.md)). New code goes in the target layout;
+the reorg migrates existing code stream by stream (see `timelines/ROADMAP.md`).
+
+**Target layout:**
 ```
 src/
-  components/
-    inspector/          # EntityInspector, OsmObjectInspector, enrichment drawer
-    enrichment/       # EnrichDrawer, ProposalCard, SourceTag
-    map/                # MapView, SymbolsLayer, NetworkLinksLayer, draw tools
-    shared/             # AppShell, MainLayout, LayersPanel, HierarchyPanel, dialogs
-    tree/               # TreeView, MilitarySymbolNode
-    ui/                 # Primitive shadcn/Radix components (button, input, tabs…)
-  hooks/                # Custom React hooks
-  pages/                # EditPage, ViewPage (the only files that do GeoPackage I/O)
-  services/
-    enrichment/         # AI enrichment pipeline (adapters, validators, prompts, schema)
-      providers/        # openai.adapter, tavily.adapter, overpass.adapter, cached-content.adapter
-    research/           # Layered batch research service
-  store/                # Pure reducer functions (enrichment.store.ts); Zustand stores after Phase 1
-  types/                # TypeScript domain type definitions
-  utils/                # Pure utility functions (geometry, entityLayer, osmLocalSearch)
+  core/                 # deep shared spine — no domain-specific code leaks in
+    entity/             # Entity, Profile (flat typed union), hierarchy.ts (generic parent/child)
+    provenance/         # Provenance Ledger storage (source rating → Source/Claim, ADR 0006)
+    persistence/        # store-agnostic port; geopackage/ is one adapter
+    coordinates/        # branded LatLng / LngLat
+    map/                # Leaflet substrate + position engine + selection dispatch
+  shell/                # app frame: AppShell, MainLayout, settings
+  modules/              # one feature per folder, co-located ui/ hooks/ store/ services/
+    orbat/              # military view: TreeView, EntityInspector, NATO symbols, network links
+    enrichment/         # AI pipeline + drawer + hook + research + citation rating
+    osm/                # Overpass / Nominatim + OSM layers
+  ui/                   # shadcn / Radix primitives
+  pages/                # EditPage, ViewPage (the only files that trigger persistence I/O)
 ```
+Heavy per-module pipelines live as self-contained projects under `sidecars/<name>/` behind the
+capability port (created when the module lands, not before).
 
-No file in `services/` or `utils/` may import from React. These are pure functions / async
-functions with no side effects.
+Nothing in `core/` (except `core/map`, which is React) or in a module's `services/` may import
+from React outside its `ui/` — the shared spine and service layers are pure functions / async
+functions with no React coupling. `core/entity` must not import any single Profile's field set;
+profile-specific descriptors, symbol renderers, and schemas register from the profile's module.
 
 ## Naming Conventions
 
 - **Files**: `kebab-case.ts` for utilities and services; `PascalCase.tsx` for React components.
 - **Hooks**: prefix `use`; filename matches the exported hook name (e.g. `useEnrichment.ts`).
-- **Stores (after Phase 1)**: `use<Domain>Store.ts` in `src/store/`
-  (e.g. `useProjectStore.ts`, `useEnrichmentStore.ts`).
+- **Stores**: `use<Domain>Store.ts` (e.g. `useProjectStore.ts`). Zustand stores live with the
+  code they serve (`core/entity`, or a module); pure reducer modules keep the `.store.ts` suffix.
 - **Types**: PascalCase for interfaces and type aliases.
-- **Domain boundary**: `MapEntity` (UI / runtime) vs `GpkgEntity` (GeoPackage / DB, a thin
-  alias of `MapEntity`). Use `MapEntity` everywhere except inside `src/services/geopackage/`.
+- **Domain boundary**: `Entity` (UI / runtime — `MapEntity` is the current name, aliased through
+  the rename in ADR [0004](adr/0004-entity-profile-tagged-union.md)) vs `GpkgEntity` (persistence,
+  a thin alias). Use the runtime type everywhere except inside the persistence layer.
 - **Constants**: `SCREAMING_SNAKE_CASE`.
 - **No default exports** for named components. Use named exports.
 
 ## Architecture Patterns
 
-**Coordinate convention**
-- Internal app: `[lat, lng]` — Leaflet convention. This is the only coordinate order used in
-  components, hooks, utilities, and the Zustand store.
-- GeoJSON / GeoPackage: `[lng, lat]` — WGS-84 / GeoJSON standard.
-- Conversion happens **only** in `src/services/geopackage/` at the read/write boundary.
-- After Phase 8: enforce with branded types (`LatLng` vs `LngLat`) from `src/types/coordinates.ts`.
+**Coordinate convention** — canonical spec in [`ARCHITECTURE.md`](ARCHITECTURE.md) (Coordinate
+Contract). In short: `[lat, lng]` everywhere in the app (components, hooks, utils, store);
+`[lng, lat]` only inside the persistence layer; conversion happens only at the read/write
+boundary, enforced by branded `LatLng` / `LngLat` types.
 
 **Pure reducers**
 - State transitions for enrichment live in `store/enrichment.store.ts` as pure functions with
   no React imports and no side effects. They are tested in isolation.
 
 **No prop drilling past one level**
-- After Phase 4: components read data directly from the Zustand project store.
+- Components read data directly from the Zustand project store.
 - Props are used only for component-specific configuration (`readOnly`, callbacks specific to
   that component's context) or for hook outputs (`enrichment`, `layeredResearch`).
 
@@ -84,8 +89,8 @@ functions with no side effects.
 - **Research progress store** (`store/researchProgress.store.ts`): 100 % branch coverage.
 - **Enrichment services** (`services/enrichment/`): unit tests for all public functions.
 - **Layered research** (`services/research/`): unit tests for BFS ordering and skip logic.
-- **GeoPackage round-trip**: integration test in `services/geopackage/geopackage.service.test.ts`
-  (required before Phase 8 coordinate changes).
+- **GeoPackage round-trip**: the persistence integration test is the gate for any schema
+  migration (the Stream-2 epics in `timelines/ROADMAP.md` must round-trip existing `.gpkg` files).
 - **Test runner**: Vitest only. No Jest.
 - **Storybook stories** required for: `EntityInspector`, `EnrichDrawer`, `OsmObjectInspector`,
   `GeometryActionMenu`, `NetworkLinksLayer` (with 500-entity fixture for performance testing).
@@ -132,7 +137,7 @@ functions with no side effects.
 - `NetworkLinksLayer` BFS traversal must be inside `useMemo([entities, selectedEntityId])`.
 - `SymbolsLayer` keeps a stable Leaflet `L.Icon` map in state, refreshed in `useLayoutEffect`
   from visible markers so icons are not recreated every pan; prune happens when marker keys change.
-- After Phase 5/6: Zustand selectors in map components must return stable references.
+- Zustand selectors in map components must return stable references.
   Use `shallow` equality for object/array selectors to avoid spurious re-renders.
 - OSM GeoJSON layer features should only re-render when `layer.osmData` reference changes
   (ensured by store `immutable update` pattern — always return new objects from actions).

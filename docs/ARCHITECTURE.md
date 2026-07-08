@@ -1,5 +1,11 @@
 # Architecture — Gabriel
 
+> **Scope:** this document describes the code **as it is today** (the type-first layout, mid-reorg).
+> The *target* architecture — `core / shell / modules`, generic `Entity` + `Profile`, first-class
+> `Source` / `Claim` — lives in the ADRs ([0003](adr/0003-local-first-self-hosted.md)–[0006](adr/0006-source-claim-first-class-model.md))
+> and the migration sequence in [`timelines/ROADMAP.md`](timelines/ROADMAP.md). Update this file as
+> each Stream-1 step lands, so it never describes an architecture the code does not have.
+
 ## Component Tree
 
 ```

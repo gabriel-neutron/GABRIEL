@@ -71,5 +71,5 @@ For architecture and implementation details:
 
 - `docs/ARCHITECTURE.md`
 - `docs/CONSTRAINTS.md`
-- `docs/TIMELINE.md`
+- `docs/timelines/ROADMAP.md`
 - `AGENTS.md`

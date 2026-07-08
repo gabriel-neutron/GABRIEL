@@ -1,7 +1,7 @@
 # Implementation Timeline — Telegram OSINT Module
 
 This timeline covers the implementation of the Telegram OSINT Graph Module described in `TELEGRAM_OSINT_PRD.md`.  
-See the main `TIMELINE.md` for the parent project's quality timeline.
+See [`ROADMAP.md`](./ROADMAP.md) for the parent project's master roadmap.
 
 ## Principles
 

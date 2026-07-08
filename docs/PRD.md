@@ -7,10 +7,18 @@ annotate hierarchical military unit structures (ORBATs — Orders of Battle) on 
 relying on a cloud service that could expose sensitive research or require expensive GIS licences.
 
 Existing options either leak data to third-party servers, lack AI-assisted enrichment from public
-sources, or require desktop GIS software not suited to web publishing. Gabriel is a local-first
-browser application: all project data stays on the user's machine (a `.gpkg` file on disk, plus an
-IndexedDB session cache). AI enrichment calls go directly from the browser to OpenAI and Tavily
-using API keys the user supplies themselves — no Gabriel server ever touches the data.
+sources, or require desktop GIS software not suited to web publishing. Gabriel is **local-first and
+self-hosted**: producer data stays on the analyst's machine (a `.gpkg` file on disk plus an
+IndexedDB session cache), and heavier pipelines run as local sidecars the analyst launches. AI
+enrichment calls go directly from the browser to OpenAI and Tavily using the user's own API keys —
+no third-party SaaS ever touches the data. Two audiences are served separately: **consumers** read
+the deployed read-only public map; **producers** (analysts) build the data (ADR
+[0003](adr/0003-local-first-self-hosted.md)).
+
+Gabriel v2.0 generalises beyond military ORBATs into a **project-agnostic OSINT data-fusion
+environment** — source-rated entities of any type (corporate, maritime, financial) in a single
+auditable structure. This PRD describes the product as it stands today; the v2.0 direction and its
+module plan live in [`timelines/ROADMAP.md`](timelines/ROADMAP.md).
 
 ## Target Users
 
@@ -74,7 +82,8 @@ Analysts who want to share a snapshot of their work. They access the deployed re
 ## Out of Scope (current version)
 
 - User authentication or multi-user collaboration.
-- Backend server or database.
+- A hosted multi-user backend or shared database. (Local, single-user *sidecars* for heavy
+  pipelines are on the v2.0 roadmap, but no shared server touches the data.)
 - Mobile / touch-optimised UI.
 - Export to formats other than GeoPackage (KMZ, Shapefile, GeoJSON bulk export are future work).
 - Offline-first PWA service worker.
@@ -86,5 +95,5 @@ Analysts who want to share a snapshot of their work. They access the deployed re
   point) to make permalink sharing easier, rather than an in-app toggle?
 - Should the enrichment country/region focus (currently implicit in the OpenAI system prompt)
   become a per-project setting exposed in the UI?
-- Should `reactflow` (currently in `package.json`) be wired into any user-facing feature, or
-  should it be removed to reduce bundle size?
+- **Resolved:** `reactflow` is unused in the UI and is slated for removal to reduce bundle size,
+  as part of the Stream-1 dead-code cleanup (`timelines/ROADMAP.md`).
