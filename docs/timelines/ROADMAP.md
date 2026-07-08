@@ -62,7 +62,8 @@ Rule: a subject moves **with** its `./`-importing test and its `@/`-importing st
 
 - [x] **A1** — `utils/orbat.ts → core/entity/hierarchy.ts`, leave a re-export shim. 📎 `CONTEXT.md` → *Hierarchy index*.
   > note: implementation + test moved to `core/entity/hierarchy.ts`/`.test.ts`; `utils/orbat.ts` is now a one-line `export * from "@/core/entity/hierarchy"` shim. All 7 in-tree importers updated to the new path directly (shim exists only for anything outside this sweep). No `CONTEXT.md` file exists in `docs/` yet — the 📎 reference is stale/forward-looking; skipped.
-- [ ] **A2** — `services/geopackage/* → core/persistence/geopackage/*`. 📎 ADR 0005 (persistence port); `ARCHITECTURE.md` → *GeoPackage I/O Boundary*.
+- [x] **A2** — `services/geopackage/* → core/persistence/geopackage/*`. 📎 ADR 0005 (persistence port); `ARCHITECTURE.md` → *GeoPackage I/O Boundary*.
+  > note: whole-folder `git mv`, no internal restructuring. 3 external importers (`useProjectIO.ts`, `ViewPage.tsx`, `useProjectStore.ts`) repointed to `@/core/persistence/geopackage`; one internal relative import (`project-open-save-restore.integration.test.ts` → `projectStorage.service`) switched from `../` to the `@/` alias since folder depth changed. `ARCHITECTURE.md`'s *GeoPackage I/O Boundary* section still names the old path — deferred to a later docs pass since Stream 1 isn't done yet.
 - [ ] **A3** — `provenance-ledger.ts → core/provenance/` **and split it**: ledger storage (`parse`/`serialize`/`merge`/`shouldPropose`) → core; citation rating (`rankCitations`/authority weight/`isSpecificArticleUrl`) → `modules/enrichment`. 📎 ADR [0001](../adr/0001-provenance-ledger-accumulation.md), ADR 0005.
 - [ ] **A4** — `types/coordinates.ts → core/coordinates/`. 📎 `ARCHITECTURE.md` → *Coordinate Contract*.
 - [ ] **A5** — `modules/enrichment/` ← `services/enrichment` + `hooks/useEnrichment` + `components/enrichment` + `services/research`. 📎 `ARCHITECTURE.md` → *AI Enrichment Pipeline*.
