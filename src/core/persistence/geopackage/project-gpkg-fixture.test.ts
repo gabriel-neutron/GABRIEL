@@ -26,7 +26,7 @@ describe("public/project.gpkg round-trip (real pre-E1 fixture)", () => {
   it(
     "loads every unit and legacy organisation into one unified, kind-tagged entities array",
     async () => {
-      const buffer = readFileSync(resolve(process.cwd(), "public/project.gpkg")).buffer as ArrayBuffer
+      const buffer = Uint8Array.from(readFileSync(resolve(process.cwd(), "public/project.gpkg"))).buffer
       const loaded = await loadGeoPackage(buffer)
 
       const units = loaded.entities.filter((e) => e.kind === "unit")
@@ -52,10 +52,16 @@ describe("public/project.gpkg round-trip (real pre-E1 fixture)", () => {
   it(
     "round-trips losslessly: re-saving and reloading preserves every entity, geometry, and layer",
     async () => {
-      const buffer = readFileSync(resolve(process.cwd(), "public/project.gpkg")).buffer as ArrayBuffer
+      // Copy into a fresh ArrayBuffer: Node pools small readFileSync results into a
+      // shared backing buffer, so `.buffer` alone can carry a nonzero byteOffset.
+      const fileBytes = readFileSync(resolve(process.cwd(), "public/project.gpkg"))
+      const buffer = Uint8Array.from(fileBytes).buffer
       const first = await loadGeoPackage(buffer)
 
-      const bytes = await saveGeoPackage(first.layers, first.entities, first.geometries, first.sourceCache)
+      // Pass `buffer` as baseBuffer, mirroring performProjectSave's real reopen-and-save
+      // path (useProjectIO.ts) — this is the exact path that silently went untested
+      // pre-migration and let the crash-on-save regression ship.
+      const bytes = await saveGeoPackage(first.layers, first.entities, first.geometries, first.sourceCache, buffer)
       const second = await loadGeoPackage(Uint8Array.from(bytes).buffer)
 
       expect(second.entities).toHaveLength(first.entities.length)

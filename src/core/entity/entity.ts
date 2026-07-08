@@ -75,9 +75,9 @@ export type Profile = UnitProfile | CorporateProfile
  * this type: every profile-specific field is optional regardless of `kind`
  * ("D1-loose", see ROADMAP.md E1 note) so the ~15 direct `entity.echelon`-style
  * reads across the orbat module keep compiling without narrowing on `kind`
- * first. Use `Profile`, `asUnitProfile`, or `asCorporateProfile` wherever
- * exhaustive, kind-safe field access is actually required (persistence
- * encode/decode, symbol rendering, the Corporate Profile's required `type`).
+ * first. Narrow on `entity.kind` directly wherever exhaustive, kind-safe field
+ * access is actually required (persistence encode/decode, symbol rendering,
+ * the Corporate Profile's required `type`).
  */
 export type Entity = EntityCore & {
   kind: Profile["kind"]
@@ -94,12 +94,4 @@ export type Entity = EntityCore & {
   domain?: UnitProfile["domain"]
   osmRelationId?: number | null
   militaryUnitId?: string | null
-}
-
-export function asUnitProfile(entity: Entity): UnitProfile | null {
-  return entity.kind === "unit" ? (entity as unknown as UnitProfile) : null
-}
-
-export function asCorporateProfile(entity: Entity): CorporateProfile | null {
-  return entity.kind === "corporate" ? (entity as unknown as CorporateProfile) : null
 }

@@ -96,11 +96,11 @@ data gets written to disk: non-OSM entities and geometries, with names trimmed, 
 | Internal app, Leaflet, Zustand store | `[lat, lng]` | `LatLng` (branded) |
 | GeoJSON, GeoPackage storage | `[lng, lat]` | `LngLat` (branded) |
 
-Conversion happens **only** in `src/services/geopackage/` (specifically `geometries.table.ts`):
+Conversion happens **only** in `src/core/persistence/geopackage/` (specifically `geometries.table.ts`):
 - `readGeometries` → wraps parsed GeoJSON coordinates in `toLeafletCoord([lng, lat]): LatLng`
 - `saveGeoPackage` → converts before write with `toGeoJsonCoord(pos: LatLng): LngLat`
 
-File: `src/types/coordinates.ts` (created in Phase 8):
+File: `src/core/coordinates/index.ts` (created in Phase 8):
 ```ts
 export type LatLng  = [number, number] & { readonly [__lat_lng_brand]: true }
 export type LngLat  = [number, number] & { readonly [__lng_lat_brand]: true }
@@ -113,7 +113,7 @@ export function asLatLng(lat: number, lng: number): LatLng
 
 ## Entity Positioning
 
-`computeAllEntityPositions` (in `src/utils/geometry.ts`) derives a `Map<entityId, LatLng>`
+`computeAllEntityPositions` (in `src/core/map/geometry.ts`) derives a `Map<entityId, LatLng>`
 from `entities` and `drawnGeometries`:
 
 1. **Pinned entities** (`positionMode === "own"`): position = first geometry's representative
@@ -187,5 +187,5 @@ All status/queue/usage writes for the batch flow through `researchProgress.store
 5. `NetworkLinksLayer` BFS is always inside a `useMemo`.
 6. Coordinate order `[lat, lng]` is the only representation in the Zustand store,
    components, and utility functions.
-7. `[lng, lat]` appears only inside `src/services/geopackage/`.
+7. `[lng, lat]` appears only inside `src/core/persistence/geopackage/`.
 8. `researchProgress.store.ts` pure transition functions have no React imports.

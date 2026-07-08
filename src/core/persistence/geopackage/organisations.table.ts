@@ -11,11 +11,12 @@ import {
 import { decodeOrganisationType, decodePositionMode } from "./validation"
 
 /**
- * Legacy, read-only: pre-E1 (ADR 0004) files stored corporate entities in a
- * separate `organisations` table. Nothing writes to this table anymore — new
- * saves fold every corporate entity into `units` (see `units.table.ts`'s
- * persisted `kind` column). This module only exists so `migrateLegacyOrganisations`
- * can upgrade an old file's rows in place, once, on load.
+ * Legacy: pre-E1 (ADR 0004) files stored corporate entities in a separate
+ * `organisations` table. New saves fold every corporate entity into `units`
+ * (see `units.table.ts`'s persisted `kind` column) and, once migrated, clear
+ * this table (see `clearLegacyOrganisationsTable`) so it never resurrects
+ * stale rows on a later load. This module only exists for that one-time
+ * migrate-then-clear path.
  */
 export const ORGANISATIONS_TABLE = "organisations"
 
@@ -82,4 +83,17 @@ export function migrateLegacyOrganisations(geoPackage: GeoPackage): MapEntity[] 
     positionMode: o.positionMode,
     isExactPosition: o.isExactPosition,
   }))
+}
+
+/**
+ * Every migrated corporate entity is written back through `units` on save (see
+ * `writeEntities`), so a legacy `organisations` table's rows are now duplicated data,
+ * not a separate source of truth. Leaving the table's rows in place would make the
+ * next `loadGeoPackage` call `migrateLegacyOrganisations` again and resurrect them
+ * as duplicate entities. Empty (not drop) the table once its content has migrated,
+ * so no destructive schema change is needed and re-running this is always safe.
+ */
+export function clearLegacyOrganisationsTable(geoPackage: GeoPackage): void {
+  if (!tableExists(geoPackage.connection, ORGANISATIONS_TABLE)) return
+  geoPackage.connection.run(`DELETE FROM ${ORGANISATIONS_TABLE}`)
 }

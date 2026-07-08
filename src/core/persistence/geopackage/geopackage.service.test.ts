@@ -273,6 +273,33 @@ describe("coordinate round-trip", () => {
     }
   })
 
+  it(
+    "rejects a corporate entity whose parentId points at a unit (cross-kind parent references are invalid)",
+    async () => {
+      const layers: GpkgLayer[] = [
+        { id: "division", name: "Division", visible: true, kind: "echelon" },
+        { id: "industry", name: "Industry", visible: true, kind: "organisation" },
+      ]
+      const entities: MapEntity[] = [
+        { kind: "unit", id: "unit-1", name: "1st Division", layerId: "division", parentId: null },
+        {
+          kind: "corporate",
+          id: "org-1",
+          name: "Cross-kind org",
+          type: "other",
+          layerId: "industry",
+          parentId: "unit-1",
+        },
+      ]
+
+      const bytes = await saveGeoPackage(layers, entities, [])
+      await expect(loadGeoPackage(Uint8Array.from(bytes).buffer)).rejects.toThrow(
+        /Unsupported schema.*missing parent/,
+      )
+    },
+    30_000,
+  )
+
   it("polygon ring coordinates survive write→read", () => {
     const ring = [
       asLatLng(48.5, 134.7),

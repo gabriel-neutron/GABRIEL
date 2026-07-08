@@ -6,6 +6,7 @@ import {
   organisationColumns,
   readOrganisations,
   migrateLegacyOrganisations,
+  clearLegacyOrganisationsTable,
 } from "./organisations.table"
 import { buildCreateTableColumnDefs, insertRow } from "./columnDescriptor"
 import type { Organisation } from "@/types/organisation.types"
@@ -144,6 +145,45 @@ describe("organisations.table (legacy, read-only)", () => {
       const geoPackage = await createTestGeoPackage()
       try {
         expect(migrateLegacyOrganisations(geoPackage)).toEqual([])
+      } finally {
+        geoPackage.close()
+      }
+    })
+  })
+
+  describe("clearLegacyOrganisationsTable", () => {
+    it("empties a legacy organisations table's rows so a later load can't re-migrate them", async () => {
+      const geoPackage = await createTestGeoPackage()
+      try {
+        createLegacyOrganisationsTable(geoPackage)
+        writeLegacyOrganisations(geoPackage, [
+          {
+            id: "org-1",
+            name: "Test Holding",
+            type: "holding",
+            parentId: null,
+            notes: null,
+            sources: null,
+            osmRelationId: null,
+            positionMode: "own",
+            isExactPosition: true,
+          },
+        ])
+        expect(readOrganisations(geoPackage)).toHaveLength(1)
+
+        clearLegacyOrganisationsTable(geoPackage)
+
+        expect(readOrganisations(geoPackage)).toEqual([])
+        expect(migrateLegacyOrganisations(geoPackage)).toEqual([])
+      } finally {
+        geoPackage.close()
+      }
+    })
+
+    it("is a no-op when there is no legacy organisations table", async () => {
+      const geoPackage = await createTestGeoPackage()
+      try {
+        expect(() => clearLegacyOrganisationsTable(geoPackage)).not.toThrow()
       } finally {
         geoPackage.close()
       }

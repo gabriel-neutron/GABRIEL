@@ -20,12 +20,20 @@ export async function loadGeoPackage(buffer: ArrayBuffer): Promise<GeoPackageLoa
 
     const layerIds = new Set(layers.map((l) => l.id))
     const entityIds = new Set(entities.map((e) => e.id))
+    // Units and corporate entities form separate hierarchies — a parentId is only
+    // valid within its own kind, so validate against a same-kind id set, not the
+    // pooled one (which would silently accept a cross-kind parent reference).
+    const unitIds = new Set(entities.filter((e) => e.kind === "unit").map((e) => e.id))
+    const corporateIds = new Set(entities.filter((e) => e.kind === "corporate").map((e) => e.id))
     for (const e of entities) {
       if (!layerIds.has(e.layerId)) {
         throw new Error("Unsupported schema: entity references missing layer.")
       }
-      if (e.parentId != null && !entityIds.has(e.parentId)) {
-        throw new Error("Unsupported schema: entity references missing parent.")
+      if (e.parentId != null) {
+        const sameKindIds = e.kind === "corporate" ? corporateIds : unitIds
+        if (!sameKindIds.has(e.parentId)) {
+          throw new Error("Unsupported schema: entity references missing parent.")
+        }
       }
     }
     for (const g of geometries) {

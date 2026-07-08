@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useLayoutEffect, useRef } from "react"
+import { useState, useCallback, useEffect, useLayoutEffect, useMemo, useRef } from "react"
 import type { DrawnGeometry, MapEntity } from "@/types/domain.types"
 import { INDUSTRY_LAYER_ID } from "@/types/organisation.types"
 import { MainLayout } from "@/shell/MainLayout"
@@ -46,14 +46,19 @@ export function EditPage({ onViewMode, onOpenAbout }: EditPageProps): React.Reac
     setToasts((prev) => prev.filter((item) => item.id !== id))
   }, [])
 
+  // AI enrichment only understands unit entities (natoSymbolCode/echelon/affiliation/
+  // domain) — a corporate entity passed in here would be silently invisible to the
+  // pipeline's entity lookup despite being selectable in the tree/map.
+  const unitEntities = useMemo(() => entities.filter((e) => e.kind === "unit"), [entities])
+
   const enrichment = useEnrichment({
-    entities,
+    entities: unitEntities,
     drawnGeometries,
     selectedEntityId,
     onApplyAccepted: updateEntity,
   })
 
-  const layeredResearch = useLayeredResearch(entities, drawnGeometries, {
+  const layeredResearch = useLayeredResearch(unitEntities, drawnGeometries, {
     onEntityAnalyzed: (entityId, analyzedAt) => {
       updateEntity(entityId, { analyzedAt })
     },

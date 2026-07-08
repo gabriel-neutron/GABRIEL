@@ -144,6 +144,7 @@ export function MapView({
 }: Props): React.ReactElement {
   const layers = useProjectStore((s) => s.layers)
   const entities = useProjectStore((s) => s.entities)
+  const unitEntities = useMemo(() => entities.filter((e) => e.kind === "unit"), [entities])
   const organisations = useMemo(() => entities.filter((e) => e.kind === "corporate"), [entities])
   const drawnGeometries = useProjectStore((s) => s.drawnGeometries)
   const entityOsmGeometries = useOsmViewStore((s) => s.entityOsmGeometries)
@@ -245,7 +246,7 @@ export function MapView({
     <div className="relative h-full w-full">
       {!readOnly && pendingGeometry && (
         <GeometryActionMenu
-          entities={entities}
+          entities={unitEntities}
           organisations={organisations}
           onCreateNew={handleCreateNew}
           onCreateNewOrganisation={handleCreateNewOrganisation}

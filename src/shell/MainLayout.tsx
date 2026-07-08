@@ -134,6 +134,7 @@ export function MainLayout({
   }, [])
 
   const defaultLayerId = getDefaultEntityLayerId(layers)
+  const selectedEntity = selectedEntityId != null ? entities.find((e) => e.id === selectedEntityId) ?? null : null
 
   return (
     <>
@@ -221,7 +222,10 @@ export function MainLayout({
         selectedOsmObject={selectedOsmObject}
         onCloseDetail={handleCloseDetail}
         detailHeaderActions={
-          !readOnly && selectedEntityId !== null && selectedOsmObject === null ? (
+          // Enrichment only runs against unit entities (useEnrichment's underlying
+          // entities list is unit-only) — hide the trigger for a corporate selection
+          // rather than opening a drawer that can't find its entity.
+          !readOnly && selectedEntity?.kind === "unit" && selectedOsmObject === null ? (
             <Button
               type="button"
               size="sm"

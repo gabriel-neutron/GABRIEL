@@ -6,6 +6,7 @@ import {
   buildInsertValues,
   buildSelectClause,
   decodeRow,
+  ensureOptionalColumns,
   getTableColumnNames,
   insertRow,
   tableExists,
@@ -132,6 +133,25 @@ describe("getTableColumnNames", () => {
     })
     const connection = { all } as unknown as GeoPackageConnection
     expect(() => getTableColumnNames(connection, "widgets")).toThrow(/Unsupported schema.*widgets/)
+  })
+})
+
+describe("ensureOptionalColumns", () => {
+  it("ALTERs in only the optional columns physically missing from the table", () => {
+    const all = vi.fn(() => [{ name: "id" }, { name: "count" }])
+    const run = vi.fn()
+    const connection = { all, run } as unknown as GeoPackageConnection
+    ensureOptionalColumns(connection, "widgets", widgetColumns())
+    expect(run).toHaveBeenCalledTimes(1)
+    expect(run).toHaveBeenCalledWith("ALTER TABLE widgets ADD COLUMN label TEXT")
+  })
+
+  it("is a no-op when every optional column is already present", () => {
+    const all = vi.fn(() => [{ name: "id" }, { name: "count" }, { name: "label" }])
+    const run = vi.fn()
+    const connection = { all, run } as unknown as GeoPackageConnection
+    ensureOptionalColumns(connection, "widgets", widgetColumns())
+    expect(run).not.toHaveBeenCalled()
   })
 })
 

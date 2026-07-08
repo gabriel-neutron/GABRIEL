@@ -96,3 +96,25 @@ export function insertRow<T>(
 export function tableExists(connection: GeoPackageConnection, tableName: string): boolean {
   return connection.isTableExists(tableName)
 }
+
+/**
+ * `optional`/`fallbackSql` only patches the SELECT side for a pre-migration table
+ * (see `buildSelectClause`) — it does nothing for a reopened table's physical
+ * schema. Since `insertRow` writes every descriptor's column unconditionally, a
+ * table opened from an older file (via `saveGeoPackage`'s `baseBuffer` path) that
+ * is still missing an `optional` column crashes on write. Call this once per save,
+ * right after the table's `CREATE TABLE IF NOT EXISTS`, to physically add any
+ * missing optional columns before rows are inserted. A no-op on a freshly created
+ * table, since every column is already present there.
+ */
+export function ensureOptionalColumns<T>(
+  connection: GeoPackageConnection,
+  tableName: string,
+  descriptors: ColumnDescriptor<T>[],
+): void {
+  const existing = getTableColumnNames(connection, tableName)
+  for (const d of descriptors) {
+    if (!d.optional || existing.has(d.column)) continue
+    connection.run(`ALTER TABLE ${tableName} ADD COLUMN ${d.column} ${d.sqlType}${d.constraints ? ` ${d.constraints}` : ""}`)
+  }
+}
