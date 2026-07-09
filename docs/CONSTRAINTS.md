@@ -21,7 +21,8 @@ src/
     enrichment/         # AI pipeline + drawer + hook + research + citation rating
     osm/                # Overpass / Nominatim + OSM layers
   ui/                   # shadcn / Radix primitives
-  pages/                # EditPage, ViewPage (the only files that trigger persistence I/O)
+  pages/                # EditPage, ViewPage (the only files that trigger persistence I/O —
+                        #   EditPage via its useProjectIO hook, ViewPage inline)
 ```
 Heavy per-module pipelines live as self-contained projects under `sidecars/<name>/` behind the
 capability port (created when the module lands, not before).
@@ -60,10 +61,14 @@ boundary, enforced by branded `LatLng` / `LngLat` types.
 - Props are used only for component-specific configuration (`readOnly`, callbacks specific to
   that component's context) or for hook outputs (`enrichment`, `layeredResearch`).
 
-**GeoPackage I/O stays in page components**
-- `EditPage` owns all GeoPackage open/save logic and IndexedDB session management.
-- `ViewPage` owns the demo project fetch.
-- No component below the page level may call `loadGeoPackage` or `saveGeoPackage`.
+**GeoPackage I/O stays at the page boundary**
+- `EditPage` owns all GeoPackage open/save logic and IndexedDB session management,
+  encapsulated in its `useProjectIO` hook — the hook is EditPage's private I/O seam,
+  not shared infrastructure, and is the single sanctioned caller of `loadGeoPackage` /
+  `saveGeoPackage` on the edit path.
+- `ViewPage` owns the demo project fetch (inline).
+- No component or hook other than `EditPage`/`useProjectIO` and `ViewPage` may call
+  `loadGeoPackage` or `saveGeoPackage`.
 
 **Zustand selectors must be granular**
 - Never select the entire store root in a leaf component.

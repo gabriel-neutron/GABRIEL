@@ -33,6 +33,6 @@ CI runs `npm run verify` on push/PR to `main`.
 - **Local-first, zero-leak** — project data lives in a `.gpkg` on disk + IndexedDB cache; nothing leaves the device except user-keyed enrichment calls
 - **Read CONSTRAINTS first** — consult `docs/CONSTRAINTS.md` before writing any new file or refactoring structure
 - **Pure core** — `core/`, `services/`, and `utils/` must not import from React
-- **I/O is gated** — only `EditPage` and `ViewPage` may call `loadGeoPackage` / `saveGeoPackage`
+- **I/O is gated** — only `EditPage` (via its private `useProjectIO` hook) and `ViewPage` may call `loadGeoPackage` / `saveGeoPackage`
 - **Docs are load-bearing** — never modify `docs/` without confirming it's in scope for the current task
 - **Commits** — imperative mood, present tense; each phase ends with `npm run verify` passing
