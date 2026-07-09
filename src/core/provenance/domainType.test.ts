@@ -12,6 +12,18 @@ describe("getDomainTypeFromUrl", () => {
     expect(getDomainTypeFromUrl("https://mil.ru")).toBe("official")
   })
 
+  it("classifies country-code government/military domains as official (not web)", () => {
+    expect(getDomainTypeFromUrl("https://www.gov.uk/guidance")).toBe("official")
+    expect(getDomainTypeFromUrl("https://www.gov.ua/en")).toBe("official")
+    expect(getDomainTypeFromUrl("https://www.gouv.fr/page")).toBe("official")
+    expect(getDomainTypeFromUrl("https://mod.gov.ua/en")).toBe("official")
+  })
+
+  it("does not misclassify a label that merely contains 'gov'/'mil' as official", () => {
+    expect(getDomainTypeFromUrl("https://governance.example.com")).toBe("web")
+    expect(getDomainTypeFromUrl("https://family.com")).toBe("web")
+  })
+
   it("classifies known OSINT domains", () => {
     expect(getDomainTypeFromUrl("https://www.bellingcat.com/x")).toBe("osint")
     expect(getDomainTypeFromUrl("https://www.oryxspioenkop.com/x")).toBe("osint")

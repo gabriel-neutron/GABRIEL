@@ -49,6 +49,41 @@ describe("runLayeredResearch", () => {
     expect(result.stats.entitiesProcessed).toBe(1)
   })
 
+  it("marks all remaining entities across deeper layers as skipped on abort", async () => {
+    // Chain e1 -> e2 -> e3 across three BFS layers. Abort after e1 completes; the
+    // top-of-loop check must skip the rest of the current layer AND every deeper layer,
+    // not just the current one (review finding #4).
+    const chain: MapEntity[] = [
+      { kind: "unit", id: "e1", name: "e1", layerId: "l", parentId: null, isExactPosition: false },
+      { kind: "unit", id: "e2", name: "e2", layerId: "l", parentId: "e1", isExactPosition: false },
+      { kind: "unit", id: "e3", name: "e3", layerId: "l", parentId: "e2", isExactPosition: false },
+    ]
+    mockedRunEnrichment.mockResolvedValue({
+      response: {
+        status: "success",
+        featureId: "e1",
+        depthUsed: 1,
+        proposals: [],
+        unresolvedFields: [],
+        unresolvedReasons: {},
+        notes: "",
+        queryTrace: [],
+        processingTimeMs: 1,
+      },
+      usage: { providerCalls: {}, estimatedInputTokens: 0, estimatedOutputTokens: 0 },
+    })
+
+    const controller = new AbortController()
+    const result = await runLayeredResearch(chain, geometries, {
+      delayBetweenEntitiesMs: 0,
+      signal: controller.signal,
+      onEntityComplete: () => controller.abort(),
+    })
+
+    expect(result.skippedEntityIds).toEqual(["e2", "e3"])
+    expect(result.stats.entitiesProcessed).toBe(1)
+  })
+
   it("reports overpass endpoint failures as warnings", async () => {
     const entities = makeEntities().map((entity) => ({ ...entity, militaryUnitId: "64123" }))
     mockedRunEnrichment.mockResolvedValueOnce({

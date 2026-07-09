@@ -112,17 +112,26 @@ export function useEntityInspector(): EntityInspectorState {
     () => (entity ? filterCitationClaims(claims, entity.id) : []),
     [entity, claims],
   )
-  // sources/reliabilities/entityClaims (after the `sources` filter below) stay
-  // 1:1-indexed with each other — computed from the same filtered join so `rate`/
-  // `remove` can index into `entityClaims` by the same position the UI renders.
+  // sources/reliabilities/resolvedClaims stay 1:1-indexed — one row per claim, in claim
+  // order — so `rate`/`remove` can index by the same position the UI renders.
+  //
+  // A claim whose `sourceId` no longer resolves (corrupted/desynced `.gpkg`) is KEPT with
+  // `source: undefined` rather than filtered out. Filtering hid it AND made it un-removable,
+  // yet `selectPersistableSnapshot` still re-persisted it every save — a dangling claim that
+  // round-tripped forever with no way to see or delete it (E2 review finding #3). Keeping the
+  // row surfaces a placeholder URL and a working Remove button so the user can clear it.
   const resolvedClaims = useMemo(() => {
     const sourceById = new Map(provenanceSources.map((s) => [s.id, s]))
-    return entityClaims
-      .map((c) => ({ claim: c, source: sourceById.get(c.sourceId) }))
-      .filter((r): r is { claim: Claim; source: NonNullable<typeof r.source> } => r.source != null)
+    return entityClaims.map((c) => ({ claim: c, source: sourceById.get(c.sourceId) }))
   }, [entityClaims, provenanceSources])
-  const sources = useMemo(() => resolvedClaims.map((r) => r.source.url), [resolvedClaims])
-  const reliabilities = useMemo(() => resolvedClaims.map((r) => r.source.reliability), [resolvedClaims])
+  const sources = useMemo(
+    () => resolvedClaims.map((r) => r.source?.url ?? "(source unavailable)"),
+    [resolvedClaims],
+  )
+  const reliabilities = useMemo(
+    () => resolvedClaims.map((r) => r.source?.reliability ?? null),
+    [resolvedClaims],
+  )
 
   const handleNameChange = useCallback(
     (name: string) => {

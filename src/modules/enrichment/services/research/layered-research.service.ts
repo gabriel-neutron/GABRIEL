@@ -93,6 +93,24 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
+/**
+ * Ids of every entity not yet reached when a run stops early: the rest of the
+ * current layer from `startIdx` onward, plus all entities in deeper layers.
+ * Used by both the abort and the `maxEntities` cap so no entity is silently lost —
+ * they land in `skippedEntityIds` for the next batch to pick up.
+ */
+function remainingFrom(
+  bfsLayers: MapEntity[][],
+  layerIdx: number,
+  startIdx: number,
+): string[] {
+  const ids = bfsLayers[layerIdx].slice(startIdx).map((e) => e.id)
+  for (let li = layerIdx + 1; li < bfsLayers.length; li++) {
+    ids.push(...bfsLayers[li].map((e) => e.id))
+  }
+  return ids
+}
+
 function isAbortError(error: unknown): boolean {
   return (
     (error instanceof DOMException && error.name === "AbortError") ||
@@ -185,7 +203,7 @@ export async function runLayeredResearch(
     for (const entity of layer) {
       // Abort check
       if (options.signal?.aborted) {
-        skippedEntityIds.push(...layer.slice(layer.indexOf(entity)).map((e) => e.id))
+        skippedEntityIds.push(...remainingFrom(bfsLayers, layerIdx, layer.indexOf(entity)))
         break outer
       }
 
@@ -204,11 +222,7 @@ export async function runLayeredResearch(
 
       // Batch size limit — remaining entities are not processed this run
       if (done >= maxEntities) {
-        skippedEntityIds.push(...layer.slice(layer.indexOf(entity)).map((e) => e.id))
-        // Also push all remaining layers
-        for (let li = layerIdx + 1; li < bfsLayers.length; li++) {
-          skippedEntityIds.push(...bfsLayers[li].map((e) => e.id))
-        }
+        skippedEntityIds.push(...remainingFrom(bfsLayers, layerIdx, layer.indexOf(entity)))
         break outer
       }
 

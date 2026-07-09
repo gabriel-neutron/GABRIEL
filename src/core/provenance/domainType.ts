@@ -13,7 +13,11 @@ export function getDomainTypeFromUrl(url: string): SourceDomainType {
   }
 
   if (hostname.endsWith("wikipedia.org")) return "wikipedia"
-  if (hostname.endsWith("mil.ru") || hostname.endsWith(".gov") || hostname.endsWith(".mil")) return "official"
+  // Match government/military by DNS *label*, not just a `.gov`/`.mil` TLD suffix, so
+  // country-code domains classify correctly too: gov.uk, gov.ua, gouv.fr, mod.gov.ua,
+  // army.mil, mil.ru all contain a `gov`/`gouv`/`mil` label.
+  const labels = hostname.split(".")
+  if (labels.includes("gov") || labels.includes("gouv") || labels.includes("mil")) return "official"
   if (
     hostname.endsWith("bellingcat.com") ||
     hostname.endsWith("oryxspioenkop.com") ||
