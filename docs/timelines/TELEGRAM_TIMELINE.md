@@ -214,41 +214,40 @@ Full BFS traversal using the three confirmed discovery signals: linked channels,
 
 ---
 
-## Phase 6 — React Graph UI (Weeks 6-8)
+## Phase 6 — React Graph Module (Weeks 6-8)
 
 **Status:** not started  
-**Prerequisite:** Phase 5 exit criteria passed; Sigma.js performance validated in Phase 1.
+**Prerequisite:** Phase 5 exit criteria passed; Sigma.js performance validated in Phase 1; ROADMAP.md E4 (module registry) landed — see ADR [0007](./adr/0007-shell-module-registry.md).
 
-**Goal**: Build the interactive Telegram graph view in the React app. The analyst can open a `.tgdb` file, view the network, search, and inspect nodes.
+**Goal**: Build the interactive Telegram graph view in the React app. The analyst can open a `.tgdb` file, view the network, search, and inspect nodes — inside the same `AppShell`/`MainLayout` shell `orbat`/`osm` already use, not a separate page.
 
 **Scope**  
-New `TelegramPage` in the React app. Sigma.js graph, channel/user detail panel, crawl controls, search. No OOB proposals yet (Phase 7).
+> **Revised 2026-07-10 (grill-with-docs session, alongside ADR 0007).** The original plan below built Telegram as a standalone `TelegramPage` reached by switching away from `EditPage` entirely — its own store, own layout, no shared shell. That shape sidesteps E4's module registry rather than exercising it. Telegram is now a real `modules/telegram/` module: it registers a `views` entry (the Sigma.js graph, a new top-level tab alongside Map/Hierarchy), a `detailRenderer` for `selectedRef.kind === "telegram-channel"` (replacing the standalone `ChannelDetail` page), a `leftPanels` entry for `CrawlControls`/`GraphSearch`, and a `headerContribution` for the sidecar connection-status indicator (see Phase 2). No OOB proposals yet (Phase 7).
 
 **Primary Targets**
-- `src/pages/TelegramPage.tsx` (new page, launched from EditPage header button)
-- `src/store/useTelegramStore.ts` (new Zustand store: sidecar state, graph data, selected node)
-- `src/components/telegram/TelegramGraph.tsx` (Sigma.js WebGL graph)
-- `src/components/telegram/ChannelDetail.tsx` (selected node detail panel)
-- `src/components/telegram/CrawlControls.tsx` (seed import, depth input, start/pause, progress)
-- `src/components/telegram/GraphSearch.tsx` (search by unit, MUN, channel, person)
-- `src/App.tsx` (add `telegram` to mode type)
-- `src/pages/EditPage.tsx` (add Telegram launch button to header)
+- `src/modules/telegram/index.ts` (module manifest: `views`, `detailRenderer`, `leftPanels`, `headerContribution`)
+- `src/modules/telegram/store/useTelegramStore.ts` (Zustand store: sidecar state, graph data, selected node)
+- `src/modules/telegram/ui/TelegramGraph.tsx` (Sigma.js WebGL graph — registered as a `views` entry)
+- `src/modules/telegram/ui/ChannelDetail.tsx` (registered as the `telegram-channel` `detailRenderer`)
+- `src/modules/telegram/ui/CrawlControls.tsx` (registered as a `leftPanels` entry: seed import, depth input, start/pause, progress)
+- `src/modules/telegram/ui/GraphSearch.tsx` (search by unit, MUN, channel, person)
+- `src/shell/moduleRegistry.ts` (add `telegramModule` to the composed `modules` array)
 - `package.json` (add `@react-sigma/core`, `sigma`, `graphology`)
 
 **Tasks**
 - [ ] Install and configure `@react-sigma/core`, `sigma`, `graphology`.
 - [ ] Create `useTelegramStore` with: sidecar URL, connection status, graph data, selected channel ID, crawl state.
-- [ ] Build `TelegramGraph`: fetch `/graph` on mount, render with Sigma.js, wire node click to detail panel.
-- [ ] Build `ChannelDetail`: display channel metadata, relevance score, extracted entities, member count.
-- [ ] Build `CrawlControls`: CSV seed import, depth selector, start/pause/resume buttons, WebSocket progress display.
+- [ ] Build `TelegramGraph`: fetch `/graph` on mount, render with Sigma.js, dispatch node click to `useSelectionStore.setSelectedRef({ kind: "telegram-channel", id })`.
+- [ ] Build `ChannelDetail` as the module's `detailRenderer` for `telegram-channel`: display channel metadata, relevance score, extracted entities, member count.
+- [ ] Build `CrawlControls` as a `leftPanels` entry: CSV seed import, depth selector, start/pause/resume buttons, WebSocket progress display.
 - [ ] Build `GraphSearch`: input → `GET /search?q=` → highlight matching nodes on graph.
-- [ ] Add "Telegram" button to `EditPage` header that switches to `TelegramPage`.
+- [ ] Add `telegramModule` to `shell/moduleRegistry.ts`'s composed array; confirm its `views` entry appears as a third tab alongside Map/Hierarchy with no `MainLayout`/`AppShell` edits required.
 - [ ] Test with real Phase 5 crawl data at 200+ nodes; verify render performance.
 - [ ] Test with mock data at 1,000 and 5,000 nodes; verify frame rate (from Phase 1 baseline).
 
 **Exit Criteria**
-- [ ] TelegramPage opens from EditPage and displays a real crawled graph.
-- [ ] Node click shows correct channel detail.
+- [ ] Telegram's graph view opens as a top-level tab inside the shared shell and displays a real crawled graph, via the module registry — no hand-added branch in `MainLayout.tsx`/`AppShell.tsx`.
+- [ ] Node click shows correct channel detail via the registered `detailRenderer`.
 - [ ] Search returns results and highlights nodes.
 - [ ] Crawl controls start/pause/resume a real crawl and show live progress.
 - [ ] Graph renders at ≥ 30 FPS at 5,000 nodes (validated against Phase 1 baseline hardware).
