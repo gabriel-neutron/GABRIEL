@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef, useMemo } from "react"
 import { Eye, EyeOff } from "lucide-react"
-import { Button } from "@/components/ui/button"
+import { Button } from "@/ui/button"
 import { useProjectStore } from "@/store/useProjectStore"
+import { selectEntity } from "@/core/map/selection"
 import { ORGANISATION_TYPE_LABELS } from "@/types/organisation.types"
 
 type Props = {
@@ -78,9 +79,7 @@ function LayersContextMenu({
 export function LayersPanel({ readOnly = false }: Props) {
   const layers = useProjectStore((s) => s.layers)
   const entities = useProjectStore((s) => s.entities)
-  const organisations = useProjectStore((s) => s.organisations)
   const selectedEntityId = useProjectStore((s) => s.selectedEntityId)
-  const selectedOrganisationId = useProjectStore((s) => s.selectedOrganisationId)
 
   const [expandedByLayerId, setExpandedByLayerId] = useState<Record<string, boolean>>({})
   const [contextMenu, setContextMenu] = useState<{ layerId: string; x: number; y: number } | null>(null)
@@ -161,23 +160,17 @@ export function LayersPanel({ readOnly = false }: Props) {
       <div className="min-h-0 flex-1 space-y-1 p-4">
         {visibleLayers.map((layer, index) => {
           const isOsmLayer = layer.osmData != null
-          const isOrgLayer = layer.kind === "organisation"
           const isCustomLayer = layer.kind === "custom"
           const rowExpanded = expandedByLayerId[layer.id] === true
-          const layerEntities = isOrgLayer
-            ? []
-            : entities
-                .filter((e) => e.layerId === layer.id)
-                .sort((a, b) => {
-                  const aGroup = entityHasChildren.get(a.id) === true
-                  const bGroup = entityHasChildren.get(b.id) === true
-                  if (aGroup !== bGroup) return aGroup ? -1 : 1
-                  return a.name.localeCompare(b.name, undefined, { sensitivity: "base" })
-                })
-          const layerOrgs = isOrgLayer
-            ? [...organisations].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }))
-            : []
-          const itemCount = isOrgLayer ? layerOrgs.length : layerEntities.length
+          const layerEntities = entities
+            .filter((e) => e.layerId === layer.id)
+            .sort((a, b) => {
+              const aGroup = entityHasChildren.get(a.id) === true
+              const bGroup = entityHasChildren.get(b.id) === true
+              if (aGroup !== bGroup) return aGroup ? -1 : 1
+              return a.name.localeCompare(b.name, undefined, { sensitivity: "base" })
+            })
+          const itemCount = layerEntities.length
           const prevLayer = visibleLayers[index - 1]
           const nextLayer = visibleLayers[index + 1]
           const canMoveUp = isCustomLayer && prevLayer?.kind === "custom"
@@ -262,8 +255,8 @@ export function LayersPanel({ readOnly = false }: Props) {
                 </div>
               </div>
 
-              {/* Military entities expand section */}
-              {!isOsmLayer && !isOrgLayer && layerEntities.length > 0 && (
+              {/* Entities expand section (units and, for the fixed Industry layer, corporate entities) */}
+              {!isOsmLayer && layerEntities.length > 0 && (
                 <div
                   className={`grid overflow-hidden border-t bg-muted/30 transition-[grid-template-rows,opacity] duration-150 ease-out ${
                     rowExpanded ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"
@@ -275,74 +268,42 @@ export function LayersPanel({ readOnly = false }: Props) {
                     }`}
                   >
                     <div className="flex flex-col gap-1">
-                      {layerEntities.map((entity) => (
-                        <div key={entity.id} className="flex items-center gap-1">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const s = useProjectStore.getState()
-                              s.setSelectedEntityId(entity.id)
-                              s.setSelectedOsmObject(null)
-                            }}
-                            className={`min-w-0 flex-1 truncate rounded px-2 py-1 text-left text-xs transition-colors hover:bg-muted ${
-                              selectedEntityId === entity.id ? "bg-muted font-medium text-foreground" : ""
-                            }`}
-                          >
-                            {entity.name}
-                          </button>
-                          {!readOnly && (
-                            <Button
+                      {layerEntities.map((entity) => {
+                        const isCorporate = entity.kind === "corporate"
+                        return (
+                          <div key={entity.id} className="flex items-center gap-1">
+                            <button
                               type="button"
-                              variant="ghost"
-                              size="icon-xs"
-                              className="h-5 w-5 shrink-0 text-muted-foreground hover:bg-destructive/15 hover:text-destructive"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                handleDeleteEntity(entity.id)
-                              }}
-                              title="Remove entity"
+                              onClick={() => selectEntity(entity.id)}
+                              className={`min-w-0 flex-1 truncate rounded px-2 py-1 text-left text-xs transition-colors hover:bg-muted ${
+                                selectedEntityId === entity.id ? "bg-muted font-medium text-foreground" : ""
+                              }`}
+                              title={
+                                isCorporate && entity.type
+                                  ? ORGANISATION_TYPE_LABELS[entity.type as keyof typeof ORGANISATION_TYPE_LABELS]
+                                  : undefined
+                              }
                             >
-                              ×
-                            </Button>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Organisation layer expand section */}
-              {isOrgLayer && layerOrgs.length > 0 && (
-                <div
-                  className={`grid overflow-hidden border-t bg-muted/30 transition-[grid-template-rows,opacity] duration-150 ease-out ${
-                    rowExpanded ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"
-                  }`}
-                >
-                  <div
-                    className={`min-h-0 overflow-hidden px-3 transition-[padding] duration-150 ease-out ${
-                      rowExpanded ? "py-2" : "py-0"
-                    }`}
-                  >
-                    <div className="flex flex-col gap-1">
-                      {layerOrgs.map((org) => (
-                        <button
-                          key={org.id}
-                          type="button"
-                          onClick={() => {
-                            const s = useProjectStore.getState()
-                            s.setSelectedOrganisationId(org.id)
-                            s.setSelectedEntityId(null)
-                            s.setSelectedOsmObject(null)
-                          }}
-                          className={`min-w-0 w-full truncate rounded px-2 py-1 text-left text-xs transition-colors hover:bg-muted ${
-                            selectedOrganisationId === org.id ? "bg-muted font-medium text-foreground" : ""
-                          }`}
-                          title={ORGANISATION_TYPE_LABELS[org.type]}
-                        >
-                          {org.name}
-                        </button>
-                      ))}
+                              {entity.name}
+                            </button>
+                            {!readOnly && !isCorporate && (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon-xs"
+                                className="h-5 w-5 shrink-0 text-muted-foreground hover:bg-destructive/15 hover:text-destructive"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  handleDeleteEntity(entity.id)
+                                }}
+                                title="Remove entity"
+                              >
+                                ×
+                              </Button>
+                            )}
+                          </div>
+                        )
+                      })}
                     </div>
                   </div>
                 </div>

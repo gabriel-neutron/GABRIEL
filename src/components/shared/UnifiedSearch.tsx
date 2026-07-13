@@ -2,10 +2,12 @@ import { useState, useRef, useEffect, useMemo } from "react"
 import { createPortal } from "react-dom"
 import { Search } from "lucide-react"
 import { useProjectStore } from "@/store/useProjectStore"
-import { Input } from "@/components/ui/input"
-import { Button } from "@/components/ui/button"
-import { searchPlace, type NominatimResult } from "@/services/nominatim.service"
-import { searchLocalOsmFeatures, type LocalOsmSearchHit } from "@/utils/osmLocalSearch"
+import { useOsmViewStore } from "@/store/useOsmViewStore"
+import { selectEntity } from "@/core/map/selection"
+import { Input } from "@/ui/input"
+import { Button } from "@/ui/button"
+import { searchPlace, type NominatimResult } from "@/modules/osm/services/nominatim.service"
+import { searchLocalOsmFeatures, type LocalOsmSearchHit } from "@/modules/osm/services/osmLocalSearch"
 import { cn } from "@/lib/utils"
 
 export type FlyToFn = (lat: number, lng: number, zoom?: number) => void
@@ -40,7 +42,7 @@ function parseLatLngPair(query: string): { lat: number; lng: number } | null {
 export function UnifiedSearch({ flyToRef }: Props) {
   const entities = useProjectStore((s) => s.entities)
   const layers = useProjectStore((s) => s.layers)
-  const entityOsmGeometries = useProjectStore((s) => s.entityOsmGeometries)
+  const entityOsmGeometries = useOsmViewStore((s) => s.entityOsmGeometries)
 
   const [query, setQuery] = useState("")
   const [open, setOpen] = useState(false)
@@ -157,7 +159,7 @@ export function UnifiedSearch({ flyToRef }: Props) {
 
   function handleSelect(result: SearchResult) {
     if (result.source === "entity") {
-      useProjectStore.getState().setSelectedEntityId(result.id)
+      selectEntity(result.id)
     } else if (result.source === "coordinates" || result.source === "local-osm") {
       flyToRef.current?.(result.lat, result.lng, 14)
     } else {

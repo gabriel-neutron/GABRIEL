@@ -1,0 +1,18 @@
+import { setSqljsWasmLocateFile } from "@ngageoint/geopackage"
+
+setSqljsWasmLocateFile(
+  (file) => `https://unpkg.com/@ngageoint/geopackage@4.2.6/dist/${file}`,
+)
+
+export { loadGeoPackage } from "./load"
+export { saveGeoPackage } from "./save"
+export { getDefaultEchelonLayers, applyGeoPackageResult } from "./applyResult"
+export type {
+  GpkgLayer,
+  GpkgEntity,
+  GpkgGeometry,
+  GpkgSource,
+  GpkgClaim,
+  GeoPackageLoadResult,
+  ApplyGeoPackageResultState,
+} from "./types"

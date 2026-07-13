@@ -127,7 +127,7 @@ The analyst can: view the network as an interactive Sigma.js WebGL graph, search
 - OpenAI API key passed via environment variable; sidecar reads from `.env` file.
 - `.tgdb` file can be opened alongside any `.gpkg` file; they are independent but linked via OOB match proposals.
 - Sidecar must handle Telegram rate limits (FloodWaitError) gracefully and surface errors to the React UI.
-- All external tool capabilities must be validated empirically before production integration (see TIMELINE).
+- All external tool capabilities must be validated empirically before production integration (see `timelines/TELEGRAM_TIMELINE.md`).
 
 ---
 

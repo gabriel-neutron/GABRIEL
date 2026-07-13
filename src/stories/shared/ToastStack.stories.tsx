@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite"
 import { useState } from "react"
-import { Button } from "@/components/ui/button"
+import { Button } from "@/ui/button"
 import { ToastStack, type ToastItem } from "@/components/shared/ToastStack"
 
 const meta = {

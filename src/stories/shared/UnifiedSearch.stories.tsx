@@ -14,7 +14,6 @@ const meta = {
       useProjectStore.setState({
         entities: [],
         layers: [],
-        entityOsmGeometries: {},
       })
     }, [])
 

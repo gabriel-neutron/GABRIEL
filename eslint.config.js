@@ -28,7 +28,7 @@ export default defineConfig([globalIgnores(['dist', 'storybook-static', 'coverag
 }, {
   // shadcn/ui components often export both components and variants/constants.
   // That pattern is safe here; disable the fast-refresh limitation for this folder.
-  files: ['src/components/ui/**/*.{ts,tsx}'],
+  files: ['src/ui/**/*.{ts,tsx}'],
   rules: {
     'react-refresh/only-export-components': 'off',
   },

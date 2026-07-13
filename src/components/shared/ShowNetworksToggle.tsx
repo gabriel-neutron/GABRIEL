@@ -1,10 +1,10 @@
 import { Network } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { useProjectStore } from "@/store/useProjectStore"
+import { Button } from "@/ui/button"
+import { useMapPrefsStore } from "@/store/useMapPrefsStore"
 
 export function ShowNetworksToggle() {
-  const showNetworks = useProjectStore((s) => s.showNetworks)
-  const setShowNetworks = useProjectStore((s) => s.setShowNetworks)
+  const showNetworks = useMapPrefsStore((s) => s.showNetworks)
+  const setShowNetworks = useMapPrefsStore((s) => s.setShowNetworks)
 
   return (
     <Button

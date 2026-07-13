@@ -5,8 +5,8 @@ import type {
   EnrichmentProposal,
   UnresolvedReason,
 } from "@/types/enrichment.types"
-import type { EntityResearchStatus } from "@/hooks/useLayeredResearch"
-import type { LayeredResearchResult } from "@/services/research/layered-research.service"
+import type { EntityResearchStatus } from "@/modules/enrichment/hooks/useLayeredResearch"
+import type { LayeredResearchResult } from "@/modules/enrichment/services/research/layered-research.service"
 
 export type EnrichmentControls = {
   isDrawerOpen: boolean

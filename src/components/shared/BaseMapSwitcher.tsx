@@ -1,7 +1,7 @@
 import { Map } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { useProjectStore } from "@/store/useProjectStore"
+import { Button } from "@/ui/button"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdown-menu"
+import { useMapPrefsStore } from "@/store/useMapPrefsStore"
 
 export const BASE_MAP_IDS = ["osm", "satellite", "hybrid", "topo"] as const
 export type BaseMapId = (typeof BASE_MAP_IDS)[number]
@@ -14,8 +14,8 @@ const LABELS: Record<BaseMapId, string> = {
 }
 
 export function BaseMapSwitcher() {
-  const baseMap = useProjectStore((s) => s.baseMap)
-  const setBaseMap = useProjectStore((s) => s.setBaseMap)
+  const baseMap = useMapPrefsStore((s) => s.baseMap)
+  const setBaseMap = useMapPrefsStore((s) => s.setBaseMap)
 
   return (
     <DropdownMenu>

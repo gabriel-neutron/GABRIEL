@@ -1,4 +1,4 @@
-import type { PositionMode } from "@/types/domain.types"
+import type { PositionMode } from "@/core/entity/entity"
 
 export type OrganisationType =
   | "holding"

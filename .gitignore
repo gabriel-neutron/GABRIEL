@@ -36,3 +36,6 @@ storybook-static
 .claude/
 .agents/
 AGENTS.md
+
+# Local working documents (not part of the release)
+FNF OSINT Proposal.pdf

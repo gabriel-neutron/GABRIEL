@@ -1,0 +1,144 @@
+import { readFileSync } from "node:fs"
+import { readdirSync, rmSync } from "node:fs"
+import { resolve } from "node:path"
+import { describe, expect, it, afterEach } from "vitest"
+import { loadGeoPackage, saveGeoPackage } from "./index"
+
+/**
+ * The real, checked-in demo project (public/project.gpkg) predates E1 (ADR 0004): it has
+ * a separate `organisations` table and no `kind` column on `units`. This is the literal
+ * "existing .gpkg files round-trip losslessly" success criterion from ROADMAP.md's E1 —
+ * tested against a real file, not only synthetic fixtures.
+ */
+describe("public/project.gpkg round-trip (real pre-E1 fixture)", () => {
+  afterEach(() => {
+    for (const file of readdirSync(process.cwd())) {
+      if (file.startsWith("gabriel-") && file.endsWith(".gpkg")) {
+        try {
+          rmSync(file, { force: true })
+        } catch {
+          // ignore: file is locked by another concurrently-running test worker
+        }
+      }
+    }
+  })
+
+  it(
+    "loads every unit and legacy organisation into one unified, kind-tagged entities array",
+    async () => {
+      const buffer = Uint8Array.from(readFileSync(resolve(process.cwd(), "public/project.gpkg"))).buffer
+      const loaded = await loadGeoPackage(buffer)
+
+      const units = loaded.entities.filter((e) => e.kind === "unit")
+      const corporate = loaded.entities.filter((e) => e.kind === "corporate")
+
+      expect(units.length).toBeGreaterThan(0)
+      expect(corporate.length).toBeGreaterThan(0)
+      expect(loaded.entities).toHaveLength(units.length + corporate.length)
+
+      // Every corporate entity migrated from the legacy `organisations` table lands
+      // on the fixed synthetic Industry layer, never an arbitrary one.
+      for (const org of corporate) {
+        expect(org.layerId).toBe("industry")
+      }
+
+      // No id collisions between the two legacy tables now sharing one array.
+      const ids = loaded.entities.map((e) => e.id)
+      expect(new Set(ids).size).toBe(ids.length)
+    },
+    60_000,
+  )
+
+  it(
+    "round-trips losslessly: re-saving and reloading preserves every entity, geometry, and layer",
+    async () => {
+      // Copy into a fresh ArrayBuffer: Node pools small readFileSync results into a
+      // shared backing buffer, so `.buffer` alone can carry a nonzero byteOffset.
+      const fileBytes = readFileSync(resolve(process.cwd(), "public/project.gpkg"))
+      const buffer = Uint8Array.from(fileBytes).buffer
+      const first = await loadGeoPackage(buffer)
+
+      // Pass `buffer` as baseBuffer, mirroring performProjectSave's real reopen-and-save
+      // path (useProjectIO.ts) — this is the exact path that silently went untested
+      // pre-migration and let the crash-on-save regression ship.
+      const bytes = await saveGeoPackage(first.layers, first.entities, first.geometries, first.sourceCache, buffer)
+      const second = await loadGeoPackage(Uint8Array.from(bytes).buffer)
+
+      expect(second.entities).toHaveLength(first.entities.length)
+      expect(second.geometries).toHaveLength(first.geometries.length)
+      expect(second.layers).toHaveLength(first.layers.length)
+
+      const firstById = new Map(first.entities.map((e) => [e.id, e]))
+      for (const entity of second.entities) {
+        const original = firstById.get(entity.id)
+        expect(original).toBeDefined()
+        expect(entity.kind).toBe(original!.kind)
+        expect(entity.name).toBe(original!.name)
+        expect(entity.layerId).toBe(original!.layerId)
+        expect(entity.parentId).toBe(original!.parentId)
+      }
+    },
+    60_000,
+  )
+
+  it(
+    "persists merge aliases through a reopen-and-save against the real pre-E3 fixture (ADR 0006, E3)",
+    async () => {
+      // The real fixture predates the `aliases` column — this drives ensureOptionalColumns'
+      // ALTER path (reopen via baseBuffer), the exact shape E1.7's crash-on-save bug lived in.
+      const fileBytes = readFileSync(resolve(process.cwd(), "public/project.gpkg"))
+      const buffer = Uint8Array.from(fileBytes).buffer
+      const first = await loadGeoPackage(buffer)
+
+      const target = first.entities.find((e) => e.kind === "unit")!
+      const aliased = first.entities.map((e) =>
+        e.id === target.id ? { ...e, aliases: ["Вагнер", "PMC Wagner"] } : e,
+      )
+
+      const bytes = await saveGeoPackage(first.layers, aliased, first.geometries, first.sourceCache, buffer)
+      const second = await loadGeoPackage(Uint8Array.from(bytes).buffer)
+
+      expect(second.entities.find((e) => e.id === target.id)!.aliases).toEqual(["Вагнер", "PMC Wagner"])
+      // Every other row stays clean (undefined) — aliases are opt-in, not defaulted to [].
+      expect(second.entities.filter((e) => e.aliases != null)).toHaveLength(1)
+    },
+    60_000,
+  )
+
+  it(
+    "derives Source/Claim provenance from the real fixture's legacy sources strings, and a double round-trip doesn't duplicate them (ADR 0006, E2 Slice A)",
+    async () => {
+      const buffer = Uint8Array.from(readFileSync(resolve(process.cwd(), "public/project.gpkg"))).buffer
+      const first = await loadGeoPackage(buffer)
+      expect(first.sources.length).toBeGreaterThan(0)
+      expect(first.claims.length).toBeGreaterThan(0)
+
+      const firstBytes = await saveGeoPackage(
+        first.layers,
+        first.entities,
+        first.geometries,
+        first.sourceCache,
+        buffer,
+        first.sources,
+        first.claims,
+      )
+      const second = await loadGeoPackage(Uint8Array.from(firstBytes).buffer)
+      expect(second.sources).toHaveLength(first.sources.length)
+      expect(second.claims).toHaveLength(first.claims.length)
+
+      const secondBytes = await saveGeoPackage(
+        second.layers,
+        second.entities,
+        second.geometries,
+        second.sourceCache,
+        Uint8Array.from(firstBytes).buffer,
+        second.sources,
+        second.claims,
+      )
+      const third = await loadGeoPackage(Uint8Array.from(secondBytes).buffer)
+      expect(third.sources).toHaveLength(first.sources.length)
+      expect(third.claims).toHaveLength(first.claims.length)
+    },
+    60_000,
+  )
+})

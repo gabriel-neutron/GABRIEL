@@ -1,9 +1,11 @@
 import { useState, useEffect } from "react"
 import { Loader2 } from "lucide-react"
-import { MainLayout } from "@/components/shared/MainLayout"
-import { loadGeoPackage, applyGeoPackageResult } from "@/services/geopackage"
+import { MainLayout } from "@/shell/MainLayout"
+import { loadGeoPackage, applyGeoPackageResult } from "@/core/persistence/geopackage"
 import { useProjectStore } from "@/store/useProjectStore"
-import { useEnrichment } from "@/hooks/useEnrichment"
+import { useSourceCacheStore } from "@/store/useSourceCacheStore"
+import { useProvenanceStore } from "@/store/useProvenanceStore"
+import { useEnrichment } from "@/modules/enrichment/hooks/useEnrichment"
 
 export type ViewPageProps = {
   onEditMode?: () => void
@@ -16,11 +18,14 @@ export function ViewPage({ onEditMode, onOpenAbout }: ViewPageProps): React.Reac
 
   const { entities, drawnGeometries, selectedEntityId } = useProjectStore()
 
+  // No onApplyAccepted: leaving it unset (not a no-op function) makes useEnrichment's
+  // own `if (!onApplyAccepted) return` guard skip the accept-flow entirely on this
+  // read-only page — including its Source/Claim store writes, which a truthy no-op
+  // callback would not have prevented (only the discarded entity patch would).
   const enrichment = useEnrichment({
     entities,
     drawnGeometries,
     selectedEntityId,
-    onApplyAccepted: () => {},
   })
 
   useEffect(function loadDemoProject() {
@@ -38,12 +43,12 @@ export function ViewPage({ onEditMode, onOpenAbout }: ViewPageProps): React.Reac
         useProjectStore.getState().setProject({
           layers: next.layers,
           entities: next.entities,
-          organisations: next.organisations,
           drawnGeometries: next.drawnGeometries,
+          claims: result.claims,
           selectedEntityId: next.selectedEntityId,
-          selectedOrganisationId: next.selectedOrganisationId,
-          sourceCache: result.sourceCache,
         })
+        useSourceCacheStore.getState().setSourceCache(result.sourceCache)
+        useProvenanceStore.getState().setSources(result.sources)
         setLoadError(null)
       })
       .catch((e) => {

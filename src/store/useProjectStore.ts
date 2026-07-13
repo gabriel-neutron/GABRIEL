@@ -1,10 +1,11 @@
 import { create } from "zustand"
 import { devtools } from "zustand/middleware"
-import { getDefaultEchelonLayers } from "@/services/geopackage"
-import type { Layer, MapEntity, DrawnGeometry, SelectedOsmObject } from "@/types/domain.types"
-import type { Organisation } from "@/types/organisation.types"
+import { getDefaultEchelonLayers } from "@/core/persistence/geopackage"
+import type { Layer, MapEntity, DrawnGeometry } from "@/types/domain.types"
 import { INDUSTRY_LAYER_ID } from "@/types/organisation.types"
-import type { BaseMapId } from "@/components/shared/BaseMapSwitcher"
+import type { Claim } from "@/core/provenance/claim"
+import type { Source } from "@/core/provenance/source"
+import { mergeEntities as mergeIdentityGraph } from "@/core/identity/merge"
 
 // ---------------------------------------------------------------------------
 // State
@@ -12,18 +13,17 @@ import type { BaseMapId } from "@/components/shared/BaseMapSwitcher"
 
 export interface ProjectState {
   layers: Layer[]
+  /** Both military units and corporate entities (kind-discriminated, ADR 0004 / E1) share this array. */
   entities: MapEntity[]
-  organisations: Organisation[]
   drawnGeometries: DrawnGeometry[]
-  sourceCache: Map<string, string>
+  /**
+   * Provenance claims (ADR 0006, E2.4) — entity-keyed, so cascade-deleted alongside
+   * `drawnGeometries` for the same reason: a dangling `claim.entityId` after entity
+   * deletion is the same class of bug atomicity here prevents. `Source` records
+   * themselves are NOT entity-keyed and live in the peripheral `useProvenanceStore`.
+   */
+  claims: Claim[]
   selectedEntityId: string | null
-  selectedOrganisationId: string | null
-  selectedOsmObject: SelectedOsmObject
-  showNetworks: boolean
-  baseMap: BaseMapId
-  entityOsmGeometries: Record<string, GeoJSON.FeatureCollection>
-  osmUnavailable: boolean
-  lastSavedAt: Date | null
 }
 
 const INDUSTRY_LAYER = {
@@ -37,17 +37,9 @@ function initialState(): ProjectState {
   return {
     layers: [...getDefaultEchelonLayers(), INDUSTRY_LAYER],
     entities: [],
-    organisations: [],
     drawnGeometries: [],
-    sourceCache: new Map(),
+    claims: [],
     selectedEntityId: null,
-    selectedOrganisationId: null,
-    selectedOsmObject: null,
-    showNetworks: true,
-    baseMap: "osm",
-    entityOsmGeometries: {},
-    osmUnavailable: false,
-    lastSavedAt: null,
   }
 }
 
@@ -59,11 +51,9 @@ export interface ProjectActions {
   setProject(p: {
     layers: Layer[]
     entities: MapEntity[]
-    organisations: Organisation[]
     drawnGeometries: DrawnGeometry[]
+    claims?: Claim[]
     selectedEntityId: string | null
-    selectedOrganisationId: string | null
-    sourceCache: Map<string, string>
   }): void
   resetProject(): void
 
@@ -77,45 +67,48 @@ export interface ProjectActions {
   addEntity(entity: MapEntity): void
   updateEntity(entityId: string, patch: Partial<MapEntity>): void
   deleteEntity(entityId: string): void
-
-  addOrganisation(org: Organisation): void
-  updateOrganisation(orgId: string, patch: Partial<Organisation>): void
-  deleteOrganisation(orgId: string): void
+  /** Collapse two records for one real-world entity into `primaryId` (ADR 0006, E3). */
+  mergeEntities(primaryId: string, secondaryId: string): void
 
   addGeometry(geom: DrawnGeometry): void
   deleteGeometry(geometryId: string): void
 
-  setSelectedEntityId(id: string | null): void
-  setSelectedOrganisationId(id: string | null): void
-  setSelectedOsmObject(obj: SelectedOsmObject): void
-  closeDetail(): void
+  addClaims(claims: Claim[]): void
+  removeClaim(claimId: string): void
 
-  setShowNetworks(v: boolean): void
-  setBaseMap(id: BaseMapId): void
-  setEntityOsmGeometries(
-    updater:
-      | Record<string, GeoJSON.FeatureCollection>
-      | ((prev: Record<string, GeoJSON.FeatureCollection>) => Record<string, GeoJSON.FeatureCollection>),
-  ): void
-  setOsmUnavailable(v: boolean): void
-  mergeSourceCache(additions: { url: string; content: string }[]): void
-  setLastSavedAt(date: Date | null): void
+  setSelectedEntityId(id: string | null): void
+  closeDetail(): void
 }
 
 // ---------------------------------------------------------------------------
 // Store
 // ---------------------------------------------------------------------------
 
-export function selectPersistableSnapshot(state: ProjectState) {
+/**
+ * The single source of truth for what data gets written to disk. `sourceCache`/
+ * `sources` live in peripheral stores (ADR 0005/0006) — passed in explicitly rather
+ * than read off `ProjectState` so this stays the one place callers assemble a save
+ * snapshot from, even though the data now spans multiple stores.
+ */
+export function selectPersistableSnapshot(
+  state: ProjectState,
+  sourceCache: Map<string, string>,
+  sources: Source[] = [],
+) {
   const nonOsmLayerIds = new Set(state.layers.filter((l) => l.osmData == null).map((l) => l.id))
+  const entities = state.entities
+    .filter((e) => nonOsmLayerIds.has(e.layerId))
+    .map((e) => ({ ...e, name: e.name.trim() || "Untitled" }))
+  const survivingEntityIds = new Set(entities.map((e) => e.id))
   return {
     layers: state.layers.map((l) => ({ ...l, kind: l.kind ?? (l.osmData != null ? ("osm" as const) : undefined) })),
-    entities: state.entities
-      .filter((e) => nonOsmLayerIds.has(e.layerId))
-      .map((e) => ({ ...e, name: e.name.trim() || "Untitled" })),
-    organisations: state.organisations.map((o) => ({ ...o, name: o.name.trim() || "Untitled" })),
+    entities,
     geometries: state.drawnGeometries.filter((g) => nonOsmLayerIds.has(g.layerId)),
-    sourceCache: state.sourceCache,
+    sourceCache,
+    // Only the claims belonging to a surviving (non-OSM) entity are persisted —
+    // otherwise an OSM entity filtered out above would leave a dangling claim.entityId.
+    claims: state.claims.filter((c) => survivingEntityIds.has(c.entityId)),
+    sources,
   }
 }
 
@@ -124,8 +117,8 @@ export const useProjectStore = create<ProjectState & ProjectActions>()(
     (set, get) => ({
       ...initialState(),
 
-      setProject({ layers, entities, organisations, drawnGeometries, selectedEntityId, selectedOrganisationId, sourceCache }) {
-        set({ layers, entities, organisations, drawnGeometries, selectedEntityId, selectedOrganisationId, sourceCache }, false, "setProject")
+      setProject({ layers, entities, drawnGeometries, claims, selectedEntityId }) {
+        set({ layers, entities, drawnGeometries, claims: claims ?? [], selectedEntityId }, false, "setProject")
       },
 
       resetProject() {
@@ -156,7 +149,7 @@ export const useProjectStore = create<ProjectState & ProjectActions>()(
       },
 
       removeLayer(id) {
-        const { layers, entities, drawnGeometries, selectedEntityId } = get()
+        const { layers, entities, drawnGeometries, claims, selectedEntityId } = get()
         const layer = layers.find((l) => l.id === id)
         if (layer?.kind === "echelon" || layer?.kind === "organisation") return
         const removedEntityIds = new Set(entities.filter((e) => e.layerId === id).map((e) => e.id))
@@ -165,6 +158,7 @@ export const useProjectStore = create<ProjectState & ProjectActions>()(
             layers: layers.filter((l) => l.id !== id),
             entities: entities.filter((e) => e.layerId !== id),
             drawnGeometries: drawnGeometries.filter((g) => g.layerId !== id),
+            claims: claims.filter((c) => !removedEntityIds.has(c.entityId)),
             selectedEntityId: selectedEntityId && removedEntityIds.has(selectedEntityId) ? null : selectedEntityId,
           },
           false,
@@ -214,28 +208,26 @@ export const useProjectStore = create<ProjectState & ProjectActions>()(
         set((s) => ({
           entities: s.entities.filter((e) => e.id !== entityId),
           drawnGeometries: s.drawnGeometries.filter((g) => g.entityId !== entityId),
+          claims: s.claims.filter((c) => c.entityId !== entityId),
           selectedEntityId: s.selectedEntityId === entityId ? null : s.selectedEntityId,
         }), false, "deleteEntity")
       },
 
-      addOrganisation(org) {
-        set((s) => ({ organisations: [...s.organisations, org] }), false, "addOrganisation")
-      },
-
-      updateOrganisation(orgId, patch) {
-        set(
-          (s) => ({ organisations: s.organisations.map((o) => (o.id === orgId ? { ...o, ...patch } : o)) }),
-          false,
-          "updateOrganisation",
-        )
-      },
-
-      deleteOrganisation(orgId) {
-        set((s) => ({
-          organisations: s.organisations.filter((o) => o.id !== orgId),
-          drawnGeometries: s.drawnGeometries.filter((g) => g.entityId !== orgId),
-          selectedOrganisationId: s.selectedOrganisationId === orgId ? null : s.selectedOrganisationId,
-        }), false, "deleteOrganisation")
+      mergeEntities(primaryId, secondaryId) {
+        set((s) => {
+          const { entities, claims, geometries } = mergeIdentityGraph(
+            { entities: s.entities, claims: s.claims, geometries: s.drawnGeometries },
+            primaryId,
+            secondaryId,
+          )
+          // The primary survives; a selection pointing at the now-gone secondary follows it.
+          return {
+            entities,
+            claims,
+            drawnGeometries: geometries,
+            selectedEntityId: s.selectedEntityId === secondaryId ? primaryId : s.selectedEntityId,
+          }
+        }, false, "mergeEntities")
       },
 
       addGeometry(geom) {
@@ -250,52 +242,20 @@ export const useProjectStore = create<ProjectState & ProjectActions>()(
         )
       },
 
+      addClaims(claims) {
+        set((s) => ({ claims: [...s.claims, ...claims] }), false, "addClaims")
+      },
+
+      removeClaim(claimId) {
+        set((s) => ({ claims: s.claims.filter((c) => c.id !== claimId) }), false, "removeClaim")
+      },
+
       setSelectedEntityId(id) {
         set({ selectedEntityId: id }, false, "setSelectedEntityId")
       },
 
-      setSelectedOrganisationId(id) {
-        set({ selectedOrganisationId: id }, false, "setSelectedOrganisationId")
-      },
-
-      setSelectedOsmObject(obj) {
-        set({ selectedOsmObject: obj }, false, "setSelectedOsmObject")
-      },
-
       closeDetail() {
-        set({ selectedEntityId: null, selectedOrganisationId: null, selectedOsmObject: null }, false, "closeDetail")
-      },
-
-      setShowNetworks(v) {
-        set({ showNetworks: v }, false, "setShowNetworks")
-      },
-
-      setBaseMap(id) {
-        set({ baseMap: id }, false, "setBaseMap")
-      },
-
-      setEntityOsmGeometries(updater) {
-        if (typeof updater === "function") {
-          set((s) => ({ entityOsmGeometries: updater(s.entityOsmGeometries) }), false, "setEntityOsmGeometries")
-        } else {
-          set({ entityOsmGeometries: updater }, false, "setEntityOsmGeometries")
-        }
-      },
-
-      setOsmUnavailable(v) {
-        set({ osmUnavailable: v }, false, "setOsmUnavailable")
-      },
-
-      mergeSourceCache(additions) {
-        set((s) => {
-          const next = new Map(s.sourceCache)
-          for (const { url, content } of additions) next.set(url, content)
-          return { sourceCache: next }
-        }, false, "mergeSourceCache")
-      },
-
-      setLastSavedAt(date) {
-        set({ lastSavedAt: date }, false, "setLastSavedAt")
+        set({ selectedEntityId: null }, false, "closeDetail")
       },
     }),
     { name: "GabrielProjectStore", enabled: import.meta.env.DEV },

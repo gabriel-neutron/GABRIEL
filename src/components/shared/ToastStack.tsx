@@ -1,5 +1,5 @@
 import { useEffect } from "react"
-import { Button } from "@/components/ui/button"
+import { Button } from "@/ui/button"
 import { AlertTriangle, X } from "lucide-react"
 
 export type ToastItem = {

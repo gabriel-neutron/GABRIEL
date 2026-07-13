@@ -1,12 +1,13 @@
-import { useState, useCallback, useEffect, useLayoutEffect, useRef } from "react"
-import type { DrawnGeometry } from "@/types/domain.types"
-import type { Organisation } from "@/types/organisation.types"
+import { useState, useCallback, useEffect, useLayoutEffect, useMemo, useRef } from "react"
+import type { DrawnGeometry, MapEntity } from "@/types/domain.types"
 import { INDUSTRY_LAYER_ID } from "@/types/organisation.types"
-import { MainLayout } from "@/components/shared/MainLayout"
+import { MainLayout } from "@/shell/MainLayout"
 import { ToastStack, type ToastItem } from "@/components/shared/ToastStack"
 import { useProjectStore } from "@/store/useProjectStore"
-import { useEnrichment } from "@/hooks/useEnrichment"
-import { useLayeredResearch } from "@/hooks/useLayeredResearch"
+import { selectEntity } from "@/core/map/selection"
+import { useSourceCacheStore } from "@/store/useSourceCacheStore"
+import { useEnrichment } from "@/modules/enrichment/hooks/useEnrichment"
+import { useLayeredResearch } from "@/modules/enrichment/hooks/useLayeredResearch"
 import { useProjectIO } from "@/hooks/useProjectIO"
 
 export type EditPageProps = {
@@ -15,28 +16,29 @@ export type EditPageProps = {
 }
 
 export function EditPage({ onViewMode, onOpenAbout }: EditPageProps): React.ReactElement {
-  const { entities, drawnGeometries, selectedEntityId, sourceCache, updateEntity, mergeSourceCache, addOrganisation, addGeometry, setSelectedOrganisationId, setSelectedEntityId } =
+  const { entities, drawnGeometries, selectedEntityId, updateEntity, addEntity, addGeometry } =
     useProjectStore()
+  const { sourceCache, mergeSourceCache } = useSourceCacheStore()
 
   const { busy, error, restoredFromSession, handleNew, handleOpen, handleSave } = useProjectIO()
 
   const handleCreateNewOrganisation = useCallback((geom: DrawnGeometry) => {
-    const org: Organisation = {
+    const org: MapEntity = {
+      kind: "corporate",
       id: crypto.randomUUID(),
       name: "New organisation",
       type: "company",
+      layerId: INDUSTRY_LAYER_ID,
       parentId: null,
       notes: null,
-      sources: null,
       osmRelationId: null,
       positionMode: "own",
       isExactPosition: false,
     }
-    addOrganisation(org)
+    addEntity(org)
     addGeometry({ ...geom, layerId: INDUSTRY_LAYER_ID, entityId: org.id })
-    setSelectedOrganisationId(org.id)
-    setSelectedEntityId(null)
-  }, [addOrganisation, addGeometry, setSelectedOrganisationId, setSelectedEntityId])
+    selectEntity(org.id)
+  }, [addEntity, addGeometry])
 
   const [toasts, setToasts] = useState<ToastItem[]>([])
 
@@ -44,14 +46,19 @@ export function EditPage({ onViewMode, onOpenAbout }: EditPageProps): React.Reac
     setToasts((prev) => prev.filter((item) => item.id !== id))
   }, [])
 
+  // AI enrichment only understands unit entities (natoSymbolCode/echelon/affiliation/
+  // domain) — a corporate entity passed in here would be silently invisible to the
+  // pipeline's entity lookup despite being selectable in the tree/map.
+  const unitEntities = useMemo(() => entities.filter((e) => e.kind === "unit"), [entities])
+
   const enrichment = useEnrichment({
-    entities,
+    entities: unitEntities,
     drawnGeometries,
     selectedEntityId,
     onApplyAccepted: updateEntity,
   })
 
-  const layeredResearch = useLayeredResearch(entities, drawnGeometries, {
+  const layeredResearch = useLayeredResearch(unitEntities, drawnGeometries, {
     onEntityAnalyzed: (entityId, analyzedAt) => {
       updateEntity(entityId, { analyzedAt })
     },
@@ -91,7 +98,7 @@ export function EditPage({ onViewMode, onOpenAbout }: EditPageProps): React.Reac
     if (!entityId) return
     const result = layeredResearch.getResult(entityId)
     if (!result) return
-    useProjectStore.getState().setSelectedEntityId(entityId)
+    selectEntity(entityId)
     isBatchReviewRef.current = true
     enrichment.loadBatchResult(result)
   }, [layeredResearch, enrichment])
@@ -131,7 +138,7 @@ export function EditPage({ onViewMode, onOpenAbout }: EditPageProps): React.Reac
       finishBatch()
       return
     }
-    useProjectStore.getState().setSelectedEntityId(nextEntityId)
+    selectEntity(nextEntityId)
     enrich.loadBatchResult(result)
   }, [
     enrichment.allProposalsResolved,

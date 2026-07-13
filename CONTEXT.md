@@ -1,20 +1,26 @@
 # Gabriel
 
-Local-first browser ORBAT editor. Analysts build and annotate hierarchical military unit structures on a map; all data stays on-device in `.gpkg` files.
+Local-first, self-hosted OSINT data-fusion environment. Analysts build source-rated, geolocated entity graphs — hierarchical military ORBATs today, adjacent accountability domains (corporate, maritime, financial) next — with every claim traceable to its sources. All **producer** data stays on-device (`.gpkg` on disk + IndexedDB cache); the deployed build serves a read-only public map to **consumers**. No third-party SaaS ever touches the data; heavier pipelines run as local sidecars the analyst launches.
 
 ## Language
 
 ### Entities and structure
 
-**MapEntity**:
-A single node in the ORBAT hierarchy — a military unit, HQ, or formation. Holds structured fields (name, echelon, affiliation, position) plus three enrichable fields: Notes, Provenance Ledger, and unit IDs.
-_Avoid_: entity, feature, unit (use MapEntity when precision matters)
+**Entity** (code: `MapEntity` today → generalises to `Entity`):
+The core node of any Gabriel map — something **sourced, source-rated, geolocated, and hierarchable**. Carries a common core (id, `type` discriminant, name, geometry/position, Provenance Ledger, source rating, `parentId`) plus a type-specific **Profile**. Today only the military profile is populated; corporate, vessel, and person profiles are future domains the core is designed to accept without change.
+_Was_: `MapEntity`, defined as "a military unit." That definition is now the **Unit Profile**, not the whole Entity.
+
+**Profile**:
+The type-specific payload attached to an Entity, selected by its `type` discriminant. The **Unit Profile** (military: echelon, affiliation, NATO symbol, unit IDs) is the only profile that exists today. Profiles are a **typed discriminated union**, never an open attribute bag — this preserves strong typing and the column-by-column GeoPackage round-trip.
+
+**Hierarchy**:
+The parent/child relation between Entities — a **core** property of any Entity, not a military one (a corporate control chain and a shipowner chain are also trees). Traversed by the shared Hierarchy index.
 
 **ORBAT** (Order of Battle):
-The hierarchical structure of military units and their relationships. Gabriel's primary artefact.
+The **military view** of the generic Hierarchy — the presentation of Unit-Profile Entities as a command tree. One module's lens on a core capability; no longer Gabriel's only structure.
 
-**Orbat module** (`src/utils/orbat.ts`, `buildOrbat`):
-The single shared parent/child traversal index for `MapEntity` and `Organisation` hierarchies —
+**Hierarchy index** (`src/utils/orbat.ts` → `hierarchy.ts`, `buildOrbat`):
+The single shared parent/child traversal index for every Entity profile and `Organisation` hierarchy —
 `childrenOf`, `ancestors`, `descendants`, `roots`, `layers`, `depthOf`. Built once per items array
 (e.g. inside a `useMemo`) and consumed by every module that walks the tree (`TreeView`,
 `OrganisationTreeView`, `HierarchyPanel`, `NetworkLinksLayer`, `geometry.ts`,
