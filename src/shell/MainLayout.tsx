@@ -71,7 +71,10 @@ export function MainLayout({
   onOverpassUnavailable,
   onCreateNewOrganisation,
 }: MainLayoutProps): React.ReactElement {
-  const { layers, entities, claims, selectedEntityId } = useProjectStore()
+  const layers = useProjectStore((s) => s.layers)
+  const entities = useProjectStore((s) => s.entities)
+  const claims = useProjectStore((s) => s.claims)
+  const selectedEntityId = useProjectStore((s) => s.selectedEntityId)
   const selectedRef = useSelectedRef()
   const handleCloseDetail = useCallback(() => {
     clearSelection()

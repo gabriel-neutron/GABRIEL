@@ -201,9 +201,10 @@ export function EntityInspector({ readOnly: readOnlyProp, enrichedOverlay: enric
   const moduleCtx = useModuleContext()
   const readOnly = readOnlyProp ?? moduleCtx.readOnly
   const enrichedOverlay = enrichedOverlayProp ?? moduleCtx.enrichedOverlay
-  const { layers, updateEntity, deleteGeometry } = useProjectStore()
+  const layers = useProjectStore((s) => s.layers)
+  const updateEntity = useProjectStore((s) => s.updateEntity)
+  const deleteGeometry = useProjectStore((s) => s.deleteGeometry)
   const assignableLayers = layers.filter((l) => l.osmData == null)
-  // Granular selectors (not the whole-store destructure above) for the E3 merge surface.
   const allEntities = useProjectStore((s) => s.entities)
   const mergeEntities = useProjectStore((s) => s.mergeEntities)
 

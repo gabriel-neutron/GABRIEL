@@ -16,7 +16,9 @@ export function ViewPage({ onEditMode, onOpenAbout }: ViewPageProps): React.Reac
   const [projectLoading, setProjectLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
 
-  const { entities, drawnGeometries, selectedEntityId } = useProjectStore()
+  const entities = useProjectStore((s) => s.entities)
+  const drawnGeometries = useProjectStore((s) => s.drawnGeometries)
+  const selectedEntityId = useProjectStore((s) => s.selectedEntityId)
 
   // No onApplyAccepted: leaving it unset (not a no-op function) makes useEnrichment's
   // own `if (!onApplyAccepted) return` guard skip the accept-flow entirely on this
