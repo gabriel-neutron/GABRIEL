@@ -3,6 +3,7 @@ import { createPortal } from "react-dom"
 import { Search } from "lucide-react"
 import { useProjectStore } from "@/store/useProjectStore"
 import { useOsmViewStore } from "@/store/useOsmViewStore"
+import { selectEntity } from "@/core/map/selection"
 import { Input } from "@/ui/input"
 import { Button } from "@/ui/button"
 import { searchPlace, type NominatimResult } from "@/modules/osm/services/nominatim.service"
@@ -158,7 +159,7 @@ export function UnifiedSearch({ flyToRef }: Props) {
 
   function handleSelect(result: SearchResult) {
     if (result.source === "entity") {
-      useProjectStore.getState().setSelectedEntityId(result.id)
+      selectEntity(result.id)
     } else if (result.source === "coordinates" || result.source === "local-osm") {
       flyToRef.current?.(result.lat, result.lng, 14)
     } else {

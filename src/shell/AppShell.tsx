@@ -17,6 +17,8 @@ import { useIsMobile } from "@/hooks/use-mobile"
 import { cn } from "@/lib/utils"
 import { useTheme } from "@/provider/theme-provider"
 import { AiProviderSettingsDialog } from "./AiProviderSettingsDialog"
+import { useViewStore } from "./useViewStore"
+import type { ModuleView } from "@/types/module.types"
 
 export type ProjectFileActions = {
   onNewProject: () => void
@@ -25,16 +27,15 @@ export type ProjectFileActions = {
 }
 
 type Props = {
-  mapSlot: ReactNode
-  treeSlot: ReactNode
+  /** Fixed core "map" view + every module's `views` (ADR 0007), composed by `MainLayout`. */
+  views: ModuleView[]
   leftSlot?: ReactNode
   rightSlot?: ReactNode
   detailHeaderActions?: ReactNode
   headerPrimarySlot?: ReactNode
   headerSecondarySlot?: ReactNode
   headerMenuSlot?: ReactNode
-  selectedEntityId: string | null
-  selectedOsmObject?: { type: "node" | "way" | "relation"; id: number } | null
+  rightPanelOpen: boolean
   onCloseDetail: () => void
   busy: boolean
   error: string | null
@@ -59,16 +60,14 @@ function StandaloneSidebarToggle() {
 }
 
 export function AppShell({
-  mapSlot,
-  treeSlot,
+  views,
   leftSlot,
   rightSlot,
   detailHeaderActions,
   headerPrimarySlot,
   headerSecondarySlot,
   headerMenuSlot,
-  selectedEntityId,
-  selectedOsmObject,
+  rightPanelOpen,
   onCloseDetail,
   busy,
   error,
@@ -78,20 +77,21 @@ export function AppShell({
   onSwitchToEdit,
   onSwitchToView,
 }: Props) {
-  const [activeView, setActiveView] = useState<"map" | "tree">("map")
+  const activeViewId = useViewStore((s) => s.activeViewId)
+  const setActiveViewId = useViewStore((s) => s.setActiveViewId)
   const [aiSettingsOpen, setAiSettingsOpen] = useState(false)
   const [mobileDetailOpen, setMobileDetailOpen] = useState(false)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const { theme } = useTheme()
   const isMobile = useIsMobile()
-  const rightPanelOpen = selectedEntityId !== null || selectedOsmObject !== null
+  const activeView = views.find((v) => v.id === activeViewId) ?? views[0]
 
   useEffect(() => {
     if (rightPanelOpen) setMobileDetailOpen(true)
   }, [rightPanelOpen])
 
   function handleViewChange(value: string) {
-    setActiveView(value as "map" | "tree")
+    setActiveViewId(value)
   }
 
   function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
@@ -169,10 +169,11 @@ export function AppShell({
               className={cn("h-8 w-8 shrink-0", theme === "dark" && "invert")}
               aria-hidden
             />
-            <Tabs value={activeView} onValueChange={handleViewChange} className="hidden sm:block">
+            <Tabs value={activeView.id} onValueChange={handleViewChange} className="hidden sm:block">
               <TabsList>
-                <TabsTrigger value="map">Map</TabsTrigger>
-                <TabsTrigger value="tree">Hierarchy</TabsTrigger>
+                {views.map((v) => (
+                  <TabsTrigger key={v.id} value={v.id}>{v.label}</TabsTrigger>
+                ))}
               </TabsList>
             </Tabs>
           </div>
@@ -253,22 +254,17 @@ export function AppShell({
               <DropdownMenuContent align="end" className="z-[10000] w-[320px]">
                 <div className="space-y-2 p-2">
                   <div className="grid grid-cols-2 gap-2">
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant={activeView === "map" ? "default" : "outline"}
-                      onClick={() => setActiveView("map")}
-                    >
-                      Map
-                    </Button>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant={activeView === "tree" ? "default" : "outline"}
-                      onClick={() => setActiveView("tree")}
-                    >
-                      Hierarchy
-                    </Button>
+                    {views.map((v) => (
+                      <Button
+                        key={v.id}
+                        type="button"
+                        size="sm"
+                        variant={activeView.id === v.id ? "default" : "outline"}
+                        onClick={() => setActiveViewId(v.id)}
+                      >
+                        {v.label}
+                      </Button>
+                    ))}
                   </div>
                   {headerPrimarySlot}
                   {headerSecondarySlot}
@@ -356,7 +352,7 @@ export function AppShell({
 
         <main className="relative min-h-0 min-w-0 flex-1">
           <StandaloneSidebarToggle />
-          <div className="h-full min-w-0">{activeView === "map" ? mapSlot : treeSlot}</div>
+          <div className="h-full min-w-0">{activeView.content}</div>
         </main>
 
         <aside

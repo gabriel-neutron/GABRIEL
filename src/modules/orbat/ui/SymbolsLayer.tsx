@@ -3,19 +3,13 @@ import L from "leaflet"
 import { Marker, Popup } from "react-leaflet"
 import { getRenderedSymbolForEntity } from "@/modules/orbat/services/symbol.service"
 import { useProjectStore } from "@/store/useProjectStore"
-import type { LatLng } from "@/core/coordinates"
-import type { MapBounds } from "@/core/map/MapBoundsReporter"
+import { useEntityVisibilityStore } from "@/modules/orbat/store/useEntityVisibilityStore"
+import { useMapViewStore, useMapInteractive } from "@/core/map/useMapViewStore"
+import { usePositionMap } from "@/core/map/usePositionMap"
+import { useVisibleLayerIds } from "@/core/map/useVisibleLayerIds"
+import { selectEntity } from "@/core/map/selection"
 
 const BOUNDS_BUFFER = 0.5
-
-type Props = {
-  positionMap: Map<string, LatLng>
-  visibleLayerIds: Set<string>
-  hiddenEntityIds?: Set<string>
-  onSelectEntity: (id: string | null) => void
-  mapBounds?: MapBounds | null
-  interactive?: boolean
-}
 
 function makeSymbolIcon(
   pngDataUri: string,
@@ -31,21 +25,21 @@ function makeSymbolIcon(
   })
 }
 
-export function SymbolsLayer({
-  positionMap,
-  visibleLayerIds,
-  hiddenEntityIds,
-  onSelectEntity,
-  mapBounds,
-  interactive = true,
-}: Props): React.ReactElement {
+/** Self-contained map layer (ADR 0007) — reads its own selection/visibility/viewport inputs. */
+export function SymbolsLayer(): React.ReactElement {
   const allEntities = useProjectStore((s) => s.entities)
+  const hiddenEntityIds = useEntityVisibilityStore((s) => s.hiddenEntityIds)
+  const mapBounds = useMapViewStore((s) => s.mapBounds)
+  const interactive = useMapInteractive()
+  const positionMap = usePositionMap()
+  const visibleLayerIds = useVisibleLayerIds()
+
   /** Military only — corporate entities render via OrganisationsLayer's Lucide icons, not NATO symbols. */
   const entities = useMemo(() => allEntities.filter((e) => e.kind === "unit"), [allEntities])
 
   const visible = useMemo(() => {
     return entities.flatMap((entity) => {
-      if (!visibleLayerIds.has(entity.layerId) || hiddenEntityIds?.has(entity.id)) return []
+      if (!visibleLayerIds.has(entity.layerId) || hiddenEntityIds.has(entity.id)) return []
       const position = positionMap.get(entity.id)
       return position ? [{ entity, position }] : []
     })
@@ -109,7 +103,7 @@ export function SymbolsLayer({
             eventHandlers={
               interactive
                 ? {
-                    click: () => onSelectEntity(item.entity.id),
+                    click: () => selectEntity(item.entity.id),
                   }
                 : undefined
             }

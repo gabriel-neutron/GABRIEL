@@ -26,6 +26,7 @@ import { ORGANISATION_TYPE_LABELS, ORGANISATION_TYPES } from "@/types/organisati
 import { UNIT_TYPE_OPTIONS_GROUPED } from "./entityInspector.options"
 import { FindOsmAtPointDialog } from "@/modules/osm/ui/FindOsmAtPointDialog"
 import { useEntityInspector } from "@/modules/orbat/hooks/useEntityInspector"
+import { useModuleContext } from "@/shell/moduleContext"
 import { useProjectStore } from "@/store/useProjectStore"
 import { ReadOnlyField, SourcesList, LinkedGeometriesList } from "@/components/shared/InspectorFields"
 import type { AdmiraltyReliability } from "@/core/provenance/admiralty"
@@ -194,7 +195,12 @@ function EntityInspectorReadOnlyView({
   )
 }
 
-export function EntityInspector({ readOnly = false, enrichedOverlay = {} }: Props) {
+export function EntityInspector({ readOnly: readOnlyProp, enrichedOverlay: enrichedOverlayProp }: Props) {
+  // Falls back to ModuleContext (ADR 0007) when rendered through the manifest's
+  // detailRenderer, which can't pass props — explicit props (e.g. Storybook) still win.
+  const moduleCtx = useModuleContext()
+  const readOnly = readOnlyProp ?? moduleCtx.readOnly
+  const enrichedOverlay = enrichedOverlayProp ?? moduleCtx.enrichedOverlay
   const { layers, updateEntity, deleteGeometry } = useProjectStore()
   const assignableLayers = layers.filter((l) => l.osmData == null)
   // Granular selectors (not the whole-store destructure above) for the E3 merge surface.

@@ -3,8 +3,7 @@ import { MapContainer, TileLayer } from "react-leaflet"
 import "leaflet/dist/leaflet.css"
 import { SymbolsLayer } from "./SymbolsLayer"
 import { useProjectStore } from "@/store/useProjectStore"
-import { asLatLng } from "@/core/coordinates"
-import type { Layer, MapEntity } from "@/types/domain.types"
+import type { Layer, MapEntity, DrawnGeometry } from "@/types/domain.types"
 
 const layer: Layer = {
   id: "layer-1",
@@ -22,6 +21,16 @@ const entity: MapEntity = {
   type: "infantry",
   affiliation: "Friend",
   domain: "Ground",
+  positionMode: "own",
+}
+
+const geometry: DrawnGeometry = {
+  id: "geom-1",
+  type: "point",
+  entityId: entity.id,
+  layerId: layer.id,
+  lat: 48.8566,
+  lng: 2.3522,
 }
 
 const meta = {
@@ -32,27 +41,20 @@ const meta = {
       useProjectStore.getState().setProject({
         layers: [layer],
         entities: [entity],
-        drawnGeometries: [],
+        drawnGeometries: [geometry],
         selectedEntityId: entity.id,
       })
       return <Story />
     },
   ],
-  args: {
-    positionMap: new Map([[entity.id, asLatLng(48.8566, 2.3522)]]),
-    visibleLayerIds: new Set([layer.id]),
-    hiddenEntityIds: new Set<string>(),
-    onSelectEntity: () => {},
-    mapBounds: null,
-  },
-  render: (args) => (
+  render: () => (
     <div className="h-[420px] w-full">
       <MapContainer center={[48.8566, 2.3522]} zoom={12} className="h-full w-full">
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
-        <SymbolsLayer {...args} />
+        <SymbolsLayer />
       </MapContainer>
     </div>
   ),

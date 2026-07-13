@@ -1,5 +1,6 @@
 import { useState } from "react"
 import type { DrawnGeometry } from "@/types/domain.types"
+import { useMapViewStore, type MapTool } from "./useMapViewStore"
 
 type Options = {
   onCreateNewEntity: (geom: DrawnGeometry) => void
@@ -7,10 +8,15 @@ type Options = {
   onLinkGeometryToEntity: (geom: DrawnGeometry, entityId: string) => void
 }
 
-export type MapTool = "pan" | "point" | "line" | "polygon"
+export type { MapTool }
 
+/**
+ * `mapTool` is shared via `useMapViewStore` (ADR 0007) so self-contained map layers
+ * (`SymbolsLayer` etc.) know whether to be interactive without a prop from `MapView`.
+ */
 export function useMapDrawing({ onCreateNewEntity, onCreateNewOrganisation, onLinkGeometryToEntity }: Options) {
-  const [mapTool, setMapTool] = useState<MapTool>("pan")
+  const mapTool = useMapViewStore((s) => s.mapTool)
+  const setMapTool = useMapViewStore((s) => s.setMapTool)
   const [pendingGeometry, setPendingGeometry] = useState<DrawnGeometry | null>(null)
 
   function handleGeometryCreated(geom: DrawnGeometry) {

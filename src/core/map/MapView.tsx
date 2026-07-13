@@ -1,18 +1,17 @@
-import { useMemo, useEffect, useRef, useCallback, useState } from "react"
+import { useMemo, useEffect, useRef, useCallback, type ReactNode } from "react"
 import L from "leaflet"
 import { MapContainer, TileLayer, Marker, Popup, Polyline, Polygon, GeoJSON, useMap } from "react-leaflet"
 import { MapToolSelector } from "./MapToolSelector"
 import { DrawControls } from "./DrawControls"
 import { GeometryActionMenu } from "./GeometryActionMenu"
-import { SymbolsLayer } from "@/modules/orbat/ui/SymbolsLayer"
-import { OrganisationsLayer } from "@/modules/orbat/ui/OrganisationsLayer"
-import { NetworkLinksLayer } from "@/modules/orbat/ui/NetworkLinksLayer"
 import { CenterOnSelection } from "./CenterOnSelection"
 import { useMapDrawing } from "./useMapDrawing"
 import { BASE_MAP_TILE_CONFIG } from "./mapTileConfig"
 import type { DrawnGeometry } from "@/types/domain.types"
-import { computeAllEntityPositions } from "@/core/map/geometry"
-import { MapBoundsReporter, type MapBounds } from "./MapBoundsReporter"
+import { MapBoundsReporter } from "./MapBoundsReporter"
+import { useMapViewStore } from "./useMapViewStore"
+import { usePositionMap } from "./usePositionMap"
+import { selectEntity, selectPeripheral } from "./selection"
 import { useProjectStore } from "@/store/useProjectStore"
 import { useMapPrefsStore } from "@/store/useMapPrefsStore"
 import { useOsmViewStore } from "@/store/useOsmViewStore"
@@ -20,16 +19,14 @@ import { useOsmRelationGeometries } from "@/modules/osm/hooks/useOsmRelationGeom
 
 type FlyToFn = (lat: number, lng: number, zoom?: number) => void
 
-function selectEntity(id: string | null) {
-  useProjectStore.getState().setSelectedEntityId(id)
-  useOsmViewStore.getState().setSelectedOsmObject(null)
-}
-
 function selectOsmObject(feature: GeoJSON.Feature & { id?: string }) {
   const parsed = getOsmTypeAndId(feature)
   if (!parsed) return
-  useOsmViewStore.getState().setSelectedOsmObject({ ...parsed, cachedFeature: feature })
-  useProjectStore.getState().setSelectedEntityId(null)
+  selectPeripheral({
+    kind: "osm",
+    id: `${parsed.type}:${parsed.id}`,
+    meta: { ...parsed, cachedFeature: feature },
+  })
 }
 
 function MapInstanceBridge({ flyToRef }: { flyToRef: React.RefObject<FlyToFn | null> }) {
@@ -127,9 +124,10 @@ type Props = {
   onCreateNewOrganisation?: (geom: DrawnGeometry) => void
   onLinkGeometryToEntity: (geom: DrawnGeometry, entityId: string) => void
   defaultLayerId: string
-  hiddenEntityIds?: Set<string>
   onOverpassUnavailable?: () => void
   flyToRef?: React.RefObject<FlyToFn | null>
+  /** Composed by `shell/moduleRegistry.ts` (ADR 0007) — replaces named orbat layer imports. */
+  mapLayers?: ReactNode[]
 }
 
 export function MapView({
@@ -138,9 +136,9 @@ export function MapView({
   onCreateNewOrganisation,
   onLinkGeometryToEntity,
   defaultLayerId,
-  hiddenEntityIds,
   onOverpassUnavailable,
   flyToRef,
+  mapLayers = [],
 }: Props): React.ReactElement {
   const layers = useProjectStore((s) => s.layers)
   const entities = useProjectStore((s) => s.entities)
@@ -167,7 +165,7 @@ export function MapView({
     handleCancel,
   } = useMapDrawing({ onCreateNewEntity, onCreateNewOrganisation, onLinkGeometryToEntity })
 
-  const [mapBounds, setMapBounds] = useState<MapBounds | null>(null)
+  const setMapBounds = useMapViewStore((s) => s.setMapBounds)
 
   const handleSelectEntity = useCallback((id: string | null) => {
     selectEntity(id)
@@ -193,15 +191,7 @@ export function MapView({
     return m
   }, [drawnGeometries, entities])
 
-  const visibleLayerIds = useMemo(
-    () => new Set(visibleLayersInOrder.map((l) => l.id)),
-    [visibleLayersInOrder],
-  )
-
-  const positionMap = useMemo(() => {
-    const all = computeAllEntityPositions(entities, drawnGeometries)
-    return new Map(all.map(({ entity, position }) => [entity.id, position]))
-  }, [entities, drawnGeometries])
+  const positionMap = usePositionMap()
 
   const getEntityPosition = useCallback(
     (entity: (typeof entities)[number]) => positionMap.get(entity.id) ?? null,
@@ -280,24 +270,7 @@ export function MapView({
           />
         )}
 
-        <SymbolsLayer
-          positionMap={positionMap}
-          visibleLayerIds={visibleLayerIds}
-          hiddenEntityIds={hiddenEntityIds}
-          onSelectEntity={handleSelectEntity}
-          mapBounds={mapBounds}
-          interactive={!isDrawing}
-        />
-        <OrganisationsLayer
-          visibleLayerIds={visibleLayerIds}
-          onSelectOrganisation={(id) => {
-            useOsmViewStore.getState().setSelectedOsmObject(null)
-            useProjectStore.getState().setSelectedEntityId(id)
-          }}
-          mapBounds={mapBounds}
-          interactive={!isDrawing}
-        />
-        <NetworkLinksLayer positionMap={positionMap} interactive={!isDrawing} />
+        {mapLayers}
 
         {visibleLayersInOrder.map((layer) =>
           layer.osmData ? (

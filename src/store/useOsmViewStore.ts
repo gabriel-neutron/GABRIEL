@@ -1,11 +1,9 @@
 import { create } from "zustand"
 import { devtools } from "zustand/middleware"
-import type { SelectedOsmObject } from "@/types/domain.types"
 
 export interface OsmViewState {
   entityOsmGeometries: Record<string, GeoJSON.FeatureCollection>
   osmUnavailable: boolean
-  selectedOsmObject: SelectedOsmObject
 }
 
 export interface OsmViewActions {
@@ -15,7 +13,6 @@ export interface OsmViewActions {
       | ((prev: Record<string, GeoJSON.FeatureCollection>) => Record<string, GeoJSON.FeatureCollection>),
   ): void
   setOsmUnavailable(v: boolean): void
-  setSelectedOsmObject(obj: SelectedOsmObject): void
   resetOsmView(): void
 }
 
@@ -23,7 +20,6 @@ function initialState(): OsmViewState {
   return {
     entityOsmGeometries: {},
     osmUnavailable: false,
-    selectedOsmObject: null,
   }
 }
 
@@ -42,10 +38,6 @@ export const useOsmViewStore = create<OsmViewState & OsmViewActions>()(
 
       setOsmUnavailable(v) {
         set({ osmUnavailable: v }, false, "setOsmUnavailable")
-      },
-
-      setSelectedOsmObject(obj) {
-        set({ selectedOsmObject: obj }, false, "setSelectedOsmObject")
       },
 
       resetOsmView() {

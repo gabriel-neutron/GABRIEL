@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useMemo } from "react"
 import { Eye, EyeOff } from "lucide-react"
 import { Button } from "@/ui/button"
 import { useProjectStore } from "@/store/useProjectStore"
-import { useOsmViewStore } from "@/store/useOsmViewStore"
+import { selectEntity } from "@/core/map/selection"
 import { ORGANISATION_TYPE_LABELS } from "@/types/organisation.types"
 
 type Props = {
@@ -274,10 +274,7 @@ export function LayersPanel({ readOnly = false }: Props) {
                           <div key={entity.id} className="flex items-center gap-1">
                             <button
                               type="button"
-                              onClick={() => {
-                                useProjectStore.getState().setSelectedEntityId(entity.id)
-                                useOsmViewStore.getState().setSelectedOsmObject(null)
-                              }}
+                              onClick={() => selectEntity(entity.id)}
                               className={`min-w-0 flex-1 truncate rounded px-2 py-1 text-left text-xs transition-colors hover:bg-muted ${
                                 selectedEntityId === entity.id ? "bg-muted font-medium text-foreground" : ""
                               }`}

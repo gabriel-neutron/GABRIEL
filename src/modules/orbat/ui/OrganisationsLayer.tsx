@@ -2,43 +2,38 @@ import { useMemo, useLayoutEffect, useState } from "react"
 import L from "leaflet"
 import { Marker, Popup } from "react-leaflet"
 import { makeOrganisationIcon } from "@/modules/orbat/services/organisation-icons"
-import { computeAllEntityPositions } from "@/core/map/geometry"
 import { useProjectStore } from "@/store/useProjectStore"
+import { useMapViewStore, useMapInteractive } from "@/core/map/useMapViewStore"
+import { usePositionMap } from "@/core/map/usePositionMap"
+import { useVisibleLayerIds } from "@/core/map/useVisibleLayerIds"
+import { selectEntity } from "@/core/map/selection"
 import { INDUSTRY_LAYER_ID, type OrganisationType } from "@/types/organisation.types"
 import type { LatLng } from "@/core/coordinates"
-import type { MapBounds } from "@/core/map/MapBoundsReporter"
 
 const BOUNDS_BUFFER = 0.5
 
-type Props = {
-  visibleLayerIds: Set<string>
-  onSelectOrganisation: (id: string | null) => void
-  mapBounds?: MapBounds | null
-  interactive?: boolean
-}
-
-export function OrganisationsLayer({
-  visibleLayerIds,
-  onSelectOrganisation,
-  mapBounds,
-  interactive = true,
-}: Props): React.ReactElement {
+/** Self-contained map layer (ADR 0007) — reads its own selection/viewport inputs. */
+export function OrganisationsLayer(): React.ReactElement {
   const allEntities = useProjectStore((s) => s.entities)
   const organisations = useMemo(() => allEntities.filter((e) => e.kind === "corporate"), [allEntities])
-  const drawnGeometries = useProjectStore((s) => s.drawnGeometries)
+  const mapBounds = useMapViewStore((s) => s.mapBounds)
+  const interactive = useMapInteractive()
+  const visibleLayerIds = useVisibleLayerIds()
 
-  const positionMap = useMemo(() => {
-    const all = computeAllEntityPositions(organisations, drawnGeometries)
-    return new Map(all.map(({ entity, position }) => [entity.id, position]))
-  }, [organisations, drawnGeometries])
+  // Same-kind-only parenting (enforced at load time, ADR 0004/E1) means a corporate
+  // entity's ancestor chain never crosses into units — computing positions over every
+  // entity and filtering to organisations here yields identical results to computing
+  // over the organisation-only subset, so this reuses the shared hook instead of a
+  // second computeAllEntityPositions call.
+  const allPositions = usePositionMap()
 
   const visible = useMemo(() => {
     if (!visibleLayerIds.has(INDUSTRY_LAYER_ID)) return []
     return organisations.flatMap((org) => {
-      const position = positionMap.get(org.id)
+      const position = allPositions.get(org.id)
       return position ? [{ org, position }] : []
     })
-  }, [organisations, positionMap, visibleLayerIds])
+  }, [organisations, allPositions, visibleLayerIds])
 
   const visibleInBounds = useMemo(() => {
     if (!mapBounds) return visible
@@ -92,11 +87,7 @@ export function OrganisationsLayer({
             position={item.position as LatLng}
             icon={icon}
             interactive={interactive}
-            eventHandlers={
-              interactive
-                ? { click: () => onSelectOrganisation(item.org.id) }
-                : undefined
-            }
+            eventHandlers={interactive ? { click: () => selectEntity(item.org.id) } : undefined}
           >
             <Popup>{item.org.name}</Popup>
           </Marker>

@@ -4,6 +4,7 @@ import { INDUSTRY_LAYER_ID } from "@/types/organisation.types"
 import { MainLayout } from "@/shell/MainLayout"
 import { ToastStack, type ToastItem } from "@/components/shared/ToastStack"
 import { useProjectStore } from "@/store/useProjectStore"
+import { selectEntity } from "@/core/map/selection"
 import { useSourceCacheStore } from "@/store/useSourceCacheStore"
 import { useEnrichment } from "@/modules/enrichment/hooks/useEnrichment"
 import { useLayeredResearch } from "@/modules/enrichment/hooks/useLayeredResearch"
@@ -15,7 +16,7 @@ export type EditPageProps = {
 }
 
 export function EditPage({ onViewMode, onOpenAbout }: EditPageProps): React.ReactElement {
-  const { entities, drawnGeometries, selectedEntityId, updateEntity, addEntity, addGeometry, setSelectedEntityId } =
+  const { entities, drawnGeometries, selectedEntityId, updateEntity, addEntity, addGeometry } =
     useProjectStore()
   const { sourceCache, mergeSourceCache } = useSourceCacheStore()
 
@@ -36,8 +37,8 @@ export function EditPage({ onViewMode, onOpenAbout }: EditPageProps): React.Reac
     }
     addEntity(org)
     addGeometry({ ...geom, layerId: INDUSTRY_LAYER_ID, entityId: org.id })
-    setSelectedEntityId(org.id)
-  }, [addEntity, addGeometry, setSelectedEntityId])
+    selectEntity(org.id)
+  }, [addEntity, addGeometry])
 
   const [toasts, setToasts] = useState<ToastItem[]>([])
 
@@ -97,7 +98,7 @@ export function EditPage({ onViewMode, onOpenAbout }: EditPageProps): React.Reac
     if (!entityId) return
     const result = layeredResearch.getResult(entityId)
     if (!result) return
-    useProjectStore.getState().setSelectedEntityId(entityId)
+    selectEntity(entityId)
     isBatchReviewRef.current = true
     enrichment.loadBatchResult(result)
   }, [layeredResearch, enrichment])
@@ -137,7 +138,7 @@ export function EditPage({ onViewMode, onOpenAbout }: EditPageProps): React.Reac
       finishBatch()
       return
     }
-    useProjectStore.getState().setSelectedEntityId(nextEntityId)
+    selectEntity(nextEntityId)
     enrich.loadBatchResult(result)
   }, [
     enrichment.allProposalsResolved,

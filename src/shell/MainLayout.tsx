@@ -1,15 +1,10 @@
-import { useState, useCallback, useRef } from "react"
+import { useCallback, useMemo, useRef, useState } from "react"
 import { MapView } from "@/core/map/MapView"
-import { EntityInspector } from "@/modules/orbat/ui/EntityInspector"
 import { EnrichDrawer } from "@/modules/enrichment/ui/EnrichDrawer"
-import { OsmObjectInspector } from "@/modules/osm/ui/OsmObjectInspector"
 import { ResearchDialog } from "@/components/shared/ResearchDialog"
 import { AppShell, type ProjectFileActions } from "./AppShell"
 import { LayersPanel } from "@/components/shared/LayersPanel"
-import { HierarchyPanel } from "@/modules/orbat/ui/HierarchyPanel"
 import { ShowNetworksToggle } from "@/components/shared/ShowNetworksToggle"
-import { TreeView } from "@/modules/orbat/ui/TreeView"
-import { OsmQueryMenu } from "@/modules/osm/ui/OsmQueryMenu"
 import { BaseMapSwitcher } from "@/components/shared/BaseMapSwitcher"
 import { ModeToggle } from "@/components/shared/ModeToggle"
 import { UnifiedSearch, type FlyToFn } from "@/components/shared/UnifiedSearch"
@@ -21,7 +16,11 @@ import type { MapEntity, DrawnGeometry } from "@/types/domain.types"
 import { getDefaultEntityLayerId } from "./entityLayer"
 import type { EnrichmentControls, LayeredResearchControls } from "@/types/layout.types"
 import { useProjectStore } from "@/store/useProjectStore"
-import { useOsmViewStore } from "@/store/useOsmViewStore"
+import { useSelectedRef } from "@/store/useSelectedRef"
+import { selectEntity, clearSelection } from "@/core/map/selection"
+import { modules, detailRenderers } from "./moduleRegistry"
+import { ModuleContext } from "./moduleContext"
+import { CommandPalette } from "./CommandPalette"
 
 export type { EnrichmentControls, LayeredResearchControls }
 
@@ -41,21 +40,6 @@ function entityFromGeometry(
     affiliation: "Hostile",
     isExactPosition: false,
   }
-}
-
-function collectDescendants(entities: MapEntity[], rootId: string): string[] {
-  const result: string[] = [rootId]
-  const queue = [rootId]
-  while (queue.length > 0) {
-    const current = queue.shift()!
-    for (const e of entities) {
-      if (e.parentId === current) {
-        result.push(e.id)
-        queue.push(e.id)
-      }
-    }
-  }
-  return result
 }
 
 export type MainLayoutProps = {
@@ -87,34 +71,20 @@ export function MainLayout({
   onOverpassUnavailable,
   onCreateNewOrganisation,
 }: MainLayoutProps): React.ReactElement {
-  const {
-    layers,
-    entities,
-    claims,
-    selectedEntityId,
-    addLayer,
-    closeDetail,
-  } = useProjectStore()
-  const selectedOsmObject = useOsmViewStore((s) => s.selectedOsmObject)
-  const setSelectedOsmObject = useOsmViewStore((s) => s.setSelectedOsmObject)
+  const { layers, entities, claims, selectedEntityId } = useProjectStore()
+  const selectedRef = useSelectedRef()
   const handleCloseDetail = useCallback(() => {
-    closeDetail()
-    setSelectedOsmObject(null)
-  }, [closeDetail, setSelectedOsmObject])
+    clearSelection()
+  }, [])
 
   const flyToRef = useRef<FlyToFn | null>(null)
 
-  const [leftMode, setLeftMode] = useState<"layers" | "hierarchy">("layers")
-  const [hiddenEntityIds, setHiddenEntityIds] = useState<Set<string>>(new Set())
-
-  function handleToggleEntityVisible(entityId: string, visible: boolean) {
-    const affected = collectDescendants(entities, entityId)
-    setHiddenEntityIds((prev) => {
-      const next = new Set(prev)
-      affected.forEach((id) => (visible ? next.delete(id) : next.add(id)))
-      return next
-    })
-  }
+  const leftPanels = [
+    { id: "layers", label: "Layers", content: <LayersPanel readOnly={readOnly} /> },
+    ...modules.flatMap((m) => m.leftPanels ?? []),
+  ]
+  const [leftPanelId, setLeftPanelId] = useState(leftPanels[0].id)
+  const activeLeftPanel = leftPanels.find((p) => p.id === leftPanelId) ?? leftPanels[0]
 
   const handleCreateNewEntity = useCallback((geom: DrawnGeometry): void => {
     const s = useProjectStore.getState()
@@ -122,60 +92,71 @@ export function MainLayout({
     const entity = entityFromGeometry(geom, defaultLayerId, s.selectedEntityId)
     s.addEntity(entity)
     s.addGeometry({ ...geom, entityId: entity.id })
-    useOsmViewStore.getState().setSelectedOsmObject(null)
-    s.setSelectedEntityId(entity.id)
+    selectEntity(entity.id)
   }, [])
 
   const handleLinkGeometryToEntity = useCallback((geom: DrawnGeometry, entityId: string): void => {
     const s = useProjectStore.getState()
     s.addGeometry({ ...geom, entityId })
-    useOsmViewStore.getState().setSelectedOsmObject(null)
     s.updateEntity(entityId, { positionMode: "own" })
-    s.setSelectedEntityId(entityId)
+    selectEntity(entityId)
   }, [])
 
   const defaultLayerId = getDefaultEntityLayerId(layers)
   const selectedEntity = selectedEntityId != null ? entities.find((e) => e.id === selectedEntityId) ?? null : null
 
+  const views = [
+    {
+      id: "map",
+      label: "Map",
+      content: (
+        <MapView
+          readOnly={readOnly}
+          onCreateNewEntity={handleCreateNewEntity}
+          onCreateNewOrganisation={onCreateNewOrganisation}
+          onLinkGeometryToEntity={handleLinkGeometryToEntity}
+          defaultLayerId={defaultLayerId}
+          onOverpassUnavailable={onOverpassUnavailable}
+          flyToRef={flyToRef}
+          mapLayers={modules.flatMap((m) => m.mapLayers ?? [])}
+        />
+      ),
+    },
+    ...modules.flatMap((m) => m.views ?? []),
+  ]
+
+  const renderers = detailRenderers()
+  const detailContent = selectedRef ? (renderers[selectedRef.kind]?.(selectedRef.id) ?? null) : null
+
+  const moduleContextValue = useMemo(
+    () => ({ readOnly, enrichedOverlay: enrichment.overlay }),
+    [readOnly, enrichment.overlay],
+  )
+
   return (
-    <>
+    <ModuleContext.Provider value={moduleContextValue}>
       <AppShell
         readOnly={readOnly}
         onOpenAbout={onOpenAbout}
         onSwitchToEdit={onSwitchToEdit}
         onSwitchToView={onSwitchToView}
-        mapSlot={
-          <MapView
-            readOnly={readOnly}
-            onCreateNewEntity={handleCreateNewEntity}
-            onCreateNewOrganisation={onCreateNewOrganisation}
-            onLinkGeometryToEntity={handleLinkGeometryToEntity}
-            defaultLayerId={defaultLayerId}
-            hiddenEntityIds={hiddenEntityIds}
-            onOverpassUnavailable={onOverpassUnavailable}
-            flyToRef={flyToRef}
-          />
-        }
-        treeSlot={<TreeView />}
+        views={views}
         leftSlot={
           <SidebarGroup className="h-full gap-2 p-0">
             <div className="shrink-0 border-b border-border px-3 py-2">
-              <Tabs value={leftMode} onValueChange={(value) => setLeftMode(value as typeof leftMode)}>
+              <Tabs value={leftPanelId} onValueChange={setLeftPanelId}>
                 <div className="flex items-center gap-2">
                   <TabsList className="w-full">
-                    <TabsTrigger value="layers" className="flex-1 text-xs">Layers</TabsTrigger>
-                    <TabsTrigger value="hierarchy" className="flex-1 text-xs">Army</TabsTrigger>
+                    {leftPanels.map((p) => (
+                      <TabsTrigger key={p.id} value={p.id} className="flex-1 text-xs">{p.label}</TabsTrigger>
+                    ))}
                   </TabsList>
                   <SidebarTrigger className="h-8 w-8 shrink-0 [&>svg]:size-5" />
                 </div>
               </Tabs>
             </div>
             <SidebarGroupContent className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-2 pb-2">
-              {leftMode === "layers" ? (
-                <LayersPanel readOnly={readOnly} />
-              ) : (
-                <HierarchyPanel hiddenEntityIds={hiddenEntityIds} onToggleEntityVisible={handleToggleEntityVisible} />
-              )}
+              {activeLeftPanel.content}
             </SidebarGroupContent>
           </SidebarGroup>
         }
@@ -218,15 +199,22 @@ export function MainLayout({
             <ModeToggle />
           </div>
         }
-        headerMenuSlot={!readOnly ? <OsmQueryMenu layers={layers} onAddLayer={addLayer} /> : null}
-        selectedEntityId={selectedEntityId}
-        selectedOsmObject={selectedOsmObject}
+        headerMenuSlot={
+          !readOnly ? (
+            <>
+              {modules
+                .filter((m) => m.headerContribution)
+                .map((m, i) => <div key={i}>{m.headerContribution}</div>)}
+            </>
+          ) : null
+        }
+        rightPanelOpen={selectedRef !== null}
         onCloseDetail={handleCloseDetail}
         detailHeaderActions={
           // Enrichment only runs against unit entities (useEnrichment's underlying
           // entities list is unit-only) — hide the trigger for a corporate selection
           // rather than opening a drawer that can't find its entity.
-          !readOnly && selectedEntity?.kind === "unit" && selectedOsmObject === null ? (
+          !readOnly && selectedEntity?.kind === "unit" ? (
             <Button
               type="button"
               size="sm"
@@ -237,21 +225,7 @@ export function MainLayout({
             </Button>
           ) : null
         }
-        rightSlot={
-          selectedOsmObject ? (
-            <OsmObjectInspector
-              type={selectedOsmObject.type}
-              id={selectedOsmObject.id}
-              cachedFeature={selectedOsmObject.cachedFeature}
-            />
-          ) : (
-            <EntityInspector
-              key={selectedEntityId ?? "none"}
-              readOnly={readOnly}
-              enrichedOverlay={enrichment.overlay}
-            />
-          )
-        }
+        rightSlot={detailContent}
         busy={busy}
         error={error}
         projectFileActions={projectFileActions}
@@ -309,6 +283,7 @@ export function MainLayout({
           if (proposal) enrichment.reject(proposal)
         }}
       />
-    </>
+      <CommandPalette readOnly={readOnly} />
+    </ModuleContext.Provider>
   )
 }

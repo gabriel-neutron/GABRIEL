@@ -2,6 +2,8 @@ import { useMemo } from "react"
 import { Polyline } from "react-leaflet"
 import { useProjectStore } from "@/store/useProjectStore"
 import { useMapPrefsStore } from "@/store/useMapPrefsStore"
+import { useMapInteractive } from "@/core/map/useMapViewStore"
+import { usePositionMap } from "@/core/map/usePositionMap"
 import type { MapEntity } from "@/types/domain.types"
 import type { LatLng } from "@/core/coordinates"
 import { buildOrbat } from "@/core/entity/hierarchy"
@@ -11,11 +13,6 @@ const NETWORK_LINE_OPTIONS = {
   weight: 5,
   opacity: 0.85,
   dashArray: "6, 6",
-}
-
-type Props = {
-  positionMap: Map<string, LatLng>
-  interactive?: boolean
 }
 
 const MAX_DEGREE = 3
@@ -31,13 +28,13 @@ function visibleNetworkIds(
   return visible
 }
 
-export function NetworkLinksLayer({
-  positionMap,
-  interactive = true,
-}: Props): React.ReactElement | null {
+/** Self-contained map layer (ADR 0007) — reads its own position/viewport inputs. */
+export function NetworkLinksLayer(): React.ReactElement | null {
   const entities = useProjectStore((s) => s.entities)
   const selectedEntityId = useProjectStore((s) => s.selectedEntityId)
   const showNetworks = useMapPrefsStore((s) => s.showNetworks)
+  const interactive = useMapInteractive()
+  const positionMap = usePositionMap()
 
   const links = useMemo(() => {
     if (!showNetworks || !selectedEntityId) return []

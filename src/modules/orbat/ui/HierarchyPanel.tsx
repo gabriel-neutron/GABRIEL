@@ -5,13 +5,15 @@ import { Separator } from "@/ui/separator"
 import type { MapEntity } from "@/types/domain.types"
 import { ORGANISATION_TYPE_LABELS } from "@/types/organisation.types"
 import { useProjectStore } from "@/store/useProjectStore"
-import { useOsmViewStore } from "@/store/useOsmViewStore"
+import { useEntityVisibilityStore } from "@/modules/orbat/store/useEntityVisibilityStore"
+import { selectEntity } from "@/core/map/selection"
 import { useShallow } from "zustand/shallow"
 import { buildOrbat, type Orbat, type OrbatNode } from "@/core/entity/hierarchy"
 
 type Props = {
-  hiddenEntityIds: Set<string>
-  onToggleEntityVisible: (entityId: string, visible: boolean) => void
+  /** Overridable for Storybook/tests; defaults to `useEntityVisibilityStore` (ADR 0007). */
+  hiddenEntityIds?: Set<string>
+  onToggleEntityVisible?: (entityId: string, visible: boolean) => void
 }
 
 type NodeProps = {
@@ -109,8 +111,7 @@ function EntityNode({
       : entity.name
 
   function handleSelectEntity() {
-    useProjectStore.getState().setSelectedEntityId(entity.id)
-    useOsmViewStore.getState().setSelectedOsmObject(null)
+    selectEntity(entity.id)
   }
 
   return (
@@ -196,13 +197,18 @@ function EntityNode({
   )
 }
 
-export function HierarchyPanel({ hiddenEntityIds, onToggleEntityVisible }: Props) {
+export function HierarchyPanel({ hiddenEntityIds: hiddenEntityIdsProp, onToggleEntityVisible: onToggleEntityVisibleProp }: Props) {
   const { entities, selectedEntityId } = useProjectStore(
     useShallow((s) => ({
       entities: s.entities,
       selectedEntityId: s.selectedEntityId,
     }))
   )
+  const storeHiddenEntityIds = useEntityVisibilityStore((s) => s.hiddenEntityIds)
+  const setEntityVisible = useEntityVisibilityStore((s) => s.setEntityVisible)
+  const hiddenEntityIds = hiddenEntityIdsProp ?? storeHiddenEntityIds
+  const onToggleEntityVisible =
+    onToggleEntityVisibleProp ?? ((entityId: string, visible: boolean) => setEntityVisible(entityId, visible, entities))
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
   const units = useMemo(() => entities.filter((e) => e.kind === "unit"), [entities])
   const corporateEntities = useMemo(() => entities.filter((e) => e.kind === "corporate"), [entities])

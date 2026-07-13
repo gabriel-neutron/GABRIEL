@@ -4,12 +4,8 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { Label } from "@/ui/label"
 import { cn } from "@/lib/utils"
 import { executeOverpassQuery, normalizeQuery } from "@/modules/osm/services/overpass.service"
-import type { Layer } from "@/types/domain.types"
-
-type Props = {
-  layers: Layer[]
-  onAddLayer: (layer: Layer) => void
-}
+import { useProjectStore } from "@/store/useProjectStore"
+import { useOsmQueryMenuStore } from "@/modules/osm/store/useOsmQueryMenuStore"
 
 const DEFAULT_QUERY = `area["ISO3166-1"="RU"][admin_level=2]->.russia;
 nwr["landuse"="military"](area.russia);
@@ -22,8 +18,12 @@ function defaultLayerName(query: string): string {
   return firstLine.length > 40 ? `${firstLine.slice(0, 37)}...` : firstLine
 }
 
-export function OsmQueryMenu({ layers, onAddLayer }: Props) {
-  const [open, setOpen] = useState(false)
+/** Self-contained (ADR 0007) — reads layers/adds layers via the project store directly. */
+export function OsmQueryMenu() {
+  const layers = useProjectStore((s) => s.layers)
+  const addLayer = useProjectStore((s) => s.addLayer)
+  const open = useOsmQueryMenuStore((s) => s.open)
+  const setOpen = useOsmQueryMenuStore((s) => s.setOpen)
   const [query, setQuery] = useState(DEFAULT_QUERY)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -44,15 +44,14 @@ export function OsmQueryMenu({ layers, onAddLayer }: Props) {
         return
       }
       const name = defaultLayerName(query)
-      const layer: Layer = {
+      addLayer({
         id: crypto.randomUUID(),
         name,
         visible: true,
         kind: "osm",
         osmData: result.geojson,
         sourceQuery: normalizedQuery,
-      }
-      onAddLayer(layer)
+      })
       setOpen(false)
     } catch (e) {
       setError(e instanceof Error ? e.message : "Query failed.")

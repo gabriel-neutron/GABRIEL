@@ -16,6 +16,8 @@ import { useProjectStore, selectPersistableSnapshot } from "@/store/useProjectSt
 import { useSourceCacheStore } from "@/store/useSourceCacheStore"
 import { useOsmViewStore } from "@/store/useOsmViewStore"
 import { useProvenanceStore } from "@/store/useProvenanceStore"
+import { useSelectionStore } from "@/store/useSelectionStore"
+import { useEntityVisibilityStore } from "@/modules/orbat/store/useEntityVisibilityStore"
 
 async function writeGeoPackageToFile(bytes: Uint8Array): Promise<void> {
   const showSave = (
@@ -145,6 +147,8 @@ export function useProjectIO() {
     useSourceCacheStore.getState().resetSourceCache()
     useProvenanceStore.getState().resetSources()
     useOsmViewStore.getState().resetOsmView()
+    useSelectionStore.getState().setSelectedRef(null)
+    useEntityVisibilityStore.getState().reset()
     setError(null)
     setRestoredFromSession(false)
     try {
