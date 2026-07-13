@@ -54,6 +54,14 @@ Public access: [https://gabriel0x0.netlify.app/](https://gabriel0x0.netlify.app/
 
 Accepted proposals affect the current session state, and become authoritative only through the normal save flow.
 
+## Known Limitations
+
+- **Merging an entity with pending enrichment work.** If you accept (but don't yet commit) enrichment
+  proposals for entity B, then merge B into entity A before committing, the uncommitted proposals for
+  B are silently dropped. No data corruption occurs, but the accepted-not-committed work is lost.
+  Commit or discard pending proposals before merging entities. See `docs/timelines/ROADMAP.md`
+  (E3 deferred findings) for tracking.
+
 ## Contributing / Verification
 
 - Keep changes simple and focused.
@@ -72,4 +80,3 @@ For architecture and implementation details:
 - `docs/ARCHITECTURE.md`
 - `docs/CONSTRAINTS.md`
 - `docs/timelines/ROADMAP.md`
-- `AGENTS.md`
