@@ -1,4 +1,5 @@
-import { OsmQueryMenu } from "@/modules/osm/ui/OsmQueryMenu"
+import { OsmQueryTrigger } from "@/modules/osm/ui/OsmQueryTrigger"
+import { OsmQueryDialog } from "@/modules/osm/ui/OsmQueryDialog"
 import { OsmObjectInspectorConnected } from "@/modules/osm/ui/OsmObjectInspectorConnected"
 import { useOsmQueryMenuStore } from "@/modules/osm/store/useOsmQueryMenuStore"
 import type { ModuleManifest } from "@/types/module.types"
@@ -9,7 +10,11 @@ export const osmModule: ModuleManifest = {
     osm: () => <OsmObjectInspectorConnected />,
   },
 
-  headerContribution: <OsmQueryMenu />,
+  // Trigger lives in the header dropdown (unmounts when it closes); the Dialog is an
+  // always-mounted overlay so the `osm.query` command can open it too (ADR 0007).
+  headerContribution: <OsmQueryTrigger />,
+
+  overlays: [<OsmQueryDialog key="osm-query-dialog" />],
 
   commands: [
     {

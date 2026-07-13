@@ -284,6 +284,7 @@ export function MainLayout({
         }}
       />
       <CommandPalette readOnly={readOnly} />
+      {modules.flatMap((m) => m.overlays ?? [])}
     </ModuleContext.Provider>
   )
 }

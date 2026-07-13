@@ -10,12 +10,13 @@ E4 ("capability port + module registry + command palette") was gated by ADR 0005
 
 ## Decision
 
-**Module manifest, composed statically.** Each module (`orbat`, `osm`, eventually `telegram`) exports one manifest object with up to six optional fields:
+**Module manifest, composed statically.** Each module (`orbat`, `osm`, eventually `telegram`) exports one manifest object with up to seven optional fields:
 
 - `views?: { id, label, content }[]` — whole standalone top-level views (replaces `AppShell`'s hardcoded `"map" | "tree"` `Tabs`; Telegram's graph becomes a third entry). The map itself is *not* a module view — it's a fixed core view.
 - `detailRenderer?: (id: string) => ReactNode`, keyed by the `selectedRef.kind` the module owns — replaces the `rightSlot` ternary.
 - `leftPanels?: { id, label, content }[]` — replaces the hardcoded Layers/Army `Tabs`.
 - `headerContribution?: ReactNode` — replaces the fixed `OsmQueryMenu` slot. A module's own async status UI (e.g. a future Telegram sidecar health dot) is just a component here doing its own polling — no special registry support needed for out-of-process concerns.
+- `overlays?: ReactNode[]` — always-mounted portal UI (dialogs, drawers), rendered once by `MainLayout` next to `CommandPalette`. Added post-hoc (Gate E4, 2026-07-13): the original design bundled `osm`'s query Dialog inside its `headerContribution` trigger, but `headerContribution` renders inside the header "..." dropdown, which unmounts its content when closed — so the `osm.query` command palette entry, flipping the shared open-state, opened nothing (no Dialog was mounted to react). A trigger that opens a Dialog must put the Dialog here, decoupled from its own mount lifetime.
 - `mapLayers?: ReactNode[]` — `core/map/MapView.tsx` renders `modules.flatMap(m => m.mapLayers ?? [])` instead of naming orbat's layer components directly, fixing the core→module import.
 - `commands?: { id, label, run(ctx), when?(ctx) }[]` — feeds the command palette (Ctrl/Cmd+K, additive; the existing header "..." dropdown is unchanged, a separate surface for settings/chrome).
 

@@ -60,6 +60,15 @@ export type ModuleManifest = {
   leftPanels?: ModuleLeftPanel[]
   /** Rendered inside the header "..." dropdown, additive to its fixed settings/chrome entries. */
   headerContribution?: ReactNode
+  /**
+   * Always-mounted, portal-based UI (dialogs, drawers) rendered once by `MainLayout`,
+   * independent of any trigger's mount lifetime. A module whose `headerContribution`
+   * (or a `command`) opens a Dialog must put the Dialog here, not bundle it with the
+   * trigger — a trigger living inside the header "..." dropdown unmounts when that
+   * dropdown closes, taking a bundled Dialog with it, so a command-palette `run()`
+   * flipping the shared open-state would be a silent no-op (Gate E4 bug, 2026-07-13).
+   */
+  overlays?: ReactNode[]
   /** Rendered inside `core/map/MapView`'s `<MapContainer>`, in registry order. */
   mapLayers?: ReactNode[]
   /** Fed into the command palette (Ctrl/Cmd+K). */

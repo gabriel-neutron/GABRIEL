@@ -19,7 +19,7 @@ App
         │   ├── header slot
         │   │   ├── ShowNetworksToggle
         │   │   ├── BaseMapSwitcher
-        │   │   ├── OsmQueryMenu
+        │   │   ├── OsmQueryTrigger   (dropdown; opens the always-mounted OsmQueryDialog overlay)
         │   │   └── "Research all" button
         │   ├── left slot (tab-switched)
         │   │   ├── LayersPanel
