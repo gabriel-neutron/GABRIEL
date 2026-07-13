@@ -18,7 +18,7 @@ import {
 } from "@/store/enrichment.store"
 import type { DrawnGeometry, MapEntity } from "@/types/domain.types"
 import type { EnrichmentProposal, EnrichmentResponse } from "@/types/enrichment.types"
-import { buildAcceptedPatch } from "@/modules/enrichment/services/enrichmentApply"
+import { buildAcceptedPatch, resolveAcceptedPatchTarget } from "@/modules/enrichment/services/enrichmentApply"
 import { useProjectStore } from "@/store/useProjectStore"
 import { useProvenanceStore } from "@/store/useProvenanceStore"
 import { createEnrichmentRunner } from "./enrichmentRunner"
@@ -43,6 +43,7 @@ export function useEnrichment({
   const runnerRef = useRef(createEnrichmentRunner(runEnrichment))
   const claims = useProjectStore((s) => s.claims)
   const addClaims = useProjectStore((s) => s.addClaims)
+  const entityMergeMap = useProjectStore((s) => s.entityMergeMap)
 
   const selectedEntity = useMemo(
     () => (selectedEntityId ? entities.find((entity) => entity.id === selectedEntityId) ?? null : null),
@@ -74,12 +75,13 @@ export function useEnrichment({
       // Preserved exactly: claims/sources are not committed at all when no callback is
       // wired, same as the pre-E2.6 behavior of never touching `entity.sources` either.
       if (!onApplyAccepted) return
+      const targetId = resolveAcceptedPatchTarget(entities, entityMergeMap, runFeatureId)
       const result = buildAcceptedPatch({
         decisions: state.decisions[runFeatureId] ?? {},
         overlay: state.overlay[runFeatureId] ?? {},
         proposals: state.run.proposals,
-        entity: entities.find((e) => e.id === runFeatureId) ?? null,
-        existingClaims: claims.filter((c) => c.entityId === runFeatureId),
+        entity: entities.find((e) => e.id === targetId) ?? null,
+        existingClaims: claims.filter((c) => c.entityId === targetId),
         existingSources: useProvenanceStore.getState().sources,
       })
       if (!result) return
@@ -89,9 +91,9 @@ export function useEnrichment({
           .setSources([...useProvenanceStore.getState().sources, ...result.newSources])
       }
       if (result.newClaims.length > 0) addClaims(result.newClaims)
-      if (result.patch != null) onApplyAccepted(runFeatureId, result.patch)
+      if (result.patch != null) onApplyAccepted(targetId, result.patch)
     },
-    [entities, onApplyAccepted, state, claims, addClaims],
+    [entities, onApplyAccepted, state, claims, addClaims, entityMergeMap],
   )
 
   const closeDrawer = useCallback(() => {

@@ -24,6 +24,12 @@ export interface ProjectState {
    */
   claims: Claim[]
   selectedEntityId: string | null
+  /**
+   * Runtime-only secondaryId -> primaryId breadcrumb left by `mergeEntities`, not persisted
+   * to the .gpkg. Lets a consumer holding a since-merged-away id (e.g. an in-progress
+   * enrichment session keyed by entity id) redirect to the surviving entity.
+   */
+  entityMergeMap: Record<string, string>
 }
 
 const INDUSTRY_LAYER = {
@@ -40,6 +46,7 @@ function initialState(): ProjectState {
     drawnGeometries: [],
     claims: [],
     selectedEntityId: null,
+    entityMergeMap: {},
   }
 }
 
@@ -118,7 +125,11 @@ export const useProjectStore = create<ProjectState & ProjectActions>()(
       ...initialState(),
 
       setProject({ layers, entities, drawnGeometries, claims, selectedEntityId }) {
-        set({ layers, entities, drawnGeometries, claims: claims ?? [], selectedEntityId }, false, "setProject")
+        set(
+          { layers, entities, drawnGeometries, claims: claims ?? [], selectedEntityId, entityMergeMap: {} },
+          false,
+          "setProject",
+        )
       },
 
       resetProject() {
@@ -220,12 +231,19 @@ export const useProjectStore = create<ProjectState & ProjectActions>()(
             primaryId,
             secondaryId,
           )
+          // mergeIdentityGraph is a no-op (returns its input unchanged) when the ids are equal,
+          // either is missing, or the kinds differ — only record the remap when the secondary
+          // genuinely existed before this call and was removed by it. Checking post-merge
+          // absence alone would also match a secondaryId that was already gone (deleted, or
+          // never real), wrongly redirecting that id onto primaryId for later consumers.
+          const merged = s.entities.some((e) => e.id === secondaryId) && !entities.some((e) => e.id === secondaryId)
           // The primary survives; a selection pointing at the now-gone secondary follows it.
           return {
             entities,
             claims,
             drawnGeometries: geometries,
             selectedEntityId: s.selectedEntityId === secondaryId ? primaryId : s.selectedEntityId,
+            entityMergeMap: merged ? { ...s.entityMergeMap, [secondaryId]: primaryId } : s.entityMergeMap,
           }
         }, false, "mergeEntities")
       },

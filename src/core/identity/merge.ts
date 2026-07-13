@@ -157,6 +157,21 @@ function mergeNotes(a: string | null | undefined, b: string | null | undefined):
 }
 
 /**
+ * Follows a secondaryId -> primaryId merge chain (an id merged away, then merged away again)
+ * to the surviving id. Returns `id` unchanged if it was never merged. Used to redirect work
+ * keyed to a since-merged-away entity id (e.g. enrichment proposals) onto its survivor.
+ */
+export function resolveEntityId(mergeMap: Record<string, string>, id: string): string {
+  let cur = id
+  const seen = new Set<string>()
+  while (mergeMap[cur] !== undefined && !seen.has(cur)) {
+    seen.add(cur)
+    cur = mergeMap[cur]
+  }
+  return cur
+}
+
+/**
  * Collapse claims that became exact duplicates once the secondary's claims moved to the
  * primary, keeping whichever survivor's `credibility`/`timestamp` is populated — an
  * analyst-assigned rating on either record must survive the merge, not just the one that

@@ -5,12 +5,31 @@ import { parse } from "@/core/provenance/ledger"
 import { dedupeSources, type Source } from "@/core/provenance/source"
 import { createCitationClaim, type Claim } from "@/core/provenance/claim"
 import { projectEntityLedger } from "@/core/provenance/ledgerProjection"
+import { resolveEntityId } from "@/core/identity/merge"
 import { selectTopCitations } from "@/modules/enrichment/services/citation-rating"
 
 export type AcceptedPatchResult = {
   patch: Partial<MapEntity> | null
   newSources: Source[]
   newClaims: Claim[]
+}
+
+/**
+ * The entity id `buildAcceptedPatch` should target for a commit keyed to `runFeatureId`.
+ * If that entity was merged away while accepted-not-committed proposals were still
+ * pending (E3 deferred finding #4), redirects to the surviving entity via `entityMergeMap`
+ * so the accepted work lands there instead of being silently dropped. Returns `runFeatureId`
+ * unchanged both when the entity still exists and when it's gone with no merge record
+ * (never existed) — the latter still resolves to `buildAcceptedPatch`'s existing
+ * entity-null short-circuit.
+ */
+export function resolveAcceptedPatchTarget(
+  entities: MapEntity[],
+  entityMergeMap: Record<string, string>,
+  runFeatureId: string,
+): string {
+  if (entities.some((e) => e.id === runFeatureId)) return runFeatureId
+  return resolveEntityId(entityMergeMap, runFeatureId)
 }
 
 /**

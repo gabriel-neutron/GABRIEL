@@ -10,6 +10,7 @@ function makeState(overrides: Partial<ProjectState> = {}): ProjectState {
     drawnGeometries: [],
     claims: [],
     selectedEntityId: null,
+    entityMergeMap: {},
     ...overrides,
   }
 }
@@ -187,6 +188,8 @@ describe("useProjectStore mergeEntities (ADR 0006, E3)", () => {
     expect(s.claims[0].entityId).toBe("a")
     // A selection pointing at the now-gone secondary follows the surviving primary.
     expect(s.selectedEntityId).toBe("a")
+    // The secondary's id is recorded as merged-away so consumers keyed to it can redirect.
+    expect(s.entityMergeMap).toEqual({ b: "a" })
   })
 
   it("is a no-op on a cross-kind merge", () => {
@@ -202,5 +205,23 @@ describe("useProjectStore mergeEntities (ADR 0006, E3)", () => {
     })
     useProjectStore.getState().mergeEntities("a", "c")
     expect(useProjectStore.getState().entities.map((e) => e.id).sort()).toEqual(["a", "c"])
+    // A no-op merge must not record a remap for an entity that's still alive.
+    expect(useProjectStore.getState().entityMergeMap).toEqual({})
+  })
+
+  it("does not record a remap when the secondary id never existed", () => {
+    useProjectStore.getState().setProject({
+      layers: [{ id: "custom-1", name: "Custom", visible: true, kind: "custom" }],
+      entities: [{ kind: "unit", id: "a", name: "Wagner", layerId: "custom-1", parentId: null }],
+      drawnGeometries: [],
+      claims: [],
+      selectedEntityId: null,
+    })
+    // secondaryId "ghost" was never a real entity (e.g. a stale duplicate-candidate row) —
+    // mergeIdentityGraph is a no-op, and post-merge absence of "ghost" alone must not be
+    // mistaken for "ghost was merged away", or a later id lookup would be misredirected.
+    useProjectStore.getState().mergeEntities("a", "ghost")
+    expect(useProjectStore.getState().entities.map((e) => e.id)).toEqual(["a"])
+    expect(useProjectStore.getState().entityMergeMap).toEqual({})
   })
 })

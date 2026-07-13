@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest"
 import type { Entity } from "@/core/entity/entity"
 import type { Claim } from "@/core/provenance/claim"
 import type { DrawnGeometry } from "@/types/domain.types"
-import { mergeEntities, type IdentityGraph } from "./merge"
+import { mergeEntities, resolveEntityId, type IdentityGraph } from "./merge"
 
 function unit(id: string, name: string, extra: Partial<Entity> = {}): Entity {
   return { id, name, layerId: "L", parentId: null, kind: "unit", ...extra }
@@ -204,5 +204,23 @@ describe("mergeEntities", () => {
     const snapshot = JSON.stringify(graph)
     mergeEntities(graph, "a", "b")
     expect(JSON.stringify(graph)).toBe(snapshot)
+  })
+})
+
+describe("resolveEntityId", () => {
+  it("returns the id unchanged when it was never merged", () => {
+    expect(resolveEntityId({}, "a")).toBe("a")
+  })
+
+  it("resolves a single merge hop", () => {
+    expect(resolveEntityId({ b: "a" }, "b")).toBe("a")
+  })
+
+  it("resolves a chain of merges to the final survivor", () => {
+    expect(resolveEntityId({ b: "a", c: "b" }, "c")).toBe("a")
+  })
+
+  it("does not loop forever on a cyclical map", () => {
+    expect(resolveEntityId({ a: "b", b: "a" }, "a")).toBe("a")
   })
 })

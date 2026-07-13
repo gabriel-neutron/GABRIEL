@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { buildAcceptedPatch } from "./enrichmentApply"
+import { buildAcceptedPatch, resolveAcceptedPatchTarget } from "./enrichmentApply"
 import type { MapEntity } from "@/types/domain.types"
 import type { EnrichmentProposal } from "@/types/enrichment.types"
 import { GENERAL_CITATION_FIELD, type Claim } from "@/core/provenance/claim"
@@ -151,5 +151,20 @@ describe("buildAcceptedPatch", () => {
       existingSources,
     })
     expect(result).toBeNull()
+  })
+})
+
+describe("resolveAcceptedPatchTarget", () => {
+  it("returns the id unchanged when the entity still exists", () => {
+    expect(resolveAcceptedPatchTarget([baseEntity], {}, "e1")).toBe("e1")
+  })
+
+  it("redirects to the surviving entity when the id was merged away", () => {
+    // e1 accepted-not-committed, then merged into e2 before commit.
+    expect(resolveAcceptedPatchTarget([{ ...baseEntity, id: "e2" }], { e1: "e2" }, "e1")).toBe("e2")
+  })
+
+  it("returns the id unchanged when it's gone with no merge record (never existed)", () => {
+    expect(resolveAcceptedPatchTarget([], {}, "ghost")).toBe("ghost")
   })
 })
