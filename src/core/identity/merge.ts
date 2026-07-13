@@ -156,15 +156,28 @@ function mergeNotes(a: string | null | undefined, b: string | null | undefined):
   return distinct.length ? distinct.join("\n\n") : (a ?? b)
 }
 
-/** Drop claims that became exact duplicates once the secondary's claims moved to the primary. */
+/**
+ * Collapse claims that became exact duplicates once the secondary's claims moved to the
+ * primary, keeping whichever survivor's `credibility`/`timestamp` is populated — an
+ * analyst-assigned rating on either record must survive the merge, not just the one that
+ * happened to appear first in array order.
+ */
 function dedupeClaims(claims: Claim[]): Claim[] {
-  const seen = new Set<string>()
-  const result: Claim[] = []
+  const byKey = new Map<string, Claim>()
+  const order: string[] = []
   for (const c of claims) {
     const key = JSON.stringify([c.entityId, c.field, c.value ?? "", c.sourceId])
-    if (seen.has(key)) continue
-    seen.add(key)
-    result.push(c)
+    const existing = byKey.get(key)
+    if (!existing) {
+      byKey.set(key, c)
+      order.push(key)
+      continue
+    }
+    byKey.set(key, {
+      ...existing,
+      credibility: existing.credibility ?? c.credibility,
+      timestamp: existing.timestamp ?? c.timestamp,
+    })
   }
-  return result
+  return order.map((key) => byKey.get(key) as Claim)
 }

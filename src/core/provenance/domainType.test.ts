@@ -40,6 +40,11 @@ describe("getDomainTypeFromUrl", () => {
     expect(getDomainTypeFromUrl("https://some.forum.example/thread")).toBe("forum")
   })
 
+  it("does not misclassify a domain whose label merely contains 'forum'/'telegram' as forum/social", () => {
+    expect(getDomainTypeFromUrl("https://newsforum.example.com")).toBe("web")
+    expect(getDomainTypeFromUrl("https://telegramwatch.example.com")).toBe("web")
+  })
+
   it("classifies known news domains", () => {
     expect(getDomainTypeFromUrl("https://www.bbc.com/news")).toBe("news")
     expect(getDomainTypeFromUrl("https://www.rferl.org/a")).toBe("news")

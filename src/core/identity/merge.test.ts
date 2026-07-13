@@ -78,6 +78,19 @@ describe("mergeEntities", () => {
     expect(new Set(claims.map((c) => c.sourceId))).toEqual(new Set(["src1", "src2"]))
   })
 
+  it("keeps an analyst-assigned credibility/timestamp instead of dropping it when claims collapse", () => {
+    const rated: Claim = { id: "c2", entityId: "b", field: "sources", value: null, sourceId: "src1", credibility: 4, timestamp: "2026-01-01" }
+    const graph: IdentityGraph = {
+      entities: [unit("a", "A"), unit("b", "B")],
+      claims: [citation("c1", "a", "src1"), rated],
+      geometries: [],
+    }
+    const { claims } = mergeEntities(graph, "a", "b")
+    expect(claims).toHaveLength(1)
+    expect(claims[0].credibility).toBe(4)
+    expect(claims[0].timestamp).toBe("2026-01-01")
+  })
+
   it("back-fills fields the primary leaves empty and concatenates distinct notes", () => {
     const graph: IdentityGraph = {
       entities: [

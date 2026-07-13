@@ -193,6 +193,9 @@ export function useProjectIO() {
       })
       useSourceCacheStore.getState().setSourceCache(result.sourceCache)
       useProvenanceStore.getState().setSources(result.sources)
+      useOsmViewStore.getState().resetOsmView()
+      useSelectionStore.getState().setSelectedRef(null)
+      useEntityVisibilityStore.getState().reset()
       await saveProject(buffer)
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load GeoPackage")

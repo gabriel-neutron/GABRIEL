@@ -25,8 +25,8 @@ export function getDomainTypeFromUrl(url: string): SourceDomainType {
   ) {
     return "osint"
   }
-  if (hostname.endsWith("vk.com") || hostname.includes("telegram")) return "social"
-  if (hostname.includes("reddit.com") || hostname.includes("forum")) return "forum"
+  if (hostname.endsWith("vk.com") || hostname.endsWith("t.me") || labels.includes("telegram")) return "social"
+  if (hostname.endsWith("reddit.com") || labels.includes("forum")) return "forum"
   if (
     hostname.endsWith("bbc.com") ||
     hostname.endsWith("rferl.org") ||
