@@ -6,6 +6,7 @@ export default mergeConfig(
   defineConfig({
     test: {
       environment: "node",
+      setupFiles: ["./src/test/setupGeoPackageWasm.ts"],
       include: ["src/**/*.{test,spec}.{ts,tsx}"],
       coverage: {
         provider: "v8",
