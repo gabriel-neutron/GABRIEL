@@ -1,4 +1,4 @@
-import type { ProposalDecision } from "@/store/enrichment.store"
+import type { ProposalDecision } from "@/modules/enrichment/store/enrichment.store"
 import type { MapEntity } from "@/types/domain.types"
 import type { EnrichmentProposal } from "@/types/enrichment.types"
 import { parse } from "@/core/provenance/ledger"

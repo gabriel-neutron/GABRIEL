@@ -19,7 +19,7 @@ import {
   startResearchBatch,
   type EntityResearchStatus,
   type ResearchProgressState,
-} from "@/store/researchProgress.store"
+} from "@/modules/enrichment/store/researchProgress.store"
 
 export type { EntityResearchStatus }
 

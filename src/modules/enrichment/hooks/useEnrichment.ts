@@ -15,7 +15,7 @@ import {
   startEnrichmentRun,
   updateEnrichmentProgress,
   type EnrichmentUiState,
-} from "@/store/enrichment.store"
+} from "@/modules/enrichment/store/enrichment.store"
 import type { DrawnGeometry, MapEntity } from "@/types/domain.types"
 import type { EnrichmentProposal, EnrichmentResponse } from "@/types/enrichment.types"
 import { buildAcceptedPatch, resolveAcceptedPatchTarget } from "@/modules/enrichment/services/enrichmentApply"

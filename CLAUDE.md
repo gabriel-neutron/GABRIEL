@@ -6,10 +6,10 @@ Military analysts build and annotate hierarchical unit structures on a map — a
 Feature-first, layered per ADR [0005](docs/adr/0005-feature-first-modular-architecture.md) (Stream 1 reorg — a few `git mv` tails remain; see ROADMAP).
 `src/pages/` routes — EditPage (full I/O), ViewPage (read-only demo)
 `src/core/` framework-agnostic core — `entity/`, `coordinates/`, `map/` (Leaflet substrate), `persistence/geopackage/` (GeoPackage I/O), `provenance/` (Source/Claim), `identity/` (entity resolution)
-`src/modules/` feature modules, each `ui/` + `hooks/` + `services/` — `enrichment/` (AI pipeline + adapters), `orbat/` (tree/inspector/symbols), `osm/` (Overpass/Nominatim)
+`src/modules/` feature modules, each `ui/` + `hooks/` + `services/` — `enrichment/` (AI pipeline + adapters, `store/` pure reducers), `orbat/` (tree/inspector/symbols), `osm/` (Overpass/Nominatim)
 `src/shell/` app shell — AppShell, MainLayout, AI-provider settings
 `src/ui/` shadcn/Radix primitives  ·  `src/components/shared/` cross-feature UI (dialogs, panels, InspectorFields)
-`src/store/` useProjectStore (Zustand) + peripheral stores, enrichment.store (pure reducer)
+`src/store/` useProjectStore (Zustand) + peripheral stores
 `src/services/` projectStorage (IndexedDB session cache)  ·  `src/hooks/` cross-cutting hooks (useProjectIO)
 `src/types/` domain types (Entity, LatLng/LngLat, …)  ·  `src/utils/` pure functions — no React
 `docs/` architecture, constraints, PRD, tech stack, timeline; ADRs in `docs/adr/`

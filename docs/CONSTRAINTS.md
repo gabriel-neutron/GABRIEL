@@ -53,7 +53,7 @@ Contract). In short: `[lat, lng]` everywhere in the app (components, hooks, util
 boundary, enforced by branded `LatLng` / `LngLat` types.
 
 **Pure reducers**
-- State transitions for enrichment live in `store/enrichment.store.ts` as pure functions with
+- State transitions for enrichment live in `modules/enrichment/store/enrichment.store.ts` as pure functions with
   no React imports and no side effects. They are tested in isolation.
 
 **No prop drilling past one level**
@@ -90,8 +90,8 @@ boundary, enforced by branded `LatLng` / `LngLat` types.
 
 ## Testing Requirements
 
-- **Enrichment store** (`store/enrichment.store.ts`): 100 % branch coverage.
-- **Research progress store** (`store/researchProgress.store.ts`): 100 % branch coverage.
+- **Enrichment store** (`modules/enrichment/store/enrichment.store.ts`): 100 % branch coverage.
+- **Research progress store** (`modules/enrichment/store/researchProgress.store.ts`): 100 % branch coverage.
 - **Enrichment services** (`services/enrichment/`): unit tests for all public functions.
 - **Layered research** (`services/research/`): unit tests for BFS ordering and skip logic.
 - **GeoPackage round-trip**: the persistence integration test is the gate for any schema
