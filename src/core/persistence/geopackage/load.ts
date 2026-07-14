@@ -6,6 +6,7 @@ import { readGeometries } from "./geometries.table"
 import { readSourceCache } from "./researchSources.table"
 import { readProvenanceSources } from "./provenanceSources.table"
 import { readProvenanceClaims } from "./provenanceClaims.table"
+import { readRatingEvents } from "./ratingEvents.table"
 import { deriveProvenanceFromEntities, type EntityLedgerInput } from "@/core/provenance/deriveFromEntities"
 import type { GeoPackageLoadResult } from "./types"
 
@@ -72,7 +73,9 @@ export async function loadGeoPackage(buffer: ArrayBuffer): Promise<GeoPackageLoa
       }
     }
 
-    return { layers, entities, geometries, sourceCache, sources, claims }
+    const ratingEvents = readRatingEvents(geoPackage)
+
+    return { layers, entities, geometries, sourceCache, sources, claims, ratingEvents }
   } catch (e) {
     if (e instanceof Error && e.message.startsWith("Unsupported schema")) throw e
     const errorMsg = e instanceof Error ? e.message : String(e)

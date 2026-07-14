@@ -156,5 +156,32 @@ export class OpenAIModelAdapter implements AiModelAdapter {
       signal,
     )
   }
+
+  async assessCredibility(
+    instructions: string,
+    payload: Record<string, unknown>,
+    signal?: AbortSignal,
+  ): Promise<{
+    credibility: number
+    contradicted: boolean
+    positivelyContradicted: boolean
+    statedAttribution: string | null
+    confidence: number
+    rationale: string
+  }> {
+    const raw = await this.callOpenAI(this.synthesisModel, instructions, payload, signal)
+    const credibility = Number(raw.credibility)
+    if (!Number.isFinite(credibility)) {
+      throw new Error("OpenAI credibility assessment returned invalid payload")
+    }
+    return {
+      credibility,
+      contradicted: raw.contradicted === true,
+      positivelyContradicted: raw.positivelyContradicted === true,
+      statedAttribution: typeof raw.statedAttribution === "string" ? raw.statedAttribution : null,
+      confidence: typeof raw.confidence === "number" ? raw.confidence : 0,
+      rationale: typeof raw.rationale === "string" ? raw.rationale : "",
+    }
+  }
 }
 

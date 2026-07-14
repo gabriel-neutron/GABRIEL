@@ -18,7 +18,12 @@ import {
 } from "@/modules/enrichment/store/enrichment.store"
 import type { DrawnGeometry, MapEntity } from "@/types/domain.types"
 import type { EnrichmentProposal, EnrichmentResponse } from "@/types/enrichment.types"
+import type { Source } from "@/core/provenance/source"
+import type { Claim } from "@/core/provenance/claim"
+import type { CredibilityAssessmentResult } from "@/core/provenance/reviewQueue"
 import { buildAcceptedPatch, resolveAcceptedPatchTarget } from "@/modules/enrichment/services/enrichmentApply"
+import { assessEntityCredibility, selectCitationsForClaims } from "@/modules/enrichment/services/credibility.service"
+import { createDefaultProviderBundle } from "@/modules/enrichment/services/providers"
 import { useProjectStore } from "@/store/useProjectStore"
 import { useProvenanceStore } from "@/store/useProvenanceStore"
 import { createEnrichmentRunner } from "./enrichmentRunner"
@@ -70,17 +75,56 @@ export function useEnrichment({
     setIsDrawerOpen(true)
   }, [context, feature])
 
+  /**
+   * ADR 0009: one batched credibility call per entity for its newly-accepted citations,
+   * best-effort — a missing/failed model call resolves to `null` (so the caller leaves
+   * those claims unrated) rather than blocking acceptance, since STANAG assessment is a
+   * value-add on top of the citation, never a gate on recording it. `citedSources` must
+   * cover every `newClaims` entry's Source — both newly-minted and reused-existing —
+   * or a claim citing a reused Source silently gets no citation sent to the model.
+   */
+  const assessNewClaimsCredibility = useCallback(
+    async (
+      entity: MapEntity,
+      proposals: EnrichmentProposal[],
+      citedSources: Source[],
+      newClaims: Claim[],
+    ): Promise<CredibilityAssessmentResult | null> => {
+      if (newClaims.length === 0) return null
+      const { assessCredibility } = createDefaultProviderBundle().model
+      if (!assessCredibility) return null
+
+      const citations = selectCitationsForClaims(newClaims, citedSources, proposals)
+      if (citations.length === 0) return null
+
+      try {
+        return await assessEntityCredibility({
+          entityName: entity.name,
+          field: "sources",
+          value: null,
+          citations,
+          model: { assessCredibility },
+        })
+      } catch (e) {
+        console.error("assessEntityCredibility failed; leaving new claims unrated", e)
+        return null
+      }
+    },
+    [],
+  )
+
   const applyAcceptedProposals = useCallback(
     (runFeatureId: string) => {
       // Preserved exactly: claims/sources are not committed at all when no callback is
       // wired, same as the pre-E2.6 behavior of never touching `entity.sources` either.
       if (!onApplyAccepted) return
       const targetId = resolveAcceptedPatchTarget(entities, entityMergeMap, runFeatureId)
+      const entity = entities.find((e) => e.id === targetId) ?? null
       const result = buildAcceptedPatch({
         decisions: state.decisions[runFeatureId] ?? {},
         overlay: state.overlay[runFeatureId] ?? {},
         proposals: state.run.proposals,
-        entity: entities.find((e) => e.id === targetId) ?? null,
+        entity,
         existingClaims: claims.filter((c) => c.entityId === targetId),
         existingSources: useProvenanceStore.getState().sources,
       })
@@ -90,10 +134,23 @@ export function useEnrichment({
           .getState()
           .setSources([...useProvenanceStore.getState().sources, ...result.newSources])
       }
-      if (result.newClaims.length > 0) addClaims(result.newClaims)
+      if (result.newClaims.length > 0) {
+        // Commit synchronously and unconditionally — the accept must land even if the
+        // user immediately closes the drawer or navigates away. Credibility is assessed
+        // afterward, detached (not awaited): it patches the already-committed claims by
+        // id once it resolves, via useProjectStore's applyCredibilityToClaims, rather
+        // than gating the commit itself on a live AI call.
+        addClaims(result.newClaims)
+        if (entity) {
+          const newClaimIds = result.newClaims.map((c) => c.id)
+          void assessNewClaimsCredibility(entity, state.run.proposals, result.citedSources, result.newClaims).then(
+            (assessment) => useProjectStore.getState().applyCredibilityToClaims(newClaimIds, assessment),
+          )
+        }
+      }
       if (result.patch != null) onApplyAccepted(targetId, result.patch)
     },
-    [entities, onApplyAccepted, state, claims, addClaims, entityMergeMap],
+    [entities, onApplyAccepted, state, claims, addClaims, entityMergeMap, assessNewClaimsCredibility],
   )
 
   const closeDrawer = useCallback(() => {

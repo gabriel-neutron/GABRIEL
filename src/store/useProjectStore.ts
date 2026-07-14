@@ -6,6 +6,9 @@ import { INDUSTRY_LAYER_ID } from "@/types/organisation.types"
 import type { Claim } from "@/core/provenance/claim"
 import type { Source } from "@/core/provenance/source"
 import { mergeEntities as mergeIdentityGraph } from "@/core/identity/merge"
+import { assignCredibility, confirmCredibility, refuteCredibility, type CredibilityAssessmentResult } from "@/core/provenance/reviewQueue"
+import { createRatingEvent, type RatingEvent } from "@/core/provenance/ratingEvent"
+import { useProvenanceStore } from "@/store/useProvenanceStore"
 
 // ---------------------------------------------------------------------------
 // State
@@ -82,6 +85,20 @@ export interface ProjectActions {
 
   addClaims(claims: Claim[]): void
   removeClaim(claimId: string): void
+  /** ADR 0009: the review-queue Confirm action — the only path to credibility `1`. A no-op if the claim isn't eligible (see `confirmCredibility`). */
+  confirmClaimCredibility(claimId: string): void
+  /** Phase 6 (v2, exploratory): the review-queue Refute action — records analyst disagreement for the Actor track record (`actorPosterior.ts`) without changing the claim's numeric credibility. */
+  refuteClaimCredibility(claimId: string): void
+  /**
+   * Patches only the claims in `claimIds` with a credibility assessment that resolved
+   * after they were already committed — the accept flow (`useEnrichment.ts`'s
+   * `applyAcceptedProposals`) commits new claims synchronously and kicks off credibility
+   * assessment as a detached (un-awaited) promise; this is that promise's continuation.
+   * Looks up claims fresh from current state at call time, not a stale closure, so an
+   * intervening edit or deletion can't be clobbered or resurrected. Not meant for
+   * synchronous use — call it from a `.then()`, not inline.
+   */
+  applyCredibilityToClaims(claimIds: string[], result: CredibilityAssessmentResult | null): void
 
   setSelectedEntityId(id: string | null): void
   closeDetail(): void
@@ -101,6 +118,7 @@ export function selectPersistableSnapshot(
   state: ProjectState,
   sourceCache: Map<string, string>,
   sources: Source[] = [],
+  ratingEvents: RatingEvent[] = [],
 ) {
   const nonOsmLayerIds = new Set(state.layers.filter((l) => l.osmData == null).map((l) => l.id))
   const entities = state.entities
@@ -116,6 +134,7 @@ export function selectPersistableSnapshot(
     // otherwise an OSM entity filtered out above would leave a dangling claim.entityId.
     claims: state.claims.filter((c) => survivingEntityIds.has(c.entityId)),
     sources,
+    ratingEvents,
   }
 }
 
@@ -266,6 +285,49 @@ export const useProjectStore = create<ProjectState & ProjectActions>()(
 
       removeClaim(claimId) {
         set((s) => ({ claims: s.claims.filter((c) => c.id !== claimId) }), false, "removeClaim")
+      },
+
+      confirmClaimCredibility(claimId) {
+        const before = get().claims.find((c) => c.id === claimId)?.credibility ?? null
+        set((s) => ({ claims: confirmCredibility(s.claims, claimId) }), false, "confirmClaimCredibility")
+        const after = get().claims.find((c) => c.id === claimId)?.credibility ?? null
+        if (after === before) return // ineligible — confirmCredibility left it unchanged, nothing to log
+        useProvenanceStore.getState().appendRatingEvent(
+          createRatingEvent({
+            targetType: "claim",
+            targetId: claimId,
+            kind: "credibility",
+            value: String(after),
+            assessor: { kind: "analyst" },
+          }),
+        )
+      },
+
+      refuteClaimCredibility(claimId) {
+        const claimExists = get().claims.some((c) => c.id === claimId)
+        if (!claimExists) return
+        set((s) => ({ claims: refuteCredibility(s.claims, claimId) }), false, "refuteClaimCredibility")
+        useProvenanceStore.getState().appendRatingEvent(
+          createRatingEvent({
+            targetType: "claim",
+            targetId: claimId,
+            kind: "credibility",
+            value: "refuted",
+            assessor: { kind: "analyst" },
+          }),
+        )
+      },
+
+      applyCredibilityToClaims(claimIds, result) {
+        if (result == null) return
+        set((s) => {
+          const idSet = new Set(claimIds)
+          const targeted = s.claims.filter((c) => idSet.has(c.id))
+          if (targeted.length === 0) return s
+          const stamped = assignCredibility(targeted, result)
+          const stampedById = new Map(stamped.map((c) => [c.id, c]))
+          return { claims: s.claims.map((c) => stampedById.get(c.id) ?? c) }
+        }, false, "applyCredibilityToClaims")
       },
 
       setSelectedEntityId(id) {

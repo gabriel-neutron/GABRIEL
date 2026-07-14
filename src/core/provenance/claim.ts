@@ -1,4 +1,5 @@
 import type { AdmiraltyCredibility } from "./admiralty"
+import type { CredibilityMeta } from "./ratingMeta"
 
 /**
  * ADR 0006: a specific asserted fact linked to the specific `Source` that asserts it.
@@ -14,6 +15,8 @@ export type Claim = {
   sourceId: string
   credibility: AdmiraltyCredibility | null
   timestamp: string | null
+  /** Provenance for `credibility` (assessor, evidence, corroboration clusters). Opt-in, like `Source.reliabilityMeta` — absent until Phase 3's AI pass or a human override sets it. */
+  credibilityMeta?: CredibilityMeta
 }
 
 export const GENERAL_CITATION_FIELD = "sources"
@@ -40,15 +43,29 @@ export function groupCitationClaimsByEntityId(claims: Claim[]): Map<string, Clai
   return byEntityId
 }
 
-/** A general-citation claim linking `entityId` to `sourceId` — the shape every producer of citation claims needs. */
-export function createCitationClaim(entityId: string, sourceId: string): Claim {
+/**
+ * Phase 6 (v2, exploratory): a claim about one specific reported item — `field`/`value`
+ * were always part of the shape (ADR 0006), this just gives per-field attribution a
+ * named constructor instead of only the general-citation sentinel. `filterCitationClaims`
+ * / `groupCitationClaimsByEntityId` only ever select `field === GENERAL_CITATION_FIELD`,
+ * so a per-field claim is invisible to the general-citation path by construction — it
+ * can carry its own `credibility` via the same `assessEntityCredibility` pass (which
+ * already takes `field`/`value` as plain parameters, not hardcoded to "sources")
+ * without that path needing to change at all.
+ */
+export function createFieldClaim(entityId: string, sourceId: string, field: string, value: string | null): Claim {
   return {
     id: crypto.randomUUID(),
     entityId,
-    field: GENERAL_CITATION_FIELD,
-    value: null,
+    field,
+    value,
     sourceId,
     credibility: null,
     timestamp: null,
   }
+}
+
+/** A general-citation claim linking `entityId` to `sourceId` — the shape every producer of citation claims needs. */
+export function createCitationClaim(entityId: string, sourceId: string): Claim {
+  return createFieldClaim(entityId, sourceId, GENERAL_CITATION_FIELD, null)
 }

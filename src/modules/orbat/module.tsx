@@ -1,6 +1,7 @@
 import { TreeView } from "@/modules/orbat/ui/TreeView"
 import { EntityInspector } from "@/modules/orbat/ui/EntityInspector"
 import { HierarchyPanel } from "@/modules/orbat/ui/HierarchyPanel"
+import { ReviewQueue } from "@/modules/orbat/ui/ReviewQueue"
 import { SymbolsLayer } from "@/modules/orbat/ui/SymbolsLayer"
 import { OrganisationsLayer } from "@/modules/orbat/ui/OrganisationsLayer"
 import { NetworkLinksLayer } from "@/modules/orbat/ui/NetworkLinksLayer"
@@ -17,7 +18,10 @@ export const orbatModule: ModuleManifest = {
     corporate: (id) => <EntityInspector key={id} />,
   },
 
-  leftPanels: [{ id: "hierarchy", label: "Army", content: <HierarchyPanel /> }],
+  leftPanels: [
+    { id: "hierarchy", label: "Army", content: <HierarchyPanel /> },
+    { id: "review", label: "Review", content: <ReviewQueue /> },
+  ],
 
   mapLayers: [
     <SymbolsLayer key="symbols" />,

@@ -1,6 +1,7 @@
 import type { Layer, MapEntity, DrawnGeometry } from "@/types/domain.types"
 import type { Source } from "@/core/provenance/source"
 import type { Claim } from "@/core/provenance/claim"
+import type { RatingEvent } from "@/core/provenance/ratingEvent"
 
 /**
  * Thin aliases, not separate shapes: the SQL column-descriptor lists (units.table.ts,
@@ -13,6 +14,7 @@ export type GpkgEntity = MapEntity
 export type GpkgGeometry = DrawnGeometry
 export type GpkgSource = Source
 export type GpkgClaim = Claim
+export type GpkgRatingEvent = RatingEvent
 
 export interface GeoPackageLoadResult {
   layers: GpkgLayer[]
@@ -29,6 +31,8 @@ export interface GeoPackageLoadResult {
    */
   sources: GpkgSource[]
   claims: GpkgClaim[]
+  /** Phase 4 (v1.5) append-only audit trail — empty for a pre-Phase-4 project. */
+  ratingEvents: GpkgRatingEvent[]
 }
 
 export interface ApplyGeoPackageResultState {

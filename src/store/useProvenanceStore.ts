@@ -3,6 +3,7 @@ import { devtools } from "zustand/middleware"
 import { setSourceReliability } from "@/core/provenance/admiralty"
 import type { AdmiraltyReliability } from "@/core/provenance/admiralty"
 import { dedupeSources, type Source } from "@/core/provenance/source"
+import { createRatingEvent, type RatingEvent } from "@/core/provenance/ratingEvent"
 
 /**
  * `Source` records are peripheral, not part of the entity/geometry transactional
@@ -13,6 +14,8 @@ import { dedupeSources, type Source } from "@/core/provenance/source"
  */
 export interface ProvenanceState {
   sources: Source[]
+  /** Phase 4 (v1.5): append-only audit trail, written on every rating change (`ratingEvent.ts`). */
+  ratingEvents: RatingEvent[]
 }
 
 export interface ProvenanceActions {
@@ -21,10 +24,12 @@ export interface ProvenanceActions {
   rateSourceReliability(sourceId: string, reliability: AdmiraltyReliability | null): void
   /** Creates-or-reuses a `Source` per URL by exact-match identity (ADR 0006). Returns the resulting records so a caller can resolve the id it needs (e.g. for a new Claim) without a second store read. */
   mergeUrls(urls: string[]): Source[]
+  setRatingEvents(events: RatingEvent[]): void
+  appendRatingEvent(event: RatingEvent): void
 }
 
 function initialState(): ProvenanceState {
-  return { sources: [] }
+  return { sources: [], ratingEvents: [] }
 }
 
 export const useProvenanceStore = create<ProvenanceState & ProvenanceActions>()(
@@ -42,12 +47,31 @@ export const useProvenanceStore = create<ProvenanceState & ProvenanceActions>()(
 
       rateSourceReliability(sourceId, reliability) {
         set((s) => ({ sources: setSourceReliability(s.sources, sourceId, reliability) }), false, "rateSourceReliability")
+        // A cleared rating (null) has nothing to log — only a set/changed letter is a rating event.
+        if (reliability == null) return
+        get().appendRatingEvent(
+          createRatingEvent({
+            targetType: "source",
+            targetId: sourceId,
+            kind: "reliability",
+            value: reliability,
+            assessor: { kind: "analyst" },
+          }),
+        )
       },
 
       mergeUrls(urls) {
         const sources = dedupeSources(urls, get().sources)
         set({ sources }, false, "mergeUrls")
         return sources
+      },
+
+      setRatingEvents(ratingEvents) {
+        set({ ratingEvents }, false, "setRatingEvents")
+      },
+
+      appendRatingEvent(event) {
+        set((s) => ({ ratingEvents: [...s.ratingEvents, event] }), false, "appendRatingEvent")
       },
     }),
     { name: "GabrielProvenanceStore", enabled: import.meta.env.DEV },

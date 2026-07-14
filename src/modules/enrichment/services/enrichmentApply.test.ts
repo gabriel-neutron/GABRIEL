@@ -139,6 +139,28 @@ describe("buildAcceptedPatch", () => {
     expect(result!.newSources).toHaveLength(0)
     expect(result!.newClaims).toHaveLength(1)
     expect(result!.newClaims[0].sourceId).toBe("s-shared")
+    // citedSources must include the reused Source even though it's absent from newSources —
+    // a caller assessing credibility for newClaims needs every claim's actual cited Source.
+    expect(result!.citedSources).toEqual([sharedSource])
+  })
+
+  it("citedSources covers every newClaim's Source, whether newly minted or reused", () => {
+    const sharedSource: Source = { id: "s-shared", url: "https://shared.example", domainType: null, reliability: null }
+    const result = buildAcceptedPatch({
+      decisions: { sources: "accepted" },
+      overlay: { sources: "https://shared.example\nhttps://fresh.example" },
+      proposals: [],
+      entity: baseEntity,
+      existingClaims: [],
+      existingSources: [sharedSource],
+    })
+    expect(result!.newSources.map((s) => s.url)).toEqual(["https://fresh.example"])
+    expect(result!.newClaims).toHaveLength(2)
+    const citedUrls = result!.citedSources.map((s) => s.url).sort()
+    expect(citedUrls).toEqual(["https://fresh.example", "https://shared.example"])
+    // Every claim's sourceId must resolve within citedSources.
+    const citedIds = new Set(result!.citedSources.map((s) => s.id))
+    expect(result!.newClaims.every((c) => citedIds.has(c.sourceId))).toBe(true)
   })
 
   it("mints no new claim when the entity already has a claim to that exact source", () => {

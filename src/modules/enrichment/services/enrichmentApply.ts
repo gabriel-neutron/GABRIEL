@@ -12,6 +12,8 @@ export type AcceptedPatchResult = {
   patch: Partial<MapEntity> | null
   newSources: Source[]
   newClaims: Claim[]
+  /** Every `Source` referenced by `newClaims` — newly minted AND reused-existing — so a caller assessing credibility for `newClaims` sends the right citations regardless of whether a URL was new to the global Source table. */
+  citedSources: Source[]
 }
 
 /**
@@ -82,6 +84,7 @@ export function buildAcceptedPatch(args: {
 
   const newSources: Source[] = []
   const newClaims: Claim[] = []
+  const citedSources: Source[] = []
   if (trulyNewUrls.length > 0) {
     const merged = dedupeSources(trulyNewUrls, existingSources)
     newSources.push(...merged.slice(existingSources.length))
@@ -90,9 +93,15 @@ export function buildAcceptedPatch(args: {
       const source = sourceByUrl.get(url)
       if (!source) continue
       newClaims.push(createCitationClaim(entity.id, source.id))
+      citedSources.push(source)
     }
   }
 
   if (Object.keys(patch).length === 0 && newClaims.length === 0) return null
-  return { patch: Object.keys(patch).length > 0 ? (patch as Partial<MapEntity>) : null, newSources, newClaims }
+  return {
+    patch: Object.keys(patch).length > 0 ? (patch as Partial<MapEntity>) : null,
+    newSources,
+    newClaims,
+    citedSources,
+  }
 }

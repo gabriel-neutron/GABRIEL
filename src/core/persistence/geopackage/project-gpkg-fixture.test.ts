@@ -1,8 +1,12 @@
 import { readFileSync } from "node:fs"
 import { readdirSync, rmSync } from "node:fs"
 import { resolve } from "node:path"
+import { GeoPackageAPI } from "@ngageoint/geopackage"
 import { describe, expect, it, afterEach } from "vitest"
 import { loadGeoPackage, saveGeoPackage } from "./index"
+import { readProvenanceSources } from "./provenanceSources.table"
+import { readProvenanceClaims } from "./provenanceClaims.table"
+import { readRatingEvents } from "./ratingEvents.table"
 
 /**
  * The real, checked-in demo project (public/project.gpkg) predates E1 (ADR 0004): it has
@@ -138,6 +142,126 @@ describe("public/project.gpkg round-trip (real pre-E1 fixture)", () => {
       const third = await loadGeoPackage(Uint8Array.from(secondBytes).buffer)
       expect(third.sources).toHaveLength(first.sources.length)
       expect(third.claims).toHaveLength(first.claims.length)
+    },
+    60_000,
+  )
+
+  it(
+    "adds reliability_meta/credibility_meta to a reopened pre-feature fixture via ensureOptionalColumns, and a rating survives the round-trip",
+    async () => {
+      const buffer = Uint8Array.from(readFileSync(resolve(process.cwd(), "public/project.gpkg"))).buffer
+      const first = await loadGeoPackage(buffer)
+      expect(first.sources.every((s) => s.reliabilityMeta === undefined)).toBe(true)
+
+      const target = first.sources[0]!
+      const rated = first.sources.map((s) =>
+        s.id === target.id
+          ? {
+              ...s,
+              reliability: "C" as const,
+              reliabilityMeta: {
+                confidence: 0.5,
+                rationale: "type-table prior",
+                assessor: { kind: "type-table" as const, mappingVersion: "v1" },
+                mappingVersion: "v1",
+                updatedAt: "2026-07-14T00:00:00.000Z",
+                overridden: false,
+              },
+            }
+          : s,
+      )
+
+      const bytes = await saveGeoPackage(first.layers, first.entities, first.geometries, first.sourceCache, buffer, rated, first.claims)
+      const second = await loadGeoPackage(Uint8Array.from(bytes).buffer)
+
+      expect(second.sources.find((s) => s.id === target.id)?.reliabilityMeta).toEqual(rated.find((s) => s.id === target.id)!.reliabilityMeta)
+      // Every other source stays clean (undefined), not defaulted.
+      expect(second.sources.filter((s) => s.reliabilityMeta != null)).toHaveLength(1)
+    },
+    60_000,
+  )
+
+  it(
+    "adds rating_events to a reopened pre-Phase-4 fixture, and the audit trail survives the round-trip",
+    async () => {
+      const buffer = Uint8Array.from(readFileSync(resolve(process.cwd(), "public/project.gpkg"))).buffer
+      const first = await loadGeoPackage(buffer)
+      expect(first.ratingEvents).toEqual([])
+
+      const event = {
+        id: "evt-1",
+        targetType: "source" as const,
+        targetId: first.sources[0]!.id,
+        kind: "reliability" as const,
+        value: "B",
+        assessor: { kind: "analyst" as const },
+        timestamp: "2026-07-14T00:00:00.000Z",
+      }
+      const bytes = await saveGeoPackage(
+        first.layers,
+        first.entities,
+        first.geometries,
+        first.sourceCache,
+        buffer,
+        first.sources,
+        first.claims,
+        [event],
+      )
+      const second = await loadGeoPackage(Uint8Array.from(bytes).buffer)
+      expect(second.ratingEvents).toEqual([event])
+    },
+    60_000,
+  )
+
+  it(
+    "wipes provenance_sources/provenance_claims/rating_events when a later save omits them, reusing a buffer that previously had rows (Fix 6 regression)",
+    async () => {
+      const buffer = Uint8Array.from(readFileSync(resolve(process.cwd(), "public/project.gpkg"))).buffer
+      const first = await loadGeoPackage(buffer)
+      expect(first.sources.length).toBeGreaterThan(0)
+
+      const event = {
+        id: "evt-1",
+        targetType: "source" as const,
+        targetId: first.sources[0]!.id,
+        kind: "reliability" as const,
+        value: "B",
+        assessor: { kind: "analyst" as const },
+        timestamp: "2026-07-14T00:00:00.000Z",
+      }
+      // First save populates sources/claims/ratingEvents into a fresh buffer.
+      const firstBytes = await saveGeoPackage(
+        first.layers,
+        first.entities,
+        first.geometries,
+        first.sourceCache,
+        buffer,
+        first.sources,
+        first.claims,
+        [event],
+      )
+
+      // Second save reuses that buffer but omits sources/claims/ratingEvents entirely
+      // (the "New Project" shape). Read the raw tables directly (bypassing
+      // loadGeoPackage's legacy-column re-derivation, which would otherwise re-mint
+      // sources from the entities' legacy `sources` strings and mask a broken wipe) to
+      // assert the persisted tables themselves end up empty, not carrying over the
+      // first save's rows.
+      const secondBytes = await saveGeoPackage(
+        first.layers,
+        first.entities,
+        first.geometries,
+        first.sourceCache,
+        Uint8Array.from(firstBytes).buffer,
+      )
+      const geoPackage = await GeoPackageAPI.open(new Uint8Array(secondBytes))
+      try {
+        expect(readProvenanceSources(geoPackage)).toEqual([])
+        expect(readProvenanceClaims(geoPackage)).toEqual([])
+        expect(readRatingEvents(geoPackage)).toEqual([])
+      } finally {
+        geoPackage.close()
+      }
     },
     60_000,
   )

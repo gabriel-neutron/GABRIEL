@@ -2,6 +2,7 @@ import { useState, useEffect } from "react"
 import { Loader2 } from "lucide-react"
 import { MainLayout } from "@/shell/MainLayout"
 import { loadGeoPackage, applyGeoPackageResult } from "@/core/persistence/geopackage"
+import { applyDeterministicRatingPipeline } from "@/core/provenance/ratingPipeline"
 import { useProjectStore } from "@/store/useProjectStore"
 import { useSourceCacheStore } from "@/store/useSourceCacheStore"
 import { useProvenanceStore } from "@/store/useProvenanceStore"
@@ -50,7 +51,9 @@ export function ViewPage({ onEditMode, onOpenAbout }: ViewPageProps): React.Reac
           selectedEntityId: next.selectedEntityId,
         })
         useSourceCacheStore.getState().setSourceCache(result.sourceCache)
-        useProvenanceStore.getState().setSources(result.sources)
+        const rated = applyDeterministicRatingPipeline(result.sources, result.claims, result.ratingEvents)
+        useProvenanceStore.getState().setSources(rated.sources)
+        useProvenanceStore.getState().setRatingEvents(rated.events)
         setLoadError(null)
       })
       .catch((e) => {

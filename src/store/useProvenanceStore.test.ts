@@ -34,4 +34,26 @@ describe("useProvenanceStore", () => {
     useProvenanceStore.getState().resetSources()
     expect(useProvenanceStore.getState().sources).toEqual([])
   })
+
+  it("rateSourceReliability appends a rating event for a human-set letter", () => {
+    useProvenanceStore.getState().setSources(sources)
+    useProvenanceStore.getState().rateSourceReliability("src-1", "B")
+    const events = useProvenanceStore.getState().ratingEvents
+    expect(events).toHaveLength(1)
+    expect(events[0]).toMatchObject({ targetType: "source", targetId: "src-1", kind: "reliability", value: "B", assessor: { kind: "analyst" } })
+  })
+
+  it("rateSourceReliability does not log an event when clearing a rating to null", () => {
+    useProvenanceStore.getState().setSources(sources)
+    useProvenanceStore.getState().rateSourceReliability("src-1", "B")
+    useProvenanceStore.getState().rateSourceReliability("src-1", null)
+    expect(useProvenanceStore.getState().ratingEvents).toHaveLength(1)
+  })
+
+  it("resetSources also clears the rating event log", () => {
+    useProvenanceStore.getState().setSources(sources)
+    useProvenanceStore.getState().rateSourceReliability("src-1", "B")
+    useProvenanceStore.getState().resetSources()
+    expect(useProvenanceStore.getState().ratingEvents).toEqual([])
+  })
 })

@@ -2,7 +2,8 @@ import type { ReactNode } from "react"
 import { Trash2 } from "lucide-react"
 import { Button } from "@/ui/button"
 import type { DrawnGeometry } from "@/types/domain.types"
-import { RELIABILITY_RATINGS, type AdmiraltyReliability } from "@/core/provenance/admiralty"
+import { RELIABILITY_RATINGS, type AdmiraltyCredibility, type AdmiraltyReliability } from "@/core/provenance/admiralty"
+import type { CredibilityMeta, RatingMeta } from "@/core/provenance/ratingMeta"
 
 function isUrl(value: string): boolean {
   return /^https?:\/\//i.test(value.trim())
@@ -24,11 +25,78 @@ export function ReadOnlyField({ label, children }: { label: string; children: Re
   )
 }
 
+/**
+ * ADR 0008/0009: a type-table or AI-assessed letter is a provisional prior, never a
+ * track-record assessment — it renders dashed/muted, `F` labeled as "not judged"
+ * rather than styled as a failing grade. Only a human override (`reliabilityMeta.
+ * overridden`) earns the solid, "confirmed" styling; letter identity alone (e.g. `A`)
+ * is never trusted to signal that on its own, since a future actor posterior (v2)
+ * could also reach a high letter without today's override path.
+ */
+function ReliabilityBadge({
+  reliability,
+  meta,
+}: {
+  reliability: AdmiraltyReliability
+  meta?: RatingMeta
+}) {
+  const humanAssessed = meta?.overridden === true
+  const label = reliability === "F" ? "F · not judged" : reliability
+  return (
+    <span
+      title={
+        humanAssessed
+          ? "ADMIRALTY reliability — human-assessed"
+          : "ADMIRALTY reliability — type-based / provisional, not a track-record assessment"
+      }
+      className={
+        humanAssessed
+          ? "h-7 shrink-0 rounded border border-foreground/30 bg-foreground/10 px-1.5 text-xs font-semibold leading-7 text-foreground"
+          : "h-7 shrink-0 rounded border border-dashed bg-muted px-1.5 text-xs font-medium leading-7 text-muted-foreground"
+      }
+    >
+      {label}
+    </span>
+  )
+}
+
+/**
+ * ADR 0009: the number is styled as an estimate, never a confirmation — cluster count
+ * on the face (the corroboration evidence, not the model's opinion), and a persistent,
+ * non-dismissable "not verified" label. `6` (no basis) renders neutral, matching the
+ * reliability badge's treatment of `F`. Machine-tier vocabulary only: corroboration
+ * found / single-origin / unverified — never confirmed/verified/trusted.
+ */
+function CredibilityBadge({
+  credibility,
+  meta,
+}: {
+  credibility: AdmiraltyCredibility
+  meta?: CredibilityMeta
+}) {
+  const clusters = meta?.corroborationClusters
+  const clusterLabel =
+    clusters == null ? "" : clusters <= 1 ? " · single-origin" : ` · ${clusters} clusters`
+  const label = credibility === 6 ? "6 · no basis" : `${credibility}${clusterLabel}`
+  return (
+    <span
+      title="STANAG credibility — estimated by model, not verified. Confirmation to 1 is a human-only action."
+      className="inline-flex h-7 shrink-0 items-center gap-1 rounded border border-dashed bg-muted px-1.5 text-xs font-medium leading-7 text-muted-foreground"
+    >
+      {label}
+      <span className="text-[9px] uppercase tracking-wide opacity-80">not verified</span>
+    </span>
+  )
+}
+
 export function SourcesList({
   sources,
   readOnly,
   onRemove,
   reliabilities,
+  reliabilityMetas,
+  credibilities,
+  credibilityMetas,
   onRate,
 }: {
   sources: string[]
@@ -36,6 +104,11 @@ export function SourcesList({
   onRemove?: (index: number) => void
   /** ADMIRALTY reliability rating (STANAG 2511) per `sources[index]`, 1:1 (ADR 0006, E2.9). */
   reliabilities?: (AdmiraltyReliability | null)[]
+  /** Rating provenance per `sources[index]`, 1:1 — drives the provisional-vs-human-assessed badge styling. */
+  reliabilityMetas?: (RatingMeta | undefined)[]
+  /** ADMIRALTY credibility (STANAG 2511) per `sources[index]`, 1:1 — set by Phase 3's AI pass on the citing Claim. */
+  credibilities?: (AdmiraltyCredibility | null)[]
+  credibilityMetas?: (CredibilityMeta | undefined)[]
   onRate?: (index: number, reliability: AdmiraltyReliability | null) => void
 }) {
   if (sources.length === 0) return null
@@ -70,26 +143,32 @@ export function SourcesList({
             )}
           </div>
           {readOnly && reliabilities?.[index] != null && (
-            <span
-              title="ADMIRALTY reliability rating"
-              className="h-7 shrink-0 rounded border bg-muted px-1.5 text-xs font-medium leading-7"
-            >
-              {reliabilities[index]}
-            </span>
+            <ReliabilityBadge reliability={reliabilities[index]!} meta={reliabilityMetas?.[index]} />
+          )}
+          {readOnly && credibilities?.[index] != null && (
+            <CredibilityBadge credibility={credibilities[index]!} meta={credibilityMetas?.[index]} />
           )}
           {!readOnly && onRate != null && (
-            <select
-              value={reliabilities?.[index] ?? ""}
-              onChange={(e) => onRate(index, (e.target.value || null) as AdmiraltyReliability | null)}
-              aria-label="Source reliability (ADMIRALTY)"
-              title="ADMIRALTY reliability rating"
-              className="h-7 shrink-0 rounded border bg-background px-1 text-xs"
-            >
-              <option value="">—</option>
-              {RELIABILITY_RATINGS.map((r) => (
-                <option key={r} value={r}>{r}</option>
-              ))}
-            </select>
+            <>
+              {reliabilities?.[index] != null && (
+                <ReliabilityBadge reliability={reliabilities[index]!} meta={reliabilityMetas?.[index]} />
+              )}
+              {credibilities?.[index] != null && (
+                <CredibilityBadge credibility={credibilities[index]!} meta={credibilityMetas?.[index]} />
+              )}
+              <select
+                value={reliabilities?.[index] ?? ""}
+                onChange={(e) => onRate(index, (e.target.value || null) as AdmiraltyReliability | null)}
+                aria-label="Source reliability (ADMIRALTY)"
+                title="ADMIRALTY reliability rating"
+                className="h-7 shrink-0 rounded border bg-background px-1 text-xs"
+              >
+                <option value="">—</option>
+                {RELIABILITY_RATINGS.map((r) => (
+                  <option key={r} value={r}>{r}</option>
+                ))}
+              </select>
+            </>
           )}
           {!readOnly && onRemove != null && (
             <Button

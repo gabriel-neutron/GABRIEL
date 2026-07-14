@@ -27,3 +27,51 @@ export function buildDefaultEnrichmentPrompt(
   return lines.join("\n")
 }
 
+export const CREDIBILITY_PROMPT_VERSION = "v1"
+
+export type CredibilityCitationInput = {
+  url: string
+  title: string
+  snippet: string
+  publishedAt?: string
+}
+
+export type CredibilityAssessmentInput = {
+  entityName: string
+  field: string
+  value: string | null
+  citations: CredibilityCitationInput[]
+}
+
+/**
+ * ADR 0009: reliability is deliberately never mentioned, so credibility stays blind to
+ * it (resisting the "diagonal collapse" pathology where reliability leaks into
+ * credibility). The model is told outright it cannot output `1` — corroboration
+ * clustering is computed independently in code (`independenceClusters.ts`) and used to
+ * cap the response server-side, never trusted from the model's own judgment of
+ * independence.
+ */
+export function buildCredibilityInstructions(): string {
+  return [
+    "Assess NATO STANAG 2511 Information Credibility (2-6) for the given claim, based only on the provided citations.",
+    "You are assessing corroboration and contradiction signals only. You may NEVER output 1 (\"Confirmed\") — that grade is reserved for a human review action and is not available to you; the caller enforces this cap regardless of what you return.",
+    "Identify: whether any citations contradict each other, and if so, whether a clear timeline shows one side is favored (positively contradicted) rather than an unresolved disagreement; any explicitly stated attribution (e.g. \"according to X\"); and your best-guess credibility (2-6) reflecting corroboration strength, before any caps are applied.",
+    "Return strict JSON only in this shape: {\"credibility\": 2-6, \"contradicted\": boolean, \"positivelyContradicted\": boolean, \"statedAttribution\": string|null, \"confidence\": 0-1, \"rationale\": string}.",
+  ].join("\n")
+}
+
+export function buildCredibilityPayload(input: CredibilityAssessmentInput): Record<string, unknown> {
+  return {
+    entityName: input.entityName,
+    field: input.field,
+    value: input.value,
+    citations: input.citations.map((c, index) => ({
+      index,
+      url: c.url,
+      title: c.title,
+      snippet: c.snippet,
+      publishedAt: c.publishedAt ?? null,
+    })),
+  }
+}
+

@@ -4,19 +4,22 @@ import { LAYERS_TABLE, createLayersTable, writeLayers } from "./layers.table"
 import { GEOMETRIES_TABLE, createGeometriesTable, writeGeometries } from "./geometries.table"
 import { RESEARCH_SOURCES_TABLE, createResearchSourcesTable, writeSourceCache } from "./researchSources.table"
 import {
-  PROVENANCE_SOURCES_TABLE,
   createProvenanceSourcesTable,
+  provenanceSourceColumns,
   writeProvenanceSources,
+  PROVENANCE_SOURCES_TABLE,
 } from "./provenanceSources.table"
 import {
-  PROVENANCE_CLAIMS_TABLE,
   createProvenanceClaimsTable,
+  provenanceClaimColumns,
   writeProvenanceClaims,
+  PROVENANCE_CLAIMS_TABLE,
 } from "./provenanceClaims.table"
+import { createRatingEventsTable, writeRatingEvents } from "./ratingEvents.table"
 import { clearLegacyOrganisationsTable } from "./organisations.table"
 import { createGeoPackageWithRetry } from "./browserSaveFile"
 import { ensureOptionalColumns } from "./columnDescriptor"
-import type { GpkgLayer, GpkgEntity, GpkgGeometry, GpkgSource, GpkgClaim } from "./types"
+import type { GpkgLayer, GpkgEntity, GpkgGeometry, GpkgSource, GpkgClaim, GpkgRatingEvent } from "./types"
 
 /**
  * A legacy `organisations` table (pre-E1, ADR 0004) is folded into `units` (via its
@@ -33,6 +36,8 @@ export async function saveGeoPackage(
   // store/useProjectIO (E2.4) — every existing call site keeps working unchanged.
   sources?: GpkgSource[],
   claims?: GpkgClaim[],
+  // Phase 4 (v1.5): same additive-trailing-param pattern as sources/claims above.
+  ratingEvents?: GpkgRatingEvent[],
 ): Promise<Uint8Array> {
   let geoPackage: GeoPackage | null = null
   try {
@@ -48,18 +53,19 @@ export async function saveGeoPackage(
     createResearchSourcesTable(geoPackage)
     createProvenanceSourcesTable(geoPackage)
     createProvenanceClaimsTable(geoPackage)
+    createRatingEventsTable(geoPackage)
 
-    // A reopened pre-migration `units` table (baseBuffer path) may still be missing
-    // columns added since its physical creation — add them before any INSERT runs.
+    // A reopened pre-migration `units`/provenance table (baseBuffer path) may still be
+    // missing columns added since its physical creation — add them before any INSERT runs.
     ensureOptionalColumns(geoPackage.connection, UNITS_TABLE, unitColumns)
+    ensureOptionalColumns(geoPackage.connection, PROVENANCE_SOURCES_TABLE, provenanceSourceColumns)
+    ensureOptionalColumns(geoPackage.connection, PROVENANCE_CLAIMS_TABLE, provenanceClaimColumns)
 
     // Replace persisted app data with the current in-memory project snapshot.
     geoPackage.connection.run(`DELETE FROM ${LAYERS_TABLE}`)
     geoPackage.connection.run(`DELETE FROM ${UNITS_TABLE}`)
     geoPackage.connection.run(`DELETE FROM ${GEOMETRIES_TABLE}`)
     geoPackage.connection.run(`DELETE FROM ${RESEARCH_SOURCES_TABLE}`)
-    geoPackage.connection.run(`DELETE FROM ${PROVENANCE_SOURCES_TABLE}`)
-    geoPackage.connection.run(`DELETE FROM ${PROVENANCE_CLAIMS_TABLE}`)
     clearLegacyOrganisationsTable(geoPackage)
 
     writeSourceCache(geoPackage, researchSources)
@@ -70,8 +76,14 @@ export async function saveGeoPackage(
 
     writeGeometries(geoPackage, geometries)
 
-    if (sources) writeProvenanceSources(geoPackage, sources)
-    if (claims) writeProvenanceClaims(geoPackage, claims)
+    // writeProvenanceSources/writeProvenanceClaims/writeRatingEvents each self-clear
+    // (DELETE FROM their own table) before inserting, so calling them unconditionally
+    // with `?? []` reproduces "wipe on omit" (e.g. a New Project save that passes no
+    // sources/claims/ratingEvents while reusing a baseBuffer) without a second,
+    // redundant DELETE here duplicating that behavior.
+    writeProvenanceSources(geoPackage, sources ?? [])
+    writeProvenanceClaims(geoPackage, claims ?? [])
+    writeRatingEvents(geoPackage, ratingEvents ?? [])
 
     const exported = await geoPackage.export()
     if (!(exported instanceof Uint8Array)) {

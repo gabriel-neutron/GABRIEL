@@ -5,7 +5,8 @@ import type { OrganisationType } from "@/types/organisation.types"
 import { useProjectStore } from "@/store/useProjectStore"
 import { useProvenanceStore } from "@/store/useProvenanceStore"
 import { createCitationClaim, filterCitationClaims, type Claim } from "@/core/provenance/claim"
-import type { AdmiraltyReliability } from "@/core/provenance/admiralty"
+import type { AdmiraltyCredibility, AdmiraltyReliability } from "@/core/provenance/admiralty"
+import type { CredibilityMeta, RatingMeta } from "@/core/provenance/ratingMeta"
 
 function detectEchelonFromName(name: string): SymbolEchelon | null {
   const n = name.toLowerCase()
@@ -36,6 +37,11 @@ export type EntityInspectorState = {
     sources: string[]
     /** ADMIRALTY reliability rating (STANAG 2511) per `sources[index]`, 1:1 (ADR 0006, E2.9). */
     reliabilities: (AdmiraltyReliability | null)[]
+    /** Rating provenance per `sources[index]`, 1:1 — drives the provisional-vs-human-assessed badge. */
+    reliabilityMetas: (RatingMeta | undefined)[]
+    /** ADMIRALTY credibility (STANAG 2511) per `sources[index]`, 1:1 — set by Phase 3's AI pass on the citing Claim. */
+    credibilities: (AdmiraltyCredibility | null)[]
+    credibilityMetas: (CredibilityMeta | undefined)[]
     draft: string
     setDraft: (value: string) => void
     add: () => void
@@ -130,6 +136,18 @@ export function useEntityInspector(): EntityInspectorState {
   )
   const reliabilities = useMemo(
     () => resolvedClaims.map((r) => r.source?.reliability ?? null),
+    [resolvedClaims],
+  )
+  const reliabilityMetas = useMemo(
+    () => resolvedClaims.map((r) => r.source?.reliabilityMeta),
+    [resolvedClaims],
+  )
+  const credibilities = useMemo(
+    () => resolvedClaims.map((r) => r.claim.credibility),
+    [resolvedClaims],
+  )
+  const credibilityMetas = useMemo(
+    () => resolvedClaims.map((r) => r.claim.credibilityMeta),
     [resolvedClaims],
   )
 
@@ -261,6 +279,9 @@ export function useEntityInspector(): EntityInspectorState {
     sourceEditor: {
       sources,
       reliabilities,
+      reliabilityMetas,
+      credibilities,
+      credibilityMetas,
       draft: newSource,
       setDraft: setNewSource,
       add: handleAddSource,

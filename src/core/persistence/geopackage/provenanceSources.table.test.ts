@@ -59,10 +59,76 @@ describe("provenanceSources.table", () => {
     30_000,
   )
 
+  it("round-trips interestedParty: true, and omits it when never set", async () => {
+    const geoPackage = await createTestGeoPackage()
+    try {
+      createProvenanceSourcesTable(geoPackage)
+      const flagged: Source = { id: "src-1", url: "https://tass.com/a", domainType: "official", reliability: "D", interestedParty: true }
+      const unflagged: Source = { id: "src-2", url: "https://example.org/a", domainType: "web", reliability: null }
+      writeProvenanceSources(geoPackage, [flagged, unflagged])
+      const loaded = readProvenanceSources(geoPackage)
+      expect(loaded.find((s) => s.id === "src-1")?.interestedParty).toBe(true)
+      expect(loaded.find((s) => s.id === "src-2")?.interestedParty).toBeUndefined()
+    } finally {
+      geoPackage.close()
+    }
+  })
+
+  it("does not error or duplicate rows when called twice on the same open connection", async () => {
+    const geoPackage = await createTestGeoPackage()
+    try {
+      createProvenanceSourcesTable(geoPackage)
+      const source: Source = { id: "src-1", url: "https://example.org/a", domainType: "web", reliability: null }
+      writeProvenanceSources(geoPackage, [source])
+      writeProvenanceSources(geoPackage, [source])
+      expect(readProvenanceSources(geoPackage)).toEqual([source])
+    } finally {
+      geoPackage.close()
+    }
+  })
+
   it("returns an empty array when the table does not exist (pre-E2 projects)", async () => {
     const geoPackage = await createTestGeoPackage()
     try {
       expect(readProvenanceSources(geoPackage)).toEqual([])
+    } finally {
+      geoPackage.close()
+    }
+  })
+
+  it("round-trips reliabilityMeta as JSON", async () => {
+    const geoPackage = await createTestGeoPackage()
+    try {
+      createProvenanceSourcesTable(geoPackage)
+      const source: Source = {
+        id: "src-1",
+        url: "https://example.org/a",
+        domainType: "official",
+        reliability: "C",
+        reliabilityMeta: {
+          confidence: 0.5,
+          rationale: "official domain",
+          assessor: { kind: "type-table", mappingVersion: "v1" },
+          mappingVersion: "v1",
+          updatedAt: "2026-07-14T00:00:00.000Z",
+          overridden: false,
+        },
+      }
+      writeProvenanceSources(geoPackage, [source])
+      expect(readProvenanceSources(geoPackage)).toEqual([source])
+    } finally {
+      geoPackage.close()
+    }
+  })
+
+  it("omits reliabilityMeta from a decoded source that never had it set", async () => {
+    const geoPackage = await createTestGeoPackage()
+    try {
+      createProvenanceSourcesTable(geoPackage)
+      const source: Source = { id: "src-1", url: "https://example.org/a", domainType: "web", reliability: null }
+      writeProvenanceSources(geoPackage, [source])
+      const [loaded] = readProvenanceSources(geoPackage)
+      expect(loaded.reliabilityMeta).toBeUndefined()
     } finally {
       geoPackage.close()
     }

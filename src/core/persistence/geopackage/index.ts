@@ -13,6 +13,7 @@ export type {
   GpkgGeometry,
   GpkgSource,
   GpkgClaim,
+  GpkgRatingEvent,
   GeoPackageLoadResult,
   ApplyGeoPackageResultState,
 } from "./types"

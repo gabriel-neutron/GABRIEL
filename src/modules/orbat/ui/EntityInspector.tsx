@@ -29,7 +29,8 @@ import { useEntityInspector } from "@/modules/orbat/hooks/useEntityInspector"
 import { useModuleContext } from "@/shell/moduleContext"
 import { useProjectStore } from "@/store/useProjectStore"
 import { ReadOnlyField, SourcesList, LinkedGeometriesList } from "@/components/shared/InspectorFields"
-import type { AdmiraltyReliability } from "@/core/provenance/admiralty"
+import type { AdmiraltyCredibility, AdmiraltyReliability } from "@/core/provenance/admiralty"
+import type { CredibilityMeta, RatingMeta } from "@/core/provenance/ratingMeta"
 import { matchesForEntity } from "@/core/identity/matchCandidates"
 import { DuplicateMatchesSection } from "./DuplicateMatchesSection"
 
@@ -116,6 +117,9 @@ type EntityInspectorReadOnlyViewProps = {
   linkedGeometries: DrawnGeometry[]
   sources: string[]
   reliabilities: (AdmiraltyReliability | null)[]
+  reliabilityMetas: (RatingMeta | undefined)[]
+  credibilities: (AdmiraltyCredibility | null)[]
+  credibilityMetas: (CredibilityMeta | undefined)[]
   enrichedOverlay: Record<string, unknown>
 }
 
@@ -126,6 +130,9 @@ function EntityInspectorReadOnlyView({
   linkedGeometries,
   sources,
   reliabilities,
+  reliabilityMetas,
+  credibilities,
+  credibilityMetas,
   enrichedOverlay,
 }: EntityInspectorReadOnlyViewProps) {
   const isCorporate = entity.kind === "corporate"
@@ -146,7 +153,14 @@ function EntityInspectorReadOnlyView({
       )}
       {sources.length > 0 && (
         <ReadOnlyField label="Sources">
-          <SourcesList sources={sources} readOnly reliabilities={reliabilities} />
+          <SourcesList
+            sources={sources}
+            readOnly
+            reliabilities={reliabilities}
+            reliabilityMetas={reliabilityMetas}
+            credibilities={credibilities}
+            credibilityMetas={credibilityMetas}
+          />
         </ReadOnlyField>
       )}
       <EnrichedSessionBlock overlay={enrichedOverlay} variant="readonly" />
@@ -236,6 +250,9 @@ export function EntityInspector({ readOnly: readOnlyProp, enrichedOverlay: enric
   const {
     sources,
     reliabilities,
+    reliabilityMetas,
+    credibilities,
+    credibilityMetas,
     draft: newSource,
     setDraft: setNewSource,
     add: handleAddSource,
@@ -282,6 +299,9 @@ export function EntityInspector({ readOnly: readOnlyProp, enrichedOverlay: enric
         linkedGeometries={linkedGeometries}
         sources={sources}
         reliabilities={reliabilities}
+        reliabilityMetas={reliabilityMetas}
+        credibilities={credibilities}
+        credibilityMetas={credibilityMetas}
         enrichedOverlay={enrichedOverlay}
       />
     )
@@ -336,6 +356,9 @@ export function EntityInspector({ readOnly: readOnlyProp, enrichedOverlay: enric
             readOnly={false}
             onRemove={handleRemoveSource}
             reliabilities={reliabilities}
+            reliabilityMetas={reliabilityMetas}
+            credibilities={credibilities}
+            credibilityMetas={credibilityMetas}
             onRate={handleRateSource}
           />
           <div className="flex gap-2">

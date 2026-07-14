@@ -1,6 +1,7 @@
 import type { SourceDomainType } from "@/types/enrichment.types"
 import type { AdmiraltyReliability } from "./admiralty"
 import { getDomainTypeFromUrl } from "./domainType"
+import type { RatingMeta } from "./ratingMeta"
 
 /**
  * ADR 0006: a deduplicated, identity-bearing citation. `id` is stable across saves —
@@ -12,6 +13,10 @@ export type Source = {
   url: string
   domainType: SourceDomainType | null
   reliability: AdmiraltyReliability | null
+  /** Provenance for `reliability` (assessor, confidence, mapping version). Opt-in, like `MapEntity.aliases` — absent until Phase 2's backfill or a human override sets it. */
+  reliabilityMeta?: RatingMeta
+  /** ADR 0008: a party to what it reports (state media, a belligerent MoD). Opt-in — absent means "not flagged," not "confirmed independent." */
+  interestedParty?: boolean
 }
 
 /**

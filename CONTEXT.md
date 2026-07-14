@@ -53,6 +53,24 @@ _Avoid_: bibliography, source list, references
 
 **Authority Weight**:
 A 0–1 score assigned to a Research Citation based on its domain type: official/gov (0.95) > OSINT reports (0.8) > Wikipedia (0.75) > news (0.7) > social (0.55) > forum (0.45) > general web (0.4). Used to rank citations when selecting the top-2 for the Provenance Ledger — Wikipedia and non-article aggregate URLs (feeds, author/tag/category pages) are excluded from ledger selection entirely, regardless of weight.
+_Relationship to Source Reliability_: Authority Weight is the **domain-type prior** that seeds a Source's Admiralty reliability. It is not a second, independent rating axis — reliability (A–F) is the promoted, per-source, AI-explainable form of the same "what kind of source is this" judgement.
+
+### Source rating (ADMIRALTY / NATO STANAG 2511)
+
+**Source Reliability** (`Source.reliability`, `A`–`F`):
+A per-**Source** rating of how trustworthy the source *type/provenance* is — a **prior**, not an accuracy posterior. Gabriel assigns it deterministically (zero-AI) from source character (domain type, official-ness, OSINT-org reputation), *not* from observed historical accuracy. Because `A`/`B` doctrinally assert an *observed track record* the tool does not have, **the type prior is capped at `C`** and leans on `F` ("cannot be judged" — honest abstention, *not* `E` "unreliable") for unknown/social/web sources. `A`/`B` are reachable only by a human override, or by the future actor-level posterior (v2). Shared across every entity that cites the source (a property of the source, not of any one claim). See [ADR 0008](docs/adr/0008-reliability-as-capped-type-prior.md).
+**Interested-party flag** (on a Source): marks a source that is a party to the conflict/subject it reports (state media, a belligerent MoD). It lowers the reliability prior *and* bars the source from counting as an independent corroborating origin for claims about its own conflict (see Information Credibility).
+_Design note (not STANAG)_: doctrine defines A–F on track record and would rate a fresh, untracked source `F`; Gabriel's capped type-prior is a deliberate, UI-flagged deviation ("type-based / provisional"), never presented as a doctrinal assessment.
+
+**Information Credibility** (`Claim.credibility`, `1`–`6`):
+A per-**Claim** rating of how believable the *asserted information* is, judged **independently of the source** — chiefly by corroboration, contradiction, and plausibility. Credibility `1` ("Confirmed") requires corroboration by **independent** sources; independence is measured as distinct **corroboration clusters** (near-duplicate text and interested-party sources are collapsed to one origin), **not** distinct URLs — 40 wire-syndication reposts are one cluster, not 40 confirmations. **The AI may never assign `1`** — its ceiling is `2` ("corroboration found, not verified"); promotion to `1`/"Confirmed" is a human act. `6` ("truth cannot be judged") is a first-class abstention output, never collapsed into a low number. See [ADR 0009](docs/adr/0009-machine-never-confirms.md).
+_Avoid_: conflating credibility with reliability — a completely reliable source can report a doubtful claim (`A4`), and an unreliable source can report a confirmed one (`E1`). The two axes are rated separately. (Doctrine warns of the "diagonal collapse" — Baker et al. 1968 found 87% of NATO ratings land on A1/B2/C3 because raters let reliability leak into credibility; Gabriel assesses the two axes in separate AI passes to resist this.)
+
+**Rating** (the materialized value + its metadata):
+The current reliability/credibility scalar lives **on the row** (`Source.reliability`, `Claim.credibility`) as the source of truth — not derived by replaying a log (event-sourcing was considered and rejected as gold-plating at single-user, single-file scale). Alongside each scalar sits a **rating-meta** blob (`reliability_meta` / `credibility_meta`): confidence, rationale, evidence refs, corroboration clusters, dates, and the **Rating Assessor**. Full history/audit is a v1.5 append-only `rating_events` table; the current value stays materialized regardless.
+
+**Rating Assessor**:
+Who produced the current rating — either an AI run (model id, model version, prompt version) or a named human analyst. A **human override** overwrites the scalar and sets `overridden: true` with `assessor: analyst`; it always wins over an AI value, and AI re-assessment runs **skip overridden targets** rather than clobbering them.
 
 ### Notes
 

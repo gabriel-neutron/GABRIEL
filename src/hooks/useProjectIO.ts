@@ -9,7 +9,9 @@ import {
   type GpkgGeometry,
   type GpkgSource,
   type GpkgClaim,
+  type GpkgRatingEvent,
 } from "@/core/persistence/geopackage"
+import { applyDeterministicRatingPipeline } from "@/core/provenance/ratingPipeline"
 import { INDUSTRY_LAYER_ID } from "@/types/organisation.types"
 import { loadProject, saveProject, clearProject, type LoadedProject } from "@/services/projectStorage.service"
 import { useProjectStore, selectPersistableSnapshot } from "@/store/useProjectStore"
@@ -53,6 +55,7 @@ export interface ProjectSaveInput {
   sourceCache: Map<string, string>
   sources: GpkgSource[]
   claims: GpkgClaim[]
+  ratingEvents?: GpkgRatingEvent[]
 }
 
 export interface ProjectSaveDeps {
@@ -65,6 +68,7 @@ export interface ProjectSaveDeps {
     baseBuffer: ArrayBuffer | undefined,
     sources: GpkgSource[] | undefined,
     claims: GpkgClaim[] | undefined,
+    ratingEvents?: GpkgRatingEvent[],
   ) => Promise<Uint8Array>
   writeGeoPackageToFile: (bytes: Uint8Array) => Promise<void>
   saveProject: (buffer: ArrayBuffer) => Promise<void>
@@ -85,6 +89,7 @@ export async function performProjectSave(input: ProjectSaveInput, deps: ProjectS
     existing?.buffer,
     input.sources,
     input.claims,
+    input.ratingEvents,
   )
   await deps.writeGeoPackageToFile(bytes)
   const buffer = new ArrayBuffer(bytes.length)
@@ -114,7 +119,9 @@ export function useProjectIO() {
             selectedEntityId: next.selectedEntityId,
           })
           useSourceCacheStore.getState().setSourceCache(result.sourceCache)
-          useProvenanceStore.getState().setSources(result.sources)
+          const rated = applyDeterministicRatingPipeline(result.sources, result.claims, result.ratingEvents)
+          useProvenanceStore.getState().setSources(rated.sources)
+          useProvenanceStore.getState().setRatingEvents(rated.events)
           setRestoredFromSession(true)
         })
       })
@@ -192,7 +199,9 @@ export function useProjectIO() {
         selectedEntityId: next.selectedEntityId,
       })
       useSourceCacheStore.getState().setSourceCache(result.sourceCache)
-      useProvenanceStore.getState().setSources(result.sources)
+      const rated = applyDeterministicRatingPipeline(result.sources, result.claims, result.ratingEvents)
+      useProvenanceStore.getState().setSources(rated.sources)
+      useProvenanceStore.getState().setRatingEvents(rated.events)
       useOsmViewStore.getState().resetOsmView()
       useSelectionStore.getState().setSelectedRef(null)
       useEntityVisibilityStore.getState().reset()
@@ -206,16 +215,17 @@ export function useProjectIO() {
   }, [])
 
   const handleSave = useCallback(async (): Promise<void> => {
-    const { layers, entities, geometries, sourceCache, sources, claims } = selectPersistableSnapshot(
+    const { layers, entities, geometries, sourceCache, sources, claims, ratingEvents } = selectPersistableSnapshot(
       useProjectStore.getState(),
       useSourceCacheStore.getState().sourceCache,
       useProvenanceStore.getState().sources,
+      useProvenanceStore.getState().ratingEvents,
     )
     setBusy(true)
     setError(null)
     try {
       await performProjectSave(
-        { layers, entities, geometries, sourceCache, sources, claims },
+        { layers, entities, geometries, sourceCache, sources, claims, ratingEvents },
         { loadProject, saveGeoPackage, writeGeoPackageToFile, saveProject },
       )
       window.alert("Saved successfully")
