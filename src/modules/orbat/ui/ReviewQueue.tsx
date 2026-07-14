@@ -4,6 +4,7 @@ import { useProjectStore } from "@/store/useProjectStore"
 import { useProvenanceStore } from "@/store/useProvenanceStore"
 import { needsReview } from "@/core/provenance/reviewQueue"
 import { selectEntity } from "@/core/map/selection"
+import { useModuleContext } from "@/shell/moduleContext"
 
 type Props = {
   readOnly?: boolean
@@ -15,7 +16,11 @@ type Props = {
  * credibility `1`, ADR 0009). Project-wide, not per-entity, since a flagged rating on
  * an unselected entity still needs surfacing.
  */
-export function ReviewQueue({ readOnly = false }: Props) {
+export function ReviewQueue({ readOnly: readOnlyProp }: Props = {}) {
+  // Falls back to ModuleContext (ADR 0007) when rendered through the manifest's
+  // leftPanels, which can't pass props — explicit props (e.g. Storybook) still win.
+  const moduleCtx = useModuleContext()
+  const readOnly = readOnlyProp ?? moduleCtx.readOnly
   const claims = useProjectStore((s) => s.claims)
   const entities = useProjectStore((s) => s.entities)
   const sources = useProvenanceStore((s) => s.sources)
