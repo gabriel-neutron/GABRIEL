@@ -1,4 +1,4 @@
-import { useMemo, useLayoutEffect, useState } from "react"
+import { memo, useMemo, useLayoutEffect, useState } from "react"
 import L from "leaflet"
 import { Marker, Popup } from "react-leaflet"
 import { makeOrganisationIcon } from "@/modules/orbat/services/organisation-icons"
@@ -13,7 +13,7 @@ import type { LatLng } from "@/core/coordinates"
 const BOUNDS_BUFFER = 0.5
 
 /** Self-contained map layer (ADR 0007) — reads its own selection/viewport inputs. */
-export function OrganisationsLayer(): React.ReactElement {
+export const OrganisationsLayer = memo(function OrganisationsLayer(): React.ReactElement {
   const allEntities = useProjectStore((s) => s.entities)
   const organisations = useMemo(() => allEntities.filter((e) => e.kind === "corporate"), [allEntities])
   const mapBounds = useMapViewStore((s) => s.mapBounds)
@@ -95,4 +95,4 @@ export function OrganisationsLayer(): React.ReactElement {
       })}
     </>
   )
-}
+})

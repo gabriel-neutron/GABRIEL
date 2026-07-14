@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react"
+import { memo, useCallback, useMemo, useState } from "react"
 import { Eye, EyeOff } from "lucide-react"
 import { Button } from "@/ui/button"
 import { Separator } from "@/ui/separator"
@@ -7,7 +7,6 @@ import { ORGANISATION_TYPE_LABELS } from "@/types/organisation.types"
 import { useProjectStore } from "@/store/useProjectStore"
 import { useEntityVisibilityStore } from "@/modules/orbat/store/useEntityVisibilityStore"
 import { selectEntity } from "@/core/map/selection"
-import { useShallow } from "zustand/shallow"
 import { buildOrbat, type Orbat, type OrbatNode } from "@/core/entity/hierarchy"
 
 type Props = {
@@ -21,7 +20,6 @@ type NodeProps = {
   depth: number
   orbat: Orbat<MapEntity>
   ancestorPath: ReadonlySet<string>
-  selectedEntityId: string | null
   hiddenEntityIds: Set<string>
   expandedIds: Set<string>
   onToggleEntityVisible: (entityId: string, visible: boolean) => void
@@ -81,12 +79,11 @@ function HierarchyPanelHeader({ anyVisible, onToggleAllVisibility }: HierarchyPa
  * toggle and hidden-state are suppressed for `kind === "corporate"` — same behaviour as the two
  * formerly-separate `EntityNode`/`OrgNode` components, just one component now.
  */
-function EntityNode({
+const EntityNode = memo(function EntityNode({
   entity,
   depth,
   orbat,
   ancestorPath,
-  selectedEntityId,
   hiddenEntityIds,
   expandedIds,
   onToggleEntityVisible,
@@ -104,7 +101,7 @@ function EntityNode({
   const isHidden = !isCorporate && hiddenEntityIds.has(entity.id)
   const ancestorHidden = !isCorporate && isAncestorHidden(entity, orbat, hiddenEntityIds)
   const effectivelyHidden = isHidden || ancestorHidden
-  const isSelected = selectedEntityId === entity.id
+  const isSelected = useProjectStore((s) => s.selectedEntityId === entity.id)
   const title =
     isCorporate && entity.type
       ? `${entity.name} — ${ORGANISATION_TYPE_LABELS[entity.type as keyof typeof ORGANISATION_TYPE_LABELS]}`
@@ -183,7 +180,6 @@ function EntityNode({
                 depth={depth + 1}
                 orbat={orbat}
                 ancestorPath={childPath}
-                selectedEntityId={selectedEntityId}
                 hiddenEntityIds={hiddenEntityIds}
                 expandedIds={expandedIds}
                 onToggleEntityVisible={onToggleEntityVisible}
@@ -195,20 +191,18 @@ function EntityNode({
       )}
     </div>
   )
-}
+})
 
 export function HierarchyPanel({ hiddenEntityIds: hiddenEntityIdsProp, onToggleEntityVisible: onToggleEntityVisibleProp }: Props) {
-  const { entities, selectedEntityId } = useProjectStore(
-    useShallow((s) => ({
-      entities: s.entities,
-      selectedEntityId: s.selectedEntityId,
-    }))
-  )
+  const entities = useProjectStore((s) => s.entities)
   const storeHiddenEntityIds = useEntityVisibilityStore((s) => s.hiddenEntityIds)
   const setEntityVisible = useEntityVisibilityStore((s) => s.setEntityVisible)
   const hiddenEntityIds = hiddenEntityIdsProp ?? storeHiddenEntityIds
-  const onToggleEntityVisible =
-    onToggleEntityVisibleProp ?? ((entityId: string, visible: boolean) => setEntityVisible(entityId, visible, entities))
+  const fallbackToggleEntityVisible = useCallback(
+    (entityId: string, visible: boolean) => setEntityVisible(entityId, visible, entities),
+    [setEntityVisible, entities],
+  )
+  const onToggleEntityVisible = onToggleEntityVisibleProp ?? fallbackToggleEntityVisible
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
   const units = useMemo(() => entities.filter((e) => e.kind === "unit"), [entities])
   const corporateEntities = useMemo(() => entities.filter((e) => e.kind === "corporate"), [entities])
@@ -218,13 +212,13 @@ export function HierarchyPanel({ hiddenEntityIds: hiddenEntityIdsProp, onToggleE
     (e) => !hiddenEntityIds.has(e.id) && !isAncestorHidden(e, orbat, hiddenEntityIds),
   )
 
-  function handleToggleExpanded(id: string) {
+  const handleToggleExpanded = useCallback((id: string) => {
     setExpandedIds((prev) => {
       const next = new Set(prev)
       if (next.has(id)) { next.delete(id) } else { next.add(id) }
       return next
     })
-  }
+  }, [])
 
   function handleToggleAllVisibility() {
     const visible = !anyVisible
@@ -250,7 +244,6 @@ export function HierarchyPanel({ hiddenEntityIds: hiddenEntityIdsProp, onToggleE
               depth={0}
               orbat={orbat}
               ancestorPath={EMPTY_PATH}
-              selectedEntityId={selectedEntityId}
               hiddenEntityIds={hiddenEntityIds}
               expandedIds={expandedIds}
               onToggleEntityVisible={onToggleEntityVisible}
@@ -272,7 +265,6 @@ export function HierarchyPanel({ hiddenEntityIds: hiddenEntityIdsProp, onToggleE
                 depth={0}
                 orbat={orgOrbat}
                 ancestorPath={EMPTY_PATH}
-                selectedEntityId={selectedEntityId}
                 hiddenEntityIds={hiddenEntityIds}
                 expandedIds={expandedIds}
                 onToggleEntityVisible={onToggleEntityVisible}

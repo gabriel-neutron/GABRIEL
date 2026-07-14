@@ -1,15 +1,16 @@
 import { useEffect, useRef } from "react"
 import { useMap } from "react-leaflet"
 import type { MapEntity } from "@/types/domain.types"
+import { useProjectStore } from "@/store/useProjectStore"
 
 type Props = {
-  selectedEntityId: string | null
   entities: MapEntity[]
   getEntityPosition: (entity: MapEntity) => [number, number] | null
 }
 
-export function CenterOnSelection({ selectedEntityId, entities, getEntityPosition }: Props) {
+export function CenterOnSelection({ entities, getEntityPosition }: Props) {
   const map = useMap()
+  const selectedEntityId = useProjectStore((s) => s.selectedEntityId)
   const lastSelectedIdRef = useRef<string | null>(null)
   const centerTargetRef = useRef<[number, number] | null>(null)
   const selectionTimeRef = useRef<number>(0)

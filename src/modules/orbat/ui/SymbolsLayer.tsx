@@ -1,4 +1,4 @@
-import { useMemo, useLayoutEffect, useState } from "react"
+import { memo, useMemo, useLayoutEffect, useState } from "react"
 import L from "leaflet"
 import { Marker, Popup } from "react-leaflet"
 import { getRenderedSymbolForEntity } from "@/modules/orbat/services/symbol.service"
@@ -26,7 +26,7 @@ function makeSymbolIcon(
 }
 
 /** Self-contained map layer (ADR 0007) — reads its own selection/visibility/viewport inputs. */
-export function SymbolsLayer(): React.ReactElement {
+export const SymbolsLayer = memo(function SymbolsLayer(): React.ReactElement {
   const allEntities = useProjectStore((s) => s.entities)
   const hiddenEntityIds = useEntityVisibilityStore((s) => s.hiddenEntityIds)
   const mapBounds = useMapViewStore((s) => s.mapBounds)
@@ -114,4 +114,4 @@ export function SymbolsLayer(): React.ReactElement {
       })}
     </>
   )
-}
+})

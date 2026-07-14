@@ -72,6 +72,15 @@ function BottomLeftZoomControl() {
   return null
 }
 
+/** Deselects the current entity when entering a draw tool. Subscribes to selection locally so MapView itself doesn't re-render on selection changes. */
+function DeselectOnDrawMode({ mapTool }: { mapTool: string }) {
+  const selectedEntityId = useProjectStore((s) => s.selectedEntityId)
+  useEffect(() => {
+    if (mapTool !== "pan" && selectedEntityId !== null) selectEntity(null)
+  }, [mapTool, selectedEntityId])
+  return null
+}
+
 const markerIcon = L.divIcon({
   className: "map-entity-marker",
   html: "<span></span>",
@@ -146,7 +155,6 @@ export function MapView({
   const organisations = useMemo(() => entities.filter((e) => e.kind === "corporate"), [entities])
   const drawnGeometries = useProjectStore((s) => s.drawnGeometries)
   const entityOsmGeometries = useOsmViewStore((s) => s.entityOsmGeometries)
-  const selectedEntityId = useProjectStore((s) => s.selectedEntityId)
   const baseMap = useMapPrefsStore((s) => s.baseMap)
 
   useOsmRelationGeometries({ onOverpassUnavailable })
@@ -166,15 +174,6 @@ export function MapView({
   } = useMapDrawing({ onCreateNewEntity, onCreateNewOrganisation, onLinkGeometryToEntity })
 
   const setMapBounds = useMapViewStore((s) => s.setMapBounds)
-
-  const handleSelectEntity = useCallback((id: string | null) => {
-    selectEntity(id)
-  }, [])
-
-  // Deselect entity when entering draw mode
-  useEffect(() => {
-    if (mapTool !== "pan" && selectedEntityId !== null) handleSelectEntity(null)
-  }, [mapTool, selectedEntityId, handleSelectEntity])
 
   const visibleLayersInOrder = useMemo(() => layers.filter((l) => l.visible), [layers])
 
@@ -253,11 +252,8 @@ export function MapView({
         <BottomLeftZoomControl />
         <MapSizeSync />
         <MapBoundsReporter onBoundsChange={setMapBounds} />
-        <CenterOnSelection
-          selectedEntityId={selectedEntityId}
-          entities={entities}
-          getEntityPosition={getEntityPosition}
-        />
+        <CenterOnSelection entities={entities} getEntityPosition={getEntityPosition} />
+        <DeselectOnDrawMode mapTool={mapTool} />
         {flyToRef && <MapInstanceBridge flyToRef={flyToRef} />}
         {!readOnly && <MapToolSelector mapTool={mapTool} onMapToolChange={setMapTool} />}
 

@@ -1,4 +1,4 @@
-import { useMemo } from "react"
+import { memo, useMemo } from "react"
 import { Polyline } from "react-leaflet"
 import { useProjectStore } from "@/store/useProjectStore"
 import { useMapPrefsStore } from "@/store/useMapPrefsStore"
@@ -29,7 +29,7 @@ function visibleNetworkIds(
 }
 
 /** Self-contained map layer (ADR 0007) — reads its own position/viewport inputs. */
-export function NetworkLinksLayer(): React.ReactElement | null {
+export const NetworkLinksLayer = memo(function NetworkLinksLayer(): React.ReactElement | null {
   const entities = useProjectStore((s) => s.entities)
   const selectedEntityId = useProjectStore((s) => s.selectedEntityId)
   const showNetworks = useMapPrefsStore((s) => s.showNetworks)
@@ -72,4 +72,4 @@ export function NetworkLinksLayer(): React.ReactElement | null {
       ))}
     </>
   )
-}
+})
