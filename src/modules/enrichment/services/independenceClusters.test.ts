@@ -42,6 +42,25 @@ describe("clusterCitations", () => {
   it("returns no clusters for an empty citation list", () => {
     expect(clusterCitations([])).toEqual([])
   })
+
+  it("keeps snippet-less citations as distinct clusters instead of collapsing them into one", () => {
+    // No snippet text = no evidence of shared origin; each must count as its own cluster,
+    // else 3 independent sources lacking snippets are under-credited as a single cluster.
+    const citations: ClusterableCitation[] = [
+      { url: "https://a.example", snippet: "" },
+      { url: "https://b.example", snippet: "   " },
+      { url: "https://c.example", snippet: "" },
+    ]
+    expect(clusterCitations(citations)).toHaveLength(3)
+  })
+
+  it("does not match a snippet-less citation against one with real text", () => {
+    const citations: ClusterableCitation[] = [
+      { url: "https://a.example", snippet: "The brigade redeployed to the border region overnight." },
+      { url: "https://b.example", snippet: "" },
+    ]
+    expect(clusterCitations(citations)).toHaveLength(2)
+  })
 })
 
 describe("countCorroborationClusters", () => {

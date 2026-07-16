@@ -60,6 +60,12 @@ function hash32(str: string, seed: number): number {
 
 /** The MinHash signature: for each seeded hash function, the minimum hash over every shingle. Two texts sharing more shingles agree on more signature slots. */
 function minhashSignature(shingleList: string[]): number[] {
+  // No shingles (empty/blank snippet) carries no similarity signal — return an empty
+  // signature so `signatureSimilarity`'s length guard scores it 0 against everything.
+  // Otherwise all snippet-less citations produce identical all-Infinity signatures,
+  // match each other at similarity 1.0, and collapse into one corroboration cluster —
+  // under-crediting genuinely independent sources that merely lack retrieval snippets.
+  if (shingleList.length === 0) return []
   const signature = new Array<number>(HASH_COUNT).fill(Number.POSITIVE_INFINITY)
   for (const shingle of shingleList) {
     for (let i = 0; i < HASH_COUNT; i += 1) {
