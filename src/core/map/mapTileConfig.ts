@@ -14,17 +14,16 @@ export type TileLayerConfig = {
 
 /**
  * Shared tile-loading options spread onto every base/overlay layer.
- * - `crossOrigin: "anonymous"` — required so the persistent tile cache can read
- *   fetched tiles into a Blob (CORS verified on all providers).
  * - `maxZoom: 19` — allow zooming past a provider's `maxNativeZoom` (Leaflet upscales).
- * The movement options (`keepBuffer`/`updateWhenZooming`/`updateWhenIdle`) are left at
- * Leaflet's defaults on purpose: raising keepBuffer and deferring to idle batched a whole
- * viewport into one simultaneous burst, which the throttled tile server answered ~5x
- * slower than progressive default loading (measured). Deliberately NOT `detectRetina` —
- * it quadruples requests against the throttled server.
+ * Movement options (`keepBuffer`/`updateWhenZooming`/`updateWhenIdle`) are left at Leaflet's
+ * defaults on purpose: raising keepBuffer and deferring to idle batched a whole viewport into
+ * one simultaneous burst, which the throttled tile server answered ~5x slower than
+ * progressive default loading (measured). Tiles load natively (a plain react-leaflet
+ * TileLayer) and rely on the browser's HTTP cache, which OSM serves with a multi-hour
+ * max-age + 7-day stale-while-revalidate — robust, and no custom fetch/IndexedDB path to
+ * strand a tile if a read hangs.
  */
 export const BASE_TILE_OPTIONS = {
-  crossOrigin: "anonymous",
   maxZoom: 19,
 } as const
 

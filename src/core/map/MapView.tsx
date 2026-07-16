@@ -1,7 +1,6 @@
 import { useMemo, useEffect, useRef, useCallback, type ReactNode } from "react"
 import L from "leaflet"
-import { MapContainer, Marker, Popup, Polyline, Polygon, GeoJSON, useMap } from "react-leaflet"
-import { CachedTileLayer } from "./CachedTileLayer"
+import { MapContainer, TileLayer, Marker, Popup, Polyline, Polygon, GeoJSON, useMap } from "react-leaflet"
 import { MapToolSelector } from "./MapToolSelector"
 import { DrawControls } from "./DrawControls"
 import { GeometryActionMenu } from "./GeometryActionMenu"
@@ -260,7 +259,7 @@ export function MapView({
 
         {/* key by url: remount on base-map switch so maxNativeZoom/subdomains re-apply
             (updateGridLayer only re-applies opacity/zIndex, not grid options). */}
-        <CachedTileLayer
+        <TileLayer
           key={tileConfig.url}
           {...BASE_TILE_OPTIONS}
           url={tileConfig.url}
@@ -268,7 +267,7 @@ export function MapView({
           maxNativeZoom={tileConfig.maxNativeZoom}
         />
         {tileConfig.overlay && (
-          <CachedTileLayer
+          <TileLayer
             key={tileConfig.overlay.url}
             {...BASE_TILE_OPTIONS}
             url={tileConfig.overlay.url}
