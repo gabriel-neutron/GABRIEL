@@ -1,12 +1,13 @@
 import { useMemo, useEffect, useRef, useCallback, type ReactNode } from "react"
 import L from "leaflet"
-import { MapContainer, TileLayer, Marker, Popup, Polyline, Polygon, GeoJSON, useMap } from "react-leaflet"
+import { MapContainer, Marker, Popup, Polyline, Polygon, GeoJSON, useMap } from "react-leaflet"
+import { CachedTileLayer } from "./CachedTileLayer"
 import { MapToolSelector } from "./MapToolSelector"
 import { DrawControls } from "./DrawControls"
 import { GeometryActionMenu } from "./GeometryActionMenu"
 import { CenterOnSelection } from "./CenterOnSelection"
 import { useMapDrawing } from "./useMapDrawing"
-import { BASE_MAP_TILE_CONFIG } from "./mapTileConfig"
+import { BASE_MAP_TILE_CONFIG, BASE_TILE_OPTIONS } from "./mapTileConfig"
 import type { DrawnGeometry } from "@/types/domain.types"
 import { MapBoundsReporter } from "./MapBoundsReporter"
 import { useMapViewStore } from "./useMapViewStore"
@@ -257,12 +258,23 @@ export function MapView({
         {flyToRef && <MapInstanceBridge flyToRef={flyToRef} />}
         {!readOnly && <MapToolSelector mapTool={mapTool} onMapToolChange={setMapTool} />}
 
-        <TileLayer url={tileConfig.url} attribution={tileConfig.attribution} />
+        {/* key by url: remount on base-map switch so maxNativeZoom/subdomains re-apply
+            (updateGridLayer only re-applies opacity/zIndex, not grid options). */}
+        <CachedTileLayer
+          key={tileConfig.url}
+          {...BASE_TILE_OPTIONS}
+          url={tileConfig.url}
+          attribution={tileConfig.attribution}
+          maxNativeZoom={tileConfig.maxNativeZoom}
+        />
         {tileConfig.overlay && (
-          <TileLayer
+          <CachedTileLayer
+            key={tileConfig.overlay.url}
+            {...BASE_TILE_OPTIONS}
             url={tileConfig.overlay.url}
             attribution={tileConfig.overlay.attribution}
             subdomains={tileConfig.overlay.subdomains}
+            maxNativeZoom={tileConfig.overlay.maxNativeZoom}
           />
         )}
 

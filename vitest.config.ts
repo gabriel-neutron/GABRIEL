@@ -17,6 +17,9 @@ export default mergeConfig(
           "**/*.d.ts",
           "**/*.stories.tsx",
           "src/main.tsx",
+          // DOM/Leaflet glue with no honest node/jsdom seam; its logic is unit-tested
+          // via tileCache.logic + tileCache.service, its behavior via the Playwright harness.
+          "src/core/map/CachedTileLayer.tsx",
           "src/**/*.test.ts",
           "src/**/*.test.tsx",
         ],
