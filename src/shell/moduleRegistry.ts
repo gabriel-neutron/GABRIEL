@@ -1,6 +1,7 @@
 import type { ReactNode } from "react"
 import { orbatModule } from "@/modules/orbat/module"
 import { osmModule } from "@/modules/osm/module"
+import { telegramModule } from "@/modules/telegram/module"
 import type { ModuleManifest } from "@/types/module.types"
 
 /**
@@ -8,7 +9,7 @@ import type { ModuleManifest } from "@/types/module.types"
  * single-bundle, local-first app; nothing loads modules independently or out of
  * order.
  */
-export const modules: ModuleManifest[] = [orbatModule, osmModule]
+export const modules: ModuleManifest[] = [orbatModule, osmModule, telegramModule]
 
 export function detailRenderers(): Partial<Record<string, (id: string) => ReactNode>> {
   return Object.assign({}, ...modules.map((m) => m.detailRenderer ?? {}))

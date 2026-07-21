@@ -1,4 +1,4 @@
-# PRD — Telegram OSINT Graph Module
+contin# PRD — Telegram OSINT Graph Module
 
 **Type:** Feature module  
 **Target app:** Existing React web application (ORBAT mapping tool)  
@@ -226,11 +226,69 @@ GET  /export/neo4j         → Cypher statements download
 | Risk | Mitigation |
 |---|---|
 | Telethon rate limits / flood bans | Validate limits empirically before building crawler; implement FloodWaitError backoff |
+| **Collection account permanently banned** | See [Account Safety](#account-safety) — this is the highest-likelihood operational risk, not a tuning concern |
 | tgspyder private channel capabilities unverified | Run isolated test against a known private channel before integrating |
 | OpenAI cost at scale | Cache all extractions in SQLite; validate cost per 1K messages before enabling at scale |
 | Sigma.js performance at 5K+ nodes | Test with mock data before building crawl pipeline |
 | Telegram invite-link join may be patched | Validate tgspyder path; document manual-join fallback |
 | `.session` file contains credentials | Never commit; add to `.gitignore`; document in setup guide |
+
+---
+
+## Account Safety
+
+The sidecar authenticates **as a real Telegram user account** (MTProto via Telethon), not a bot. That account can be
+**permanently banned** by Telegram's anti-spam system, which is a distinct and more severe outcome than a `FloodWaitError`.
+Treat account survival as a first-class design constraint, not a rate-limit detail. All guidance below is grounded in the
+sources listed at the end of this section.
+
+### FloodWait is not a ban
+
+- **`FloodWaitError`** — a *temporary* throttle. Telegram tells you how many seconds to wait (seconds to ~24h); it lifts on
+  its own. The crawler must catch it, wait the stated time, and resume. This is expected and survivable.
+- **`PeerFloodError`** — a *persistent* account restriction (cannot message non-contacts, etc.). This is a warning shot, not
+  a timeout. On `PeerFloodError` the sidecar must **hard-stop the account, not retry**.
+- **Full ban / deletion** — permanent. Recovery is unreliable. This is the outcome the rules below exist to prevent.
+- Detect account health by messaging **[@SpamBot](https://t.me/SpamBot)**; a limited account also surfaces
+  `PeerFloodError` on some peers but not others.
+
+### Hard rules (design-level, non-negotiable)
+
+1. **Dedicated collection account only — never a personal account.** Assume this account *will* eventually be banned and
+   design so that is survivable (archive data per-investigation; no dependence on account longevity). Never authenticate
+   with a number or identity you care about.
+2. **Physical SIM over VoIP/virtual numbers.** VoIP-registered accounts are flagged and banned faster. If a virtual number
+   is unavoidable, use a reputable high-verification provider, never a cheap disposable one.
+3. **Never combine member enumeration with adds/invites.** Calling `GetParticipants` alongside `AddChatUser` or channel
+   invitations is an *immediate* spam signal. Gabriel is read-only collection and must **never add, invite, or message**
+   users under any code path — encode this as a hard boundary in `telegram_client.py`, not just a convention.
+4. **Age and warm up the account before any bulk collection.** Fresh accounts hit restrictions within days; accounts ~6+
+   months old with genuine activity are far more resilient. Before crawling, warm up over weeks with human-like behavior
+   (join a few channels, read, gradual scaling) — do not point a day-old account at a 200-channel BFS.
+5. **Member-list extraction (`GetParticipants`) is the top ban vector — budget it tightly.** Message/history scraping is
+   low-risk and stable; member enumeration is Telegram's #1 spam signal. Keep member calls well under **~20–30
+   `GetParticipants` calls/hour** on large groups. Prefer message-history collection wherever the intelligence goal allows.
+6. **Jittered, human-scale delays.** Use a randomized base delay (≈1–2s + jitter) between requests; never a tight fixed
+   loop. Gradual scaling beats sudden spikes.
+7. **One session per account; isolate IPs.** Never share `.session` strings across devices. Use a stable (ideally
+   residential) proxy per account; run no more than 2–3 accounts per IP; stagger start times.
+8. **Stay current.** Use the latest Telethon and keep the account's linked Telegram Desktop/app updated.
+
+### Ban-avoidance is a Phase 1 exit gate
+
+There is no throwaway account available to empirically probe the account restriction threshold, and the real collection
+account must never be risked to find it. The Phase 5 BFS delay budget is instead derived directly from the documented
+community guidance in the Hard rules above (member calls well under ~20–30/hour, jittered 1–2s+ base delay). The crawler
+must implement automatic `FloodWaitError` backoff plus a `PeerFloodError` hard-stop before any large crawl runs, and treat
+the real collection account's first `FloodWaitError`/`PeerFloodError` in production as live signal to tighten the budget
+further, not as an isolated validation experiment.
+
+### Sources
+
+- [Telethon FAQ — bans and limitations](https://docs.telethon.dev/en/stable/quick-references/faq.html)
+- [Telegram Scraper: What Works and What Gets You Banned (Clura)](https://clura.ai/blog/telegram-scraper)
+- [How to Avoid Getting Banned on Telegram (2026 Guide)](https://telegramscraper.shop/blog/how-to-avoid-telegram-ban)
+- [Fix Telegram FloodWait Error Fast (Membertel)](https://membertel.com/blog/how-to-fix-telegram-floodwait-error-fast/)
 
 ---
 
@@ -240,3 +298,32 @@ GET  /export/neo4j         → Cypher statements download
 2. Russian military keyword dictionary: needed for rule-based relevance scoring. Build from scratch or import from existing OSINT resource?
 3. Which `.gpkg` file does the sidecar load for OOB matching? Needs a configurable path or file-picker integration.
 4. Forward chains (not selected for v1): revisit for v2 — they are the strongest signal for Russian military Telegram intelligence.
+
+
+---
+
+## Credentials
+
+#telegram
+app_id=38723789
+apps_api_hash=f24b56beee4756ff947f24954710089d
+app_name=myapp
+test_ip=149.154.167.40:443
+
+-----BEGIN RSA PUBLIC KEY-----
+MIIBCgKCAQEAyMEdY1aR+sCR3ZSJrtztKTKqigvO/vBfqACJLZtS7QMgCGXJ6XIR
+yy7mx66W0/sOFa7/1mAZtEoIokDP3ShoqF4fVNb6XeqgQfaUHd8wJpDWHcR2OFwv
+plUUI1PLTktZ9uW2WE23b+ixNwJjJGwBDJPQEQFBE+vfmH0JP503wr5INS1poWg/
+j25sIWeYPHYeOrFp/eXaqhISP6G+q2IeTaWTXpwZj4LzXq5YOpk4bYEQ6mvRq7D1
+aHWfYmlEGepfaYR8Q0YqvvhYtMte3ITnuSJs171+GDqpdKcSwHnd6FudwGO4pcCO
+j4WcDuXc2CTHgH8gFTNhp/Y8/SpDOhvn9QIDAQAB
+-----END RSA PUBLIC KEY-----
+149.154.167.50:443
+-----BEGIN RSA PUBLIC KEY-----
+MIIBCgKCAQEA6LszBcC1LGzyr992NzE0ieY+BSaOW622Aa9Bd4ZHLl+TuFQ4lo4g
+5nKaMBwK/BIb9xUfg0Q29/2mgIR6Zr9krM7HjuIcCzFvDtr+L0GQjae9H0pRB2OO
+62cECs5HKhT5DZ98K33vmWiLowc621dQuwKWSQKjWf50XYFw42h21P2KXUGyp2y/
++aEyZ+uVgLLQbRA1dEjSDZ2iGRy12Mk5gpYc397aYp438fsJoHIgJ2lgMv5h7WY9
+t6N/byY9Nw9p21Og3AoXSL2q/2IJ1WRUhebgAdGVMlV1fkuOQoEzR7EdpqtQD9Cs
+5+bfo3Nhmcyvk5ftB0WkJ9z6bNZ7yxrP8wIDAQAB
+-----END RSA PUBLIC KEY-----

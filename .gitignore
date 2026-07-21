@@ -23,7 +23,7 @@ coverage
 *.njsproj
 *.sln
 *.sw?
-
+.playwright-mcp
 *storybook.log
 storybook-static
 
@@ -32,10 +32,20 @@ storybook-static
 .env.local
 .env.production
 
+# sidecar (Python/FastAPI) — never commit credentials or the local Telegram graph db
+sidecar/.venv/
+sidecar/__pycache__/
+sidecar/**/__pycache__/
+sidecar/*.session
+sidecar/*.session-journal
+sidecar/*.tgdb
+sidecar/validation/volume_test.tgdb
+sidecar/sidecar.log
+
 # AI agent local/project guidance (keep CLAUDE.md only)
 .claude/
 .agents/
 AGENTS.md
 
-# Local working documents (not part of the release)
-FNF OSINT Proposal.pdf
+# Local working documents
+*.pdf
