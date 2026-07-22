@@ -87,6 +87,29 @@ CREATE TABLE IF NOT EXISTS oob_proposals (
     decided_at TEXT
 );
 
+-- Slice 3's persistent budget ledger (docs/issues/TELEGRAM_PHASE3_ISSUES.md,
+-- sidecar/governor.py) — a single row (id=1, enforced by the CHECK) so the governor can
+-- reload it on every governed call instead of trusting any in-memory-only counter (the
+-- anti-pattern `sidecar/choke.py`'s `_cold_start_call_count` module global is; a
+-- restart/`uvicorn --reload` must not reset the hourly/daily counts, the warm-up clock,
+-- the cooldown state, or the kill-switch latch).
+CREATE TABLE IF NOT EXISTS governor_ledger (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    first_call_at TEXT,
+    hour_window_start TEXT,
+    day_window_start TEXT,
+    metadata_count INTEGER NOT NULL DEFAULT 0,
+    history_count INTEGER NOT NULL DEFAULT 0,
+    resolve_count INTEGER NOT NULL DEFAULT 0,
+    daily_count INTEGER NOT NULL DEFAULT 0,
+    cooldown_until TEXT,
+    cooldown_multiplier REAL NOT NULL DEFAULT 1.0,
+    cooldown_tighten_level INTEGER NOT NULL DEFAULT 0,
+    flood_wait_events_json TEXT NOT NULL DEFAULT '[]',
+    kill_switch_tripped INTEGER NOT NULL DEFAULT 0,
+    kill_switch_reason TEXT
+);
+
 CREATE INDEX IF NOT EXISTS idx_messages_channel_id ON messages(channel_id);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_messages_channel_message_unique ON messages(channel_id, message_id);
 CREATE INDEX IF NOT EXISTS idx_edges_from_id ON edges(from_id);

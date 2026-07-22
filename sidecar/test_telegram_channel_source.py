@@ -7,24 +7,40 @@ Telethon shapes."
 """
 
 from datetime import datetime, timezone
+from pathlib import Path
 
+import aiosqlite
 import pytest
+import pytest_asyncio
 from telethon.errors import ChatAdminRequiredError, UsernameInvalidError, UsernameNotOccupiedError
 
-from sidecar import choke
+from sidecar import db, governor
 from sidecar.telegram_channel_source import TelethonChannelSource, TelethonUsernameResolver
 
 
-@pytest.fixture(autouse=True)
-def _no_real_delay(monkeypatch):
-    choke.reset_cold_start_counter_for_tests()
-    monkeypatch.setattr(choke.asyncio, "sleep", _no_sleep)
+@pytest_asyncio.fixture(autouse=True)
+async def _no_real_delay(monkeypatch, tmp_path: Path):
+    # `_rpc_get_entity`/`_rpc_get_full_channel`/`_rpc_get_messages` are governed (Slice
+    # 3) — point the governor's ledger at a throwaway temp file so these tests never
+    # touch (or need) `sidecar/project.tgdb`, and never sleep for real.
+    tgdb_path = tmp_path / "test.tgdb"
+    await db.init_db(tgdb_path)
+    governor.set_ledger_path_for_tests(tgdb_path)
+    monkeypatch.setattr(governor.asyncio, "sleep", _no_sleep)
     yield
-    choke.reset_cold_start_counter_for_tests()
+    governor.reset_ledger_path_for_tests()
 
 
 async def _no_sleep(_seconds: float) -> None:
     return None
+
+
+async def _metadata_call_count() -> int:
+    async with aiosqlite.connect(governor._ledger_path) as conn:
+        conn.row_factory = aiosqlite.Row
+        cursor = await conn.execute("SELECT metadata_count FROM governor_ledger WHERE id = 1")
+        row = await cursor.fetchone()
+        return row["metadata_count"] if row else 0
 
 
 class _FakeEntity:
@@ -213,17 +229,17 @@ async def test_resolve_username_raises_if_client_not_connected():
 
 
 @pytest.mark.asyncio
-async def test_resolve_username_goes_through_the_same_choke_as_channel_source():
-    """Reuses `_rpc_get_entity` — the identical `choked_rpc`-wrapped call
-    `fetch_channel_metadata` uses — so it spends from the same cold-start budget rather
-    than a separate/parallel rate-limit path."""
+async def test_resolve_username_goes_through_the_same_governor_as_channel_source():
+    """Reuses `_rpc_get_entity` — the identical `governed_rpc("metadata")`-wrapped call
+    `fetch_channel_metadata` uses — so it spends from the same governor budget ledger
+    rather than a separate/parallel rate-limit path."""
     entity = _FakeEntity(id=1, username="x", title="X")
     client = _FakeClient(entity=entity)
 
-    start = choke._cold_start_call_count
+    start = await _metadata_call_count()
     await _resolver_for(client).resolve_username("x")
 
-    assert choke._cold_start_call_count == start + 1
+    assert await _metadata_call_count() == start + 1
 
 
 class _FakeRequest:

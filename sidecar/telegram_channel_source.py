@@ -1,12 +1,24 @@
 """
 `TelethonChannelSource` — the ONLY module that imports Telethon RPCs (Slice 1,
-docs/issues/TELEGRAM_PHASE3_ISSUES.md). Every call goes through `sidecar/choke.py`'s
-`choked_rpc` (fixed jittered delay + cold-start cap, innermost; FloodWait/PeerFloodError
-hard-stop outermost) — there is no path from here to Telegram that skips it.
+docs/issues/TELEGRAM_PHASE3_ISSUES.md). Every call goes through `sidecar/governor.py`'s
+`governed_rpc` (Slice 3's hardened governor — persistent budget ledger, warm-up ramp,
+FloodWait cooldown, kill-switch latch; promoted from Slice 1's minimal
+`sidecar/choke.py`, which remains in place but is no longer the production choke-point
+for these three calls) — there is no path from here to Telegram that skips it.
+
+`_rpc_get_entity` is reused by both `fetch_channel_metadata` (channel lookup) and
+`TelethonUsernameResolver.resolve_username` (Slice 2) — both are `call_type="metadata"`
+governed calls, so username resolution keeps sharing the exact same budget as channel
+metadata lookups rather than a separate/parallel path, per Slice 2's guarantee.
+`_rpc_get_full_channel` is also `call_type="metadata"` (it's the second RPC
+`fetch_channel_metadata` issues to fill in the member count). `_rpc_get_messages` is
+`call_type="history"`.
 
 Hard boundary (see docs/TELEGRAM_OSINT_PRD.md#account-safety, rule 3): read-only
 collection only. Do not add SendMessageRequest, AddChatUserRequest, or any
-invite/join-on-behalf-of-user call here or anywhere else in the sidecar.
+invite/join-on-behalf-of-user call here or anywhere else in the sidecar (the sidecar's
+one deliberate exception, the @SpamBot preflight probe, lives in isolation in
+`sidecar/spambot_check.py` and must never be imported here).
 """
 
 import json
@@ -17,7 +29,7 @@ from telethon.tl.functions.channels import GetFullChannelRequest
 
 from sidecar import telegram_client
 from sidecar.channel_source import ChannelMeta, MessageRecord
-from sidecar.choke import choked_rpc
+from sidecar.governor import governed_rpc
 from sidecar.logging_config import logger
 
 
@@ -28,17 +40,17 @@ def _require_client(client_provider) -> TelegramClient:
     return client
 
 
-@choked_rpc
+@governed_rpc("metadata")
 async def _rpc_get_entity(client: TelegramClient, ref: str):
     return await client.get_entity(ref)
 
 
-@choked_rpc
+@governed_rpc("metadata")
 async def _rpc_get_full_channel(client: TelegramClient, entity):
     return await client(GetFullChannelRequest(entity))
 
 
-@choked_rpc
+@governed_rpc("history")
 async def _rpc_get_messages(client: TelegramClient, entity, limit: int):
     return await client.get_messages(entity, limit=limit)
 
@@ -118,9 +130,9 @@ class TelethonChannelSource:
 class TelethonUsernameResolver:
     """`UsernameResolver` seam's real adapter (Slice 2,
     docs/issues/TELEGRAM_PHASE3_ISSUES.md). Reuses `_rpc_get_entity` — the identical
-    `choked_rpc`-wrapped call `fetch_channel_metadata` uses — so username resolution
-    shares the exact same choke-point and cold-start budget, not a separate/parallel
-    rate-limit path."""
+    `governed_rpc("metadata")`-wrapped call `fetch_channel_metadata` uses — so username
+    resolution shares the exact same governor choke-point and budget ledger, not a
+    separate/parallel rate-limit path."""
 
     def __init__(self, client_provider=telegram_client._get_client) -> None:
         self._client_provider = client_provider
