@@ -25,6 +25,9 @@ export type ModuleView = {
   id: string
   label: string
   content: ReactNode
+  /** Hides the left sidebar (and its toggle) while this view is active — for views
+   * that render their own full-bleed content, like a graph canvas. */
+  hideSidebar?: boolean
 }
 
 export type ModuleLeftPanel = {

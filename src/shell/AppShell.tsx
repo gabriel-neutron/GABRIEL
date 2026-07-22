@@ -340,18 +340,20 @@ export function AppShell({
       </header>
 
       <div className="flex min-h-0 min-w-0 flex-1">
-        <Sidebar
-          collapsible="offcanvas"
-          variant="sidebar"
-          className="z-[90] top-[var(--app-header-height)] h-[calc(100dvh-var(--app-header-height))]"
-        >
-          <SidebarContent className="min-h-0 w-full flex-1 overflow-y-auto overflow-x-hidden px-2 pb-2">
-            {leftSlot}
-          </SidebarContent>
-        </Sidebar>
+        {!activeView.hideSidebar && (
+          <Sidebar
+            collapsible="offcanvas"
+            variant="sidebar"
+            className="z-[90] top-[var(--app-header-height)] h-[calc(100dvh-var(--app-header-height))]"
+          >
+            <SidebarContent className="min-h-0 w-full flex-1 overflow-y-auto overflow-x-hidden px-2 pb-2">
+              {leftSlot}
+            </SidebarContent>
+          </Sidebar>
+        )}
 
         <main className="relative min-h-0 min-w-0 flex-1">
-          <StandaloneSidebarToggle />
+          {!activeView.hideSidebar && <StandaloneSidebarToggle />}
           <div className="h-full min-w-0">{activeView.content}</div>
         </main>
 
