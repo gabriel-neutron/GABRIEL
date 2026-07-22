@@ -1,15 +1,13 @@
 """
 BFS discovery crawler — session state, frontier persistence, pause/resume (Phase 5).
 
-Deliberately NOT wired to any FastAPI endpoint. The traversal algorithm itself (frontier
-management, depth limiting, visited-set loop prevention, pause/resume) is generic graph
-BFS with no Telegram dependency — parameterized by an injected `expand_channel`
-callback, so it's fully testable with a fake graph, no live connection needed. But
-`expand_channel`'s real implementation (follow t.me/ links, shared admins, keyword
-mentions — FR-2) needs Phase 3's collector.py, itself gated on Phase 1. Exposing a
-`POST /crawl/start` that runs this against a fake or missing expander would misrepresent
-the feature as working when it can't actually reach Telegram — wire the real endpoints
-only once a real `expand_channel` exists.
+The traversal algorithm itself (frontier management, depth limiting, visited-set loop
+prevention, pause/resume) is generic graph BFS with no Telegram dependency —
+parameterized by an injected `expand_channel` callback, so it's fully testable with a
+fake graph, no live connection needed. Slice 5 (docs/issues/TELEGRAM_PHASE3_ISSUES.md)
+wires the real `expander.expand_channel` composition (via `sidecar/crawl_service.py`)
+into `/crawl/*` endpoints — actually *unleashing* a real crawl remains additionally
+gated on the hardened governor (Slice 3) and the canary (Slice 6).
 """
 
 import json
@@ -18,10 +16,24 @@ from datetime import datetime, timezone
 from typing import Awaitable, Callable
 
 import aiosqlite
+from telethon.errors import FloodWaitError
 
 from sidecar.db import DEFAULT_TGDB_PATH
+from sidecar.governor import BudgetCeilingExceeded, GovernorKillSwitchTripped, is_run_ceiling_hit
+from sidecar.logging_config import logger
+from sidecar.rate_limiter import AccountHardStopped
 
 ExpandChannel = Callable[[int], Awaitable[list[int]]]
+
+# Any of these, raised out of `expand_channel`, means "stop making Telegram calls right
+# now" — not "the crawl is broken." A `FloodWaitError` survived `with_flood_wait_retry`'s
+# own retries (governor.py) and means we're being actively rate-limited; `AccountHardStopped`
+# means a `PeerFloodError` was seen and the account must not make another call this
+# session; `BudgetCeilingExceeded` means the hourly/daily/per-run ledger says no calls
+# left in this window; `GovernorKillSwitchTripped` means a human (or an automatic
+# PeerFloodError trip) has latched the kill switch. All four are "pause and wait for a
+# human or a clock," never "crash the crawl and lose the frontier."
+PAUSING_EXCEPTIONS = (FloodWaitError, AccountHardStopped, BudgetCeilingExceeded, GovernorKillSwitchTripped)
 
 
 @dataclass
@@ -89,7 +101,11 @@ async def persist_state(state: CrawlState, path=DEFAULT_TGDB_PATH) -> None:
 
 
 async def run_crawl(
-    state: CrawlState, expand_channel: ExpandChannel, path=DEFAULT_TGDB_PATH, max_steps: int | None = None
+    state: CrawlState,
+    expand_channel: ExpandChannel,
+    path=DEFAULT_TGDB_PATH,
+    max_steps: int | None = None,
+    should_pause: Callable[[], bool] | None = None,
 ) -> CrawlState:
     """Pops the frontier breadth-first, expands each channel via the injected callback,
     and enqueues unvisited neighbors at depth+1 up to `state.depth_limit`. The `visited`
@@ -101,19 +117,66 @@ async def run_crawl(
     Stops and returns (status stays "running", ready to call again) when either the
     frontier empties (status flips to "completed") or `max_steps` expansions have run
     this call, whichever comes first — the caller decides pause timing by choosing when
-    to stop calling this and instead call `persist_state` + set status to "paused"."""
+    to stop calling this and instead call `persist_state` + set status to "paused".
+
+    A frontier item is only popped and marked visited *after* it has been fully handled
+    (either successfully expanded, or immediately for a depth-limited leaf that never
+    calls `expand_channel` at all) — never before. If `expand_channel` raises one of
+    `PAUSING_EXCEPTIONS` (see module-level comment: FloodWaitError, AccountHardStopped,
+    BudgetCeilingExceeded, GovernorKillSwitchTripped — all mean "stop calling Telegram
+    right now," never "crash the crawl"), the channel that failed is still sitting at
+    `frontier[0]`, not in `visited`, and not counted toward `steps`. The state is
+    persisted with `status = "paused"` and returned immediately (no re-raise); the very
+    next `run_crawl` call against this same (loaded) state retries that exact channel
+    first, so a resumed crawl reaches an identical final `visited` set to one that was
+    never interrupted at all.
+
+    `should_pause`, if given, is checked at the top of every iteration, before popping —
+    a `True` result is handled exactly like a pausing exception (pause, persist, return)
+    so a caller (e.g. a background-task orchestrator) can request a cooperative pause
+    between steps without injecting a fake exception.
+
+    Also checks `governor.is_run_ceiling_hit()` every iteration — Slice 3 built the
+    per-run call-count ceiling specifically for this consumer (see that module's
+    docstring: "Slice 5 wires it into the crawler next"). `is_run_ceiling_hit()` returns
+    `False` whenever no run is active (`governor.start_run()` never called — e.g. a
+    fake-`expand_channel` test that has no reason to touch the governor at all), so this
+    is a no-op unless a caller has actually started a governed run."""
+    async def _pause(reason: str) -> CrawlState:
+        logger.warning("run_crawl: pausing — %s", reason)
+        state.status = "paused"
+        await persist_state(state, path)
+        return state
+
+    def _mark_visited(channel_id: int) -> None:
+        state.frontier.pop(0)
+        state.visited.add(channel_id)
+
     steps = 0
     while state.frontier and (max_steps is None or steps < max_steps):
-        channel_id, depth = state.frontier.pop(0)
+        if should_pause is not None and should_pause():
+            return await _pause("cooperative should_pause() returned True")
+
+        if is_run_ceiling_hit():
+            return await _pause("per-run call ceiling hit, needs human confirmation to continue")
+
+        channel_id, depth = state.frontier[0]
         if channel_id in state.visited:
+            state.frontier.pop(0)
             continue
-        state.visited.add(channel_id)
-        steps += 1
 
         if depth >= state.depth_limit:
+            _mark_visited(channel_id)
+            steps += 1
             continue
 
-        neighbor_ids = await expand_channel(channel_id)
+        try:
+            neighbor_ids = await expand_channel(channel_id)
+        except PAUSING_EXCEPTIONS as e:
+            return await _pause(f"channel_id={channel_id} raised {type(e).__name__}: {e}")
+
+        _mark_visited(channel_id)
+        steps += 1
         for neighbor_id in neighbor_ids:
             if neighbor_id not in state.visited:
                 state.frontier.append((neighbor_id, depth + 1))

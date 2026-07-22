@@ -11,7 +11,18 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-from sidecar import collector, db, export, gpkg_reader, graph, oob_matcher, oob_proposals, seed, telegram_client
+from sidecar import (
+    collector,
+    crawl_service,
+    db,
+    export,
+    gpkg_reader,
+    graph,
+    oob_matcher,
+    oob_proposals,
+    seed,
+    telegram_client,
+)
 from sidecar.telegram_channel_source import TelethonChannelSource
 from sidecar.logging_config import logger
 
@@ -204,6 +215,56 @@ async def oob_reject(proposal_id: int) -> Response | dict:
     if result is None:
         return Response(status_code=404, content="Proposal not found or already decided")
     return {"status": "rejected"}
+
+
+class CrawlStartRequest(BaseModel):
+    seed_ids: list[int]
+    depth_limit: int
+
+
+@app.post("/crawl/start")
+async def crawl_start(body: CrawlStartRequest) -> dict:
+    """Slice 5 (docs/issues/TELEGRAM_PHASE3_ISSUES.md). Starts a BFS crawl session and
+    spawns its loop as a background task (`sidecar/crawl_service.py`) — returns
+    immediately rather than blocking the request on a run that makes many governed,
+    rate-limited calls. Read-only, same as `/collect`: every Telegram call this crawl
+    can reach goes through `governor.governed_rpc`, and `expand_channel`'s real
+    composition provably issues zero `GetParticipants`/member-enumeration calls (Slice 2's
+    structural guarantee, re-verified for this module in `test_crawl_service.py`)."""
+    state = await crawl_service.start_crawl(body.seed_ids, body.depth_limit)
+    return {"session_id": state.session_id, "status": state.status, "frontier_size": len(state.frontier)}
+
+
+@app.post("/crawl/pause/{session_id}", response_model=None)
+async def crawl_pause(session_id: int) -> Response | dict:
+    """Requests a cooperative pause — the background task's `should_pause()` check
+    (`crawler.run_crawl`) picks this up at the top of its next loop iteration and
+    persists `status="paused"` without losing the frontier item it's currently on."""
+    try:
+        await crawl_service.request_pause(session_id)
+    except crawl_service.CrawlNotActive as e:
+        return Response(status_code=409, content=str(e))
+    return {"session_id": session_id, "status": "pause_requested"}
+
+
+@app.post("/crawl/resume/{session_id}", response_model=None)
+async def crawl_resume(session_id: int) -> Response | dict:
+    """Resumes a paused (or interrupted-by-FloodWait/governor-exception) session from its
+    persisted frontier — Slice 5's acceptance criterion that resuming reaches an
+    identical result to an uninterrupted run. Spawns a new background task; returns
+    immediately, same as `/crawl/start`."""
+    try:
+        state = await crawl_service.resume_crawl(session_id)
+    except crawl_service.CrawlAlreadyRunning as e:
+        return Response(status_code=409, content=str(e))
+    return {"session_id": state.session_id, "status": state.status, "frontier_size": len(state.frontier)}
+
+
+@app.get("/crawl/status/{session_id}")
+async def crawl_status(session_id: int) -> dict:
+    """Reads the persisted session state fresh from SQLite — reflects reality even if no
+    background task is active in this process (e.g. after a restart)."""
+    return await crawl_service.get_status(session_id)
 
 
 @app.get("/export/graphml")
