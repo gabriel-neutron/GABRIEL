@@ -9,10 +9,10 @@ Telethon shapes."
 from datetime import datetime, timezone
 
 import pytest
-from telethon.errors import ChatAdminRequiredError
+from telethon.errors import ChatAdminRequiredError, UsernameInvalidError, UsernameNotOccupiedError
 
 from sidecar import choke
-from sidecar.telegram_channel_source import TelethonChannelSource
+from sidecar.telegram_channel_source import TelethonChannelSource, TelethonUsernameResolver
 
 
 @pytest.fixture(autouse=True)
@@ -63,13 +63,23 @@ class _FakeClient:
     """Stands in for `TelegramClient`: `get_entity`, `__call__` (RPC dispatch), and
     `get_messages` are the only three surfaces `TelethonChannelSource` touches."""
 
-    def __init__(self, entity, full_channel_result=None, full_channel_error=None, messages=None):
+    def __init__(
+        self,
+        entity,
+        full_channel_result=None,
+        full_channel_error=None,
+        messages=None,
+        get_entity_error=None,
+    ):
         self._entity = entity
         self._full_channel_result = full_channel_result
         self._full_channel_error = full_channel_error
         self._messages = messages or []
+        self._get_entity_error = get_entity_error
 
     async def get_entity(self, ref: str):
+        if self._get_entity_error is not None:
+            raise self._get_entity_error
         return self._entity
 
     async def __call__(self, request):
@@ -157,6 +167,63 @@ async def test_fetch_recent_messages_maps_to_domain_records():
 async def test_fetch_channel_metadata_raises_if_client_not_connected():
     with pytest.raises(RuntimeError):
         await TelethonChannelSource(client_provider=lambda: None).fetch_channel_metadata("x")
+
+
+def _resolver_for(client) -> TelethonUsernameResolver:
+    return TelethonUsernameResolver(client_provider=lambda: client)
+
+
+@pytest.mark.asyncio
+async def test_resolve_username_returns_peer_id():
+    entity = _FakeEntity(id=999, username="found", title="Found")
+    client = _FakeClient(entity=entity)
+
+    result = await _resolver_for(client).resolve_username("found")
+
+    assert result == 999
+
+
+@pytest.mark.asyncio
+async def test_resolve_username_returns_none_for_unoccupied_username():
+    client = _FakeClient(entity=None, get_entity_error=UsernameNotOccupiedError(_FakeRequest()))
+
+    assert await _resolver_for(client).resolve_username("ghost") is None
+
+
+@pytest.mark.asyncio
+async def test_resolve_username_returns_none_for_invalid_username():
+    client = _FakeClient(entity=None, get_entity_error=UsernameInvalidError(_FakeRequest()))
+
+    assert await _resolver_for(client).resolve_username("!!!") is None
+
+
+@pytest.mark.asyncio
+async def test_resolve_username_returns_none_on_value_error():
+    """Telethon's own `get_entity` raises a bare `ValueError` for several
+    could-not-resolve cases beyond the two named exception types."""
+    client = _FakeClient(entity=None, get_entity_error=ValueError("Cannot find entity"))
+
+    assert await _resolver_for(client).resolve_username("nope") is None
+
+
+@pytest.mark.asyncio
+async def test_resolve_username_raises_if_client_not_connected():
+    with pytest.raises(RuntimeError):
+        await TelethonUsernameResolver(client_provider=lambda: None).resolve_username("x")
+
+
+@pytest.mark.asyncio
+async def test_resolve_username_goes_through_the_same_choke_as_channel_source():
+    """Reuses `_rpc_get_entity` — the identical `choked_rpc`-wrapped call
+    `fetch_channel_metadata` uses — so it spends from the same cold-start budget rather
+    than a separate/parallel rate-limit path."""
+    entity = _FakeEntity(id=1, username="x", title="X")
+    client = _FakeClient(entity=entity)
+
+    start = choke._cold_start_call_count
+    await _resolver_for(client).resolve_username("x")
+
+    assert choke._cold_start_call_count == start + 1
 
 
 class _FakeRequest:

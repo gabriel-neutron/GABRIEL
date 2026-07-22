@@ -12,13 +12,20 @@ invite/join-on-behalf-of-user call here or anywhere else in the sidecar.
 import json
 
 from telethon import TelegramClient
-from telethon.errors import ChatAdminRequiredError
+from telethon.errors import ChatAdminRequiredError, UsernameInvalidError, UsernameNotOccupiedError
 from telethon.tl.functions.channels import GetFullChannelRequest
 
 from sidecar import telegram_client
 from sidecar.channel_source import ChannelMeta, MessageRecord
 from sidecar.choke import choked_rpc
 from sidecar.logging_config import logger
+
+
+def _require_client(client_provider) -> TelegramClient:
+    client = client_provider()
+    if client is None:
+        raise RuntimeError("Telegram client is not connected")
+    return client
 
 
 @choked_rpc
@@ -44,14 +51,8 @@ class TelethonChannelSource:
     def __init__(self, client_provider=telegram_client._get_client) -> None:
         self._client_provider = client_provider
 
-    def _require_client(self) -> TelegramClient:
-        client = self._client_provider()
-        if client is None:
-            raise RuntimeError("Telegram client is not connected")
-        return client
-
     async def fetch_channel_metadata(self, ref: str) -> ChannelMeta:
-        client = self._require_client()
+        client = _require_client(self._client_provider)
         entity = await _rpc_get_entity(client, ref)
 
         # `participants_count` is `None` on the entity from `get_entity` alone — needs
@@ -96,7 +97,7 @@ class TelethonChannelSource:
         )
 
     async def fetch_recent_messages(self, ref: str, limit: int) -> list[MessageRecord]:
-        client = self._require_client()
+        client = _require_client(self._client_provider)
         entity = await _rpc_get_entity(client, ref)
         messages = await _rpc_get_messages(client, entity, limit)
 
@@ -112,3 +113,23 @@ class TelethonChannelSource:
                 )
             )
         return records
+
+
+class TelethonUsernameResolver:
+    """`UsernameResolver` seam's real adapter (Slice 2,
+    docs/issues/TELEGRAM_PHASE3_ISSUES.md). Reuses `_rpc_get_entity` — the identical
+    `choked_rpc`-wrapped call `fetch_channel_metadata` uses — so username resolution
+    shares the exact same choke-point and cold-start budget, not a separate/parallel
+    rate-limit path."""
+
+    def __init__(self, client_provider=telegram_client._get_client) -> None:
+        self._client_provider = client_provider
+
+    async def resolve_username(self, username: str) -> int | None:
+        client = _require_client(self._client_provider)
+        try:
+            entity = await _rpc_get_entity(client, username)
+        except (UsernameNotOccupiedError, UsernameInvalidError, ValueError) as e:
+            logger.info("resolve_username: %r unresolvable (%s)", username, type(e).__name__)
+            return None
+        return entity.id
