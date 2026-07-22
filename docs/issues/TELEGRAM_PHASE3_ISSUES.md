@@ -35,11 +35,11 @@ No product code changes. The output is recorded findings that gate slices 1, 3, 
 
 ### Acceptance criteria
 
-- [ ] `01c_participant_visibility.py` run on the live session; result recorded: non-member `get_participants` returns { real members | admins-only }
-- [ ] Member-overlap go/no-go decision documented (drives whether slice 4 is built or dropped)
-- [ ] Rate-limit burst run on one channel; first FloodWait onset / calls-before-throttle number recorded
-- [ ] Known shape landmines reconfirmed: `participants_count` is `None` from `get_entity` (needs `GetFullChannelRequest`); `get_participants` raises `ChatAdminRequiredError` on broadcast channels
-- [ ] Findings written to the validation results file so downstream slices cite measured numbers, not guesses
+- [x] `01c_participant_visibility.py` run on the live session; result recorded: non-member `get_participants` returns { real members | **admins-only** } — 2026-07-22, see `sidecar/validation/RESULTS.md`
+- [x] Member-overlap go/no-go decision documented (drives whether slice 4 is built or dropped) — **NO-GO**; Slice 4 is dropped, member-overlap edge removed from scope
+- [x] Rate-limit burst run on one channel; first FloodWait onset / calls-before-throttle number recorded — 40 tight-loop `get_messages` calls, zero FloodWait, floor is ">40 calls" for this call type (see `sidecar/validation/RESULTS.md`)
+- [x] Known shape landmines reconfirmed: `participants_count` is `None` from `get_entity` (needs `GetFullChannelRequest`); `get_participants` raises `ChatAdminRequiredError` on broadcast channels — reconfirmed 2026-07-21, see `sidecar/validation/RESULTS.md`
+- [x] Findings written to the validation results file so downstream slices cite measured numbers, not guesses
 
 ### Blocked by
 
@@ -176,6 +176,11 @@ Config may only *tighten* these; coded ceilings are hard floors (`effective = mi
 
 **Type:** AFK
 
+**Status: DROPPED, 2026-07-22.** Slice 0's `01c_participant_visibility.py` result is
+admins-only (see `sidecar/validation/RESULTS.md`) — this slice is not built. The
+member-overlap edge is removed from scope; BFS discovery relies only on Slice 2's
+linked-channel and keyword-mention signals.
+
 ### What to build
 
 **Conditional slice.** If slice 0's `01c` result is *admins-only*, **do not build this** —
@@ -193,7 +198,7 @@ explicitly opted in.
 
 ### Acceptance criteria
 
-- [ ] If slice 0 = admins-only: slice not built; member-overlap edge removed from scope; gap documented
+- [x] If slice 0 = admins-only: slice not built; member-overlap edge removed from scope; gap documented
 - [ ] If built: member enumeration is reachable only via the opt-in endpoint, never from any `/crawl/*` path
 - [ ] Enumeration uses a dedicated tight budget in the governor; `PeerFloodError` hard-stops with zero retries
 - [ ] Raw member identities are not stored by default (non-identifying aggregate only) unless explicitly opted in

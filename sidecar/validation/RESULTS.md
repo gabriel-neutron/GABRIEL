@@ -161,6 +161,42 @@ Account Safety rule 5 assumes. `validation/01c_participant_visibility.py` was wr
 this (requests 200, breaks results down by participant type). **Run it and record the answer
 before any Phase 2 design work depends on member overlap.**
 
+## Member visibility (`01c_participant_visibility.py`) — 2026-07-22
+
+**RESOLVED — ADMINS ONLY, confirmed.** Ran against the same linked megagroup as above
+(id `1629354228`, «Комментарии к "Белым дядям"», account not a member — `entity.left: True`).
+Requested `limit=200`, received exactly **5** participants, all `ChannelParticipantAdmin`. No
+`ChatAdminRequiredError`, no `FloodWaitError` — the call succeeded cleanly, it simply doesn't
+return rank-and-file members to a non-member.
+
+**Go/no-go decision: NO-GO on member-overlap as a non-member signal.** The PRD's member-overlap
+channel-similarity signal (Slice 4, docs/issues/TELEGRAM_PHASE3_ISSUES.md) cannot be built
+without joining every discovered group first — a materially worse ban-risk profile than the
+PRD's Account Safety section assumes for that signal. Per Slice 4's own conditional framing:
+**do not build Slice 4**; drop the member-overlap edge from scope. BFS discovery relies only on
+the linked-channel and keyword-mention signals (Slice 2's `edges.py` extractors).
+
+## Rate-limit burst — first FloodWait data point — 2026-07-22
+
+Ran `validation/07_rate_limit_burst.py` (new — Slice 0 called for this measurement but no
+script existed yet) against the same linked megagroup, 40 tight-loop `get_messages(limit=1)`
+calls (history reads — Account Safety rule 5's "low-risk and stable" call type, deliberately
+not `get_participants`), hard-capped at 40 so an unexpectedly high threshold couldn't turn the
+measurement into an actual burst against the account.
+
+**Result: zero `FloodWaitError` across all 40 calls**, ~34.4s elapsed (~0.86s/call — Telethon's
+own network round-trip time, no artificial delay was added). The threshold for this call type
+is above 40 calls at back-to-back cadence; this run doesn't pin the exact number, only a floor.
+
+**Decision:** `sidecar/choke.py`'s placeholder numbers (`BASE_DELAY_SECONDS=3.0`,
+`JITTER_SECONDS=2.0`, `COLD_START_CALL_CEILING=15`) are confirmed conservative relative to this
+floor — 15 calls at a 3–5s spacing is well inside the ">40 back-to-back" boundary this run
+found for message-history reads. Not a reason to loosen Slice 3's eventual governor numbers
+(`get_participants` is a different, far riskier call type this run says nothing about — see the
+NO-GO above), but it does mean Slice 1's choke was not overly conservative to the point of being
+impractical. Re-run with a higher `MAX_CALLS` if a tighter number is ever needed; do not use
+`get_participants` for this measurement.
+
 ## OOB fuzzy matcher — validated against real project data — 2026-07-20
 
 `sidecar/gpkg_reader.py` built and tested against the repo's own bundled demo file,
