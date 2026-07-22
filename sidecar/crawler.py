@@ -168,6 +168,7 @@ async def run_crawl(
         if depth >= state.depth_limit:
             _mark_visited(channel_id)
             steps += 1
+            await persist_state(state, path)
             continue
 
         try:
@@ -180,6 +181,11 @@ async def run_crawl(
         for neighbor_id in neighbor_ids:
             if neighbor_id not in state.visited:
                 state.frontier.append((neighbor_id, depth + 1))
+        # Persisted every step, not just at pause/completion — Slice 7's WS stream
+        # (`sidecar/crawl_ws.py`) reads this same `crawl_sessions` row for
+        # frontier_size/visited_count, and a multi-step run between governed calls could
+        # otherwise leave that row (and anything reading it) stale for the whole run.
+        await persist_state(state, path)
 
     if not state.frontier:
         state.status = "completed"

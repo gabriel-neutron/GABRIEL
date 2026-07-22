@@ -6,7 +6,7 @@ from pathlib import Path
 
 import aiosqlite
 from dotenv import load_dotenv
-from fastapi import FastAPI, Request, Response
+from fastapi import FastAPI, Request, Response, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
@@ -14,6 +14,7 @@ from pydantic import BaseModel
 from sidecar import (
     collector,
     crawl_service,
+    crawl_ws,
     db,
     export,
     gpkg_reader,
@@ -265,6 +266,29 @@ async def crawl_status(session_id: int) -> dict:
     """Reads the persisted session state fresh from SQLite — reflects reality even if no
     background task is active in this process (e.g. after a restart)."""
     return await crawl_service.get_status(session_id)
+
+
+@app.websocket("/crawl/ws/{session_id}")
+async def crawl_ws_stream(websocket: WebSocket, session_id: int) -> None:
+    """Slice 7 (docs/issues/TELEGRAM_PHASE3_ISSUES.md). Streams `crawl_ws.progress_stream`'s
+    node/edge/frontier counts to the browser. Deliberately reads only durable state
+    (`crawl_ws.py`'s docstring) — this handler never touches `crawl_service`'s in-memory
+    orchestration state, so a client disconnecting (tab closed, network blip, whatever)
+    can't affect the crawl, and the crawl pausing/completing/erroring can't crash this
+    handler either. `WebSocketDisconnect` (raised by `send_json` once the peer is gone,
+    or surfaced by Starlette on receive) just ends this handler's loop."""
+    await websocket.accept()
+    try:
+        sent_any = False
+        async for message in crawl_ws.progress_stream(session_id):
+            await websocket.send_json(message)
+            sent_any = True
+            if message["status"] == "completed":
+                break
+        if not sent_any:
+            await websocket.send_json({"error": "session_not_found", "session_id": session_id})
+    except WebSocketDisconnect:
+        logger.info("crawl_ws_stream: client disconnected session_id=%s", session_id)
 
 
 @app.get("/export/graphml")

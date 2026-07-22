@@ -51,6 +51,15 @@ async def get_graph(path=DEFAULT_TGDB_PATH) -> dict:
     return {"nodes": nodes, "edges": edges}
 
 
+async def get_graph_counts(path=DEFAULT_TGDB_PATH) -> dict:
+    """Cheaper than `get_graph()` for a caller (Slice 7's WS stream) that only needs
+    counts every tick, not the full node/edge attribute payload."""
+    async with aiosqlite.connect(path) as conn:
+        node_count = (await (await conn.execute("SELECT COUNT(*) FROM channels")).fetchone())[0]
+        edge_count = (await (await conn.execute("SELECT COUNT(*) FROM edges")).fetchone())[0]
+    return {"node_count": node_count, "edge_count": edge_count}
+
+
 async def search(query: str, path=DEFAULT_TGDB_PATH, limit: int = 50) -> list[dict]:
     """Cross-graph search across channel title/username and extracted entity values."""
     like_pattern = f"%{query}%"

@@ -1,8 +1,10 @@
 import { SigmaContainer, useLoadGraph } from "@react-sigma/core"
 import "@react-sigma/core/lib/style.css"
 import Graph from "graphology"
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
+import { useCrawlProgress } from "@/modules/telegram/hooks/useCrawlProgress"
 import { fetchGraph, type SigmaGraphData } from "@/modules/telegram/services/sidecar.service"
+import { Input } from "@/ui/input"
 
 function GraphLoader({ data }: { data: SigmaGraphData }) {
   const loadGraph = useLoadGraph()
@@ -37,8 +39,12 @@ export function TelegramGraphView() {
   const [state, setState] = useState<
     { kind: "loading" } | { kind: "ready"; data: SigmaGraphData } | { kind: "error"; message: string }
   >({ kind: "loading" })
+  const [sessionId, setSessionId] = useState<number | null>(null)
+  const [sessionInput, setSessionInput] = useState("")
+  const progress = useCrawlProgress(sessionId)
+  const lastSeenCounts = useRef<{ nodeCount: number; edgeCount: number } | null>(null)
 
-  useEffect(() => {
+  const refetchGraph = useCallback(() => {
     let cancelled = false
     fetchGraph()
       .then((data) => {
@@ -52,32 +58,83 @@ export function TelegramGraphView() {
     }
   }, [])
 
-  if (state.kind === "loading") {
-    return <div className="p-4 text-sm text-muted-foreground">Loading graph…</div>
+  useEffect(() => refetchGraph(), [refetchGraph])
+
+  // Refetches the full graph whenever the live crawl's node/edge counts change — simpler
+  // and safer than incrementally patching the graphology graph client-side, and at the
+  // scale this crawl operates at (Slice 0: tens to low hundreds of channels) a full
+  // refetch per change is cheap.
+  useEffect(() => {
+    if (progress.kind !== "live") return
+    const { node_count: nodeCount, edge_count: edgeCount } = progress.message
+    const last = lastSeenCounts.current
+    if (last && last.nodeCount === nodeCount && last.edgeCount === edgeCount) return
+    lastSeenCounts.current = { nodeCount, edgeCount }
+    refetchGraph()
+  }, [progress, refetchGraph])
+
+  function handleAttach() {
+    const parsed = Number(sessionInput)
+    lastSeenCounts.current = null
+    setSessionId(Number.isFinite(parsed) && sessionInput.trim() !== "" ? parsed : null)
   }
-  if (state.kind === "error") {
-    return (
+
+  const crawlStatusLine =
+    progress.kind === "live"
+      ? `Crawl #${progress.message.session_id}: ${progress.message.status} — ${progress.message.visited_count} visited, ${progress.message.frontier_size} queued, ${progress.message.node_count} nodes, ${progress.message.edge_count} edges`
+      : progress.kind === "error"
+        ? `Crawl session error: ${progress.message}`
+        : progress.kind === "connecting"
+          ? "Connecting to crawl session…"
+          : null
+
+  const controls = (
+    <div className="flex items-center gap-2 border-b p-2 text-sm">
+      <Input
+        className="h-7 w-32"
+        placeholder="Session id"
+        value={sessionInput}
+        onChange={(e) => setSessionInput(e.target.value)}
+      />
+      <button type="button" className="text-sm underline" onClick={handleAttach}>
+        {sessionId === null ? "Watch live crawl" : "Change session"}
+      </button>
+      {crawlStatusLine && <span className="text-muted-foreground">{crawlStatusLine}</span>}
+    </div>
+  )
+
+  let body: ReactNode
+  if (state.kind === "loading") {
+    body = <div className="p-4 text-sm text-muted-foreground">Loading graph…</div>
+  } else if (state.kind === "error") {
+    body = (
       <div className="p-4 text-sm text-destructive">
         {state.message} — is the sidecar running? (`npm run sidecar`)
       </div>
     )
-  }
-  if (state.data.nodes.length === 0) {
-    return (
+  } else if (state.data.nodes.length === 0) {
+    body = (
       <div className="p-4 text-sm text-muted-foreground">
         No channels yet — import seeds from the Telegram panel to get started.
+      </div>
+    )
+  } else {
+    body = (
+      <div className="min-h-0 flex-1">
+        <SigmaContainer
+          style={{ width: "100%", height: "100%" }}
+          settings={{ renderLabels: state.data.nodes.length <= 500 }}
+        >
+          <GraphLoader data={state.data} />
+        </SigmaContainer>
       </div>
     )
   }
 
   return (
-    <div className="h-full w-full">
-      <SigmaContainer
-        style={{ width: "100%", height: "100%" }}
-        settings={{ renderLabels: state.data.nodes.length <= 500 }}
-      >
-        <GraphLoader data={state.data} />
-      </SigmaContainer>
+    <div className="flex h-full w-full flex-col">
+      {controls}
+      {body}
     </div>
   )
 }

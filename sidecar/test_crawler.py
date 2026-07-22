@@ -7,6 +7,7 @@ must pause without losing the frontier item that failed, and resuming from the
 persisted state must reach an IDENTICAL final `visited` set to an uninterrupted run.
 """
 
+import asyncio
 from pathlib import Path
 
 import pytest
@@ -55,6 +56,43 @@ async def test_uninterrupted_run_completes_with_empty_frontier(tgdb_path):
     assert state.status == "completed"
     assert state.frontier == []
     assert state.visited == {1, 2, 3, 4}
+
+
+@pytest.mark.asyncio
+async def test_run_crawl_persists_frontier_state_after_every_step_not_just_at_end(tgdb_path):
+    """Regression: Slice 7's WS stream (`sidecar/crawl_ws.py`) reads this same durable
+    `crawl_sessions` row for `frontier_size`/`visited_count` on every tick. Before this
+    fix, `persist_state` only ran inside `_pause()` or once after the whole while-loop
+    exited, so a caller watching a long, unpaused, uninterrupted run saw frontier/visited
+    frozen at the start value for the entire run — never "real time" at all."""
+    step_started = asyncio.Event()
+    proceed = asyncio.Event()
+
+    async def slow_expand_channel(channel_id: int) -> list[int]:
+        step_started.set()
+        await proceed.wait()
+        proceed.clear()
+        return list(GRAPH.get(channel_id, []))
+
+    state = await crawler.start_session([1], depth_limit=3, path=tgdb_path)
+    task = asyncio.create_task(crawler.run_crawl(state, slow_expand_channel, path=tgdb_path))
+
+    await step_started.wait()  # run_crawl is now inside expand_channel(1)
+    step_started.clear()
+    proceed.set()  # let channel 1 finish expanding
+
+    await step_started.wait()  # run_crawl is now inside expand_channel for 1's neighbor —
+    # channel 1's _mark_visited + persist_state must already have happened for the loop
+    # to have reached this point.
+
+    mid_run = await crawler.load_session(state.session_id, path=tgdb_path)
+    assert 1 in mid_run.visited
+    assert 1 not in [channel_id for channel_id, _ in mid_run.frontier]
+
+    while not task.done():
+        proceed.set()
+        await asyncio.sleep(0)
+    await task
 
 
 @pytest.mark.asyncio

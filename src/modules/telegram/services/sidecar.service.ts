@@ -5,6 +5,7 @@
  */
 
 const SIDECAR_BASE_URL = "http://localhost:8000"
+const SIDECAR_WS_URL = "ws://localhost:8000"
 
 export type SidecarHealth = {
   status: "ok"
@@ -92,6 +93,26 @@ export async function decideOobProposal(
     throw new Error(`OOB ${decision} failed: ${res.status}`)
   }
   return res.json()
+}
+
+export type CrawlProgressMessage = {
+  session_id: number
+  status: "running" | "paused" | "completed"
+  frontier_size: number
+  visited_count: number
+  node_count: number
+  edge_count: number
+}
+
+export type CrawlProgressError = { error: string; session_id: number }
+
+/** Slice 7 (`sidecar/crawl_ws.py`). `main.py`'s `/crawl/ws/{session_id}` matches the
+ * path-param style `/crawl/status/{session_id}` already uses. Callers open this URL with
+ * `new WebSocket(...)` (or an injected factory in tests) — no client-side wrapper here,
+ * since connection lifecycle (reconnect on drop) is stateful and belongs in the hook that
+ * owns it, not this pure-function service file. */
+export function crawlWebSocketUrl(sessionId: number): string {
+  return `${SIDECAR_WS_URL}/crawl/ws/${sessionId}`
 }
 
 export type SeedImportResult = { requested: number; inserted: number; usernames: string[] }
