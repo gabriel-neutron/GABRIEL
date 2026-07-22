@@ -94,7 +94,7 @@ export async function decideOobProposal(
   return res.json()
 }
 
-export type SeedImportResult = { requested: number; inserted: number; ids: number[] }
+export type SeedImportResult = { requested: number; inserted: number; usernames: string[] }
 
 /** FR-1. Only writes DB rows — no Telegram call, works with the sidecar offline from Telegram. */
 export async function importSeeds(input: {

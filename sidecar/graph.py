@@ -17,7 +17,7 @@ async def get_graph(path=DEFAULT_TGDB_PATH) -> dict:
     async with aiosqlite.connect(path) as conn:
         conn.row_factory = aiosqlite.Row
         channel_rows = await conn.execute_fetchall(
-            "SELECT id, username, title, relevance_score, type FROM channels"
+            "SELECT rowid, id, username, title, relevance_score, type FROM channels"
         )
         edge_rows = await conn.execute_fetchall(
             "SELECT id, from_id, to_id, edge_type, weight FROM edges"
@@ -25,7 +25,12 @@ async def get_graph(path=DEFAULT_TGDB_PATH) -> dict:
 
     nodes = [
         {
-            "key": str(row["id"]),
+            # Not-yet-collected seed rows have `id IS NULL` (see identity contract,
+            # docs/issues/TELEGRAM_PHASE3_ISSUES.md Slice 1) — falling back to
+            # `str(row["id"])` for all of them would collapse every uncollected seed
+            # onto the same "None" node key, so key by the real peer id once known and
+            # by the row's own SQLite rowid (unique per seed) until then.
+            "key": str(row["id"]) if row["id"] is not None else f"seed-{row['rowid']}",
             "attributes": {
                 "label": row["title"] or row["username"] or f"channel-{row['id']}",
                 "size": 3 + 5 * (row["relevance_score"] or 0),

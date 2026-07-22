@@ -60,6 +60,16 @@ interactive login step above, or if `TG_API_ID`/`TG_API_HASH` are unset — the 
 still starts and serves `/health` either way, since it's the first thing the React
 header status dot polls.
 
+## Tests
+
+```
+pip install -r requirements-dev.txt
+pytest
+```
+
+Unit tests run against `FakeChannelSource`/temp SQLite files — no live Telegram
+credentials or network needed.
+
 ## Current scope (Phase 2)
 
 Only `/health`, schema init, and Telethon session connect/disconnect exist so far.

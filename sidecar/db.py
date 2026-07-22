@@ -7,9 +7,15 @@ import aiosqlite
 DEFAULT_TGDB_PATH = Path(__file__).parent / "project.tgdb"
 
 SCHEMA = """
+-- `id` is the Telegram peer ID, not a SQLite-assigned surrogate — it is NULL until a
+-- seed channel is actually collected (see `sidecar/seed.py` and `sidecar/collector.py`'s
+-- reconciliation upsert), so it deliberately carries no PRIMARY KEY/AUTOINCREMENT
+-- semantics that would hand out a fake id colliding with real peer ID space. `UNIQUE`
+-- alone permits multiple NULL rows (SQL NULL != NULL) while still enforcing uniqueness
+-- once a real id is known.
 CREATE TABLE IF NOT EXISTS channels (
-    id INTEGER PRIMARY KEY,
-    username TEXT,
+    id INTEGER UNIQUE,
+    username TEXT UNIQUE,
     title TEXT,
     description TEXT,
     member_count INTEGER,
@@ -35,7 +41,8 @@ CREATE TABLE IF NOT EXISTS messages (
     message_id INTEGER,
     text TEXT,
     date TEXT,
-    view_count INTEGER
+    view_count INTEGER,
+    raw_json TEXT
 );
 
 CREATE TABLE IF NOT EXISTS entities_extracted (
@@ -81,6 +88,7 @@ CREATE TABLE IF NOT EXISTS oob_proposals (
 );
 
 CREATE INDEX IF NOT EXISTS idx_messages_channel_id ON messages(channel_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_messages_channel_message_unique ON messages(channel_id, message_id);
 CREATE INDEX IF NOT EXISTS idx_edges_from_id ON edges(from_id);
 CREATE INDEX IF NOT EXISTS idx_edges_to_id ON edges(to_id);
 CREATE INDEX IF NOT EXISTS idx_oob_proposals_status ON oob_proposals(status);
@@ -99,11 +107,68 @@ async def migrate_crawl_sessions_columns(conn: aiosqlite.Connection) -> None:
         await conn.execute("ALTER TABLE crawl_sessions ADD COLUMN visited_json TEXT")
 
 
+async def migrate_messages_columns(conn: aiosqlite.Connection) -> None:
+    """Idempotent column-add migration for `raw_json`, added alongside Slice 1's
+    identity-contract fix so collected messages keep the same "raw JSON is
+    authoritative" guarantee as `channels`."""
+    cursor = await conn.execute("PRAGMA table_info(messages)")
+    existing_columns = {row[1] async for row in cursor}
+    if "raw_json" not in existing_columns:
+        await conn.execute("ALTER TABLE messages ADD COLUMN raw_json TEXT")
+
+
+async def migrate_channels_identity(conn: aiosqlite.Connection) -> None:
+    """Rebuilds `channels` if it still has the old `id INTEGER PRIMARY KEY` schema —
+    SQLite has no `ALTER TABLE ... DROP CONSTRAINT`, so a pre-existing table (from before
+    Slice 1's identity-contract fix, docs/issues/TELEGRAM_PHASE3_ISSUES.md) must be
+    recreated. `id` stops being SQLite's rowid alias so a not-yet-collected seed row can
+    genuinely have no id, instead of an autoincrement surrogate that collides with real
+    Telegram peer ID space. Existing `type='seed'` rows (never collected) have their
+    surrogate id cleared to NULL; already-collected rows keep their id as-is (it should
+    already be a real peer id)."""
+    cursor = await conn.execute("PRAGMA table_info(channels)")
+    columns = {row[1]: row for row in await cursor.fetchall()}
+    id_column = columns.get("id")
+    if id_column is None or id_column[5] == 0:  # row[5] is the `pk` flag
+        return
+
+    await conn.execute("ALTER TABLE channels RENAME TO channels_old_pk_migration")
+    await conn.execute(
+        """
+        CREATE TABLE channels (
+            id INTEGER UNIQUE,
+            username TEXT UNIQUE,
+            title TEXT,
+            description TEXT,
+            member_count INTEGER,
+            type TEXT,
+            relevance_score REAL,
+            is_private INTEGER,
+            collected_at TEXT,
+            raw_json TEXT
+        )
+        """
+    )
+    await conn.execute(
+        """
+        INSERT INTO channels (id, username, title, description, member_count, type,
+                               relevance_score, is_private, collected_at, raw_json)
+        SELECT CASE WHEN type = 'seed' THEN NULL ELSE id END,
+               username, title, description, member_count, type,
+               relevance_score, is_private, collected_at, raw_json
+        FROM channels_old_pk_migration
+        """
+    )
+    await conn.execute("DROP TABLE channels_old_pk_migration")
+
+
 async def init_db(path: Path = DEFAULT_TGDB_PATH) -> None:
     """Create all tables if they don't exist. Safe to call on every startup."""
     async with aiosqlite.connect(path) as conn:
         await conn.executescript(SCHEMA)
         await migrate_crawl_sessions_columns(conn)
+        await migrate_messages_columns(conn)
+        await migrate_channels_identity(conn)
         await conn.commit()
 
 

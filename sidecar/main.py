@@ -11,7 +11,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-from sidecar import db, export, gpkg_reader, graph, oob_matcher, oob_proposals, seed, telegram_client
+from sidecar import collector, db, export, gpkg_reader, graph, oob_matcher, oob_proposals, seed, telegram_client
+from sidecar.telegram_channel_source import TelethonChannelSource
 from sidecar.logging_config import logger
 
 # Explicit path — bare load_dotenv() searches upward from cwd and can pick up an
@@ -89,8 +90,25 @@ async def seed_import(body: SeedImportRequest) -> dict:
     usernames = list(body.usernames or [])
     if body.csv_text:
         usernames += seed.parse_seed_csv(body.csv_text)
-    inserted_ids = await seed.import_seeds(usernames)
-    return {"requested": len(usernames), "inserted": len(inserted_ids), "ids": inserted_ids}
+    inserted_usernames = await seed.import_seeds(usernames)
+    return {
+        "requested": len(usernames),
+        "inserted": len(inserted_usernames),
+        "usernames": inserted_usernames,
+    }
+
+
+@app.post("/collect/{channel_id}")
+async def collect(channel_id: str) -> dict:
+    """Slice 1 (docs/issues/TELEGRAM_PHASE3_ISSUES.md). Fetches one channel's metadata
+    + a page of recent messages through the `ChannelSource` seam and persists them
+    (`raw_json` authoritative, typed columns provisional). `channel_id` may be a
+    username or a numeric Telegram peer id — Telethon's `get_entity` accepts either, and
+    the identity-reconciliation upsert (`sidecar/collector.py`) resolves either against
+    an existing seed row by username. Read-only: no send/join/invite call exists
+    anywhere on this path."""
+    source = TelethonChannelSource()
+    return await collector.collect_channel(channel_id, source)
 
 
 @app.get("/channels")

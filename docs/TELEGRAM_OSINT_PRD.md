@@ -292,6 +292,19 @@ further, not as an isolated validation experiment.
 
 ---
 
+## Data Retention (PII)
+
+Collected message text and any stored identities (`users.first_name`/`last_name`/`username`,
+message `from_id`) are personal data about real people, not just OSINT signal. Gabriel is
+local-first (see project principles) — `project.tgdb` and every `.gpkg` export live only on the
+analyst's device, per investigation, never on a shared server. Each investigation's `.tgdb`/
+`.gpkg` is expected to be archived or deleted by the analyst once that investigation concludes,
+the same way any other case file would be — Gabriel does not implement automatic retention
+limits or scheduled deletion (out of scope for v1); the analyst is responsible for their own
+per-investigation archival/deletion practice and local legal obligations around PII they collect.
+
+---
+
 ## Open Items (Resolve Before Phase 2)
 
 1. Telegram credentials: user must supply `api_id` + `api_hash` from my.telegram.org.

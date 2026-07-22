@@ -28,9 +28,9 @@ def parse_seed_csv(csv_text: str) -> list[str]:
     return usernames
 
 
-async def import_seeds(usernames: list[str], path=DEFAULT_TGDB_PATH) -> list[int]:
+async def import_seeds(usernames: list[str], path=DEFAULT_TGDB_PATH) -> list[str]:
     """Insert each username as a seed channel if not already present (by username).
-    Returns the row ids of newly-inserted channels (existing ones are skipped, not
+    Returns the usernames of newly-inserted channels (existing ones are skipped, not
     duplicated or reset).
 
     The PRD's `channels` table (docs/TELEGRAM_OSINT_PRD.md's Data Model) has no `status`
@@ -38,25 +38,32 @@ async def import_seeds(usernames: list[str], path=DEFAULT_TGDB_PATH) -> list[int
     status=seed" — `type` is repurposed to hold `'seed'` until Phase 3's real
     collector.py overwrites it with the actual Telethon-reported type
     ('channel'/'group'), giving collection code an unambiguous "not yet collected" marker
-    to query against (`WHERE type = 'seed'`)."""
+    to query against (`WHERE type = 'seed'`).
+
+    Deliberately does not assign `id` (per the identity contract, `channels.id` IS the
+    Telegram peer ID — a seed row has no real id yet, so it stays NULL and is looked up
+    by `username` until `collector.py`'s reconciliation upsert resolves it on first
+    collection; see docs/issues/TELEGRAM_PHASE3_ISSUES.md Slice 1). Returning `username`
+    instead of a surrogate rowid keeps callers from treating the row's SQLite rowid as a
+    meaningful identifier."""
     now = datetime.now(timezone.utc).isoformat()
-    inserted_ids: list[int] = []
+    inserted_usernames: list[str] = []
 
     async with aiosqlite.connect(path) as conn:
         for username in usernames:
             existing = await conn.execute_fetchall(
-                "SELECT id FROM channels WHERE username = ?", (username,)
+                "SELECT username FROM channels WHERE username = ?", (username,)
             )
             if existing:
                 continue
-            cursor = await conn.execute(
+            await conn.execute(
                 """
                 INSERT INTO channels (username, title, type, is_private, collected_at, raw_json)
                 VALUES (?, ?, 'seed', 0, ?, '{}')
                 """,
                 (username, username, now),
             )
-            inserted_ids.append(cursor.lastrowid)
+            inserted_usernames.append(username)
         await conn.commit()
 
-    return inserted_ids
+    return inserted_usernames
