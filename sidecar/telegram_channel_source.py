@@ -40,9 +40,20 @@ def _require_client(client_provider) -> TelegramClient:
     return client
 
 
+def _as_entity_ref(ref: str) -> str | int:
+    """Telethon's `get_entity` parses an all-digit *string* as a phone number for
+    contact lookup, not as a cached numeric peer id — it raises `ValueError` for any
+    peer that isn't a saved contact, which is every channel. A bare `int` instead
+    resolves through Telethon's own entity/session cache by peer id, which is what a
+    numeric `ref` always means in this codebase (`sidecar/db.py`'s channel-id-is-the-
+    real-peer-id contract) — e.g. `crawl_service.real_expand_channel` re-collecting an
+    already-known neighbor by its numeric id."""
+    return int(ref) if ref.isdigit() else ref
+
+
 @governed_rpc("metadata")
 async def _rpc_get_entity(client: TelegramClient, ref: str):
-    return await client.get_entity(ref)
+    return await client.get_entity(_as_entity_ref(ref))
 
 
 @governed_rpc("metadata")

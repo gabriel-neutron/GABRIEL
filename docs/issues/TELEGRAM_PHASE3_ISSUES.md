@@ -254,10 +254,14 @@ crawl exists earlier, but pointing it at 18 seeds / depth 3 is authorized only o
 
 ### Acceptance criteria
 
-- [ ] Canary crawl (1–3 seeds, depth 1) completes with @SpamBot clean before and after
-- [ ] FloodWait frequency observed < ~1/hr; zero `PeerFloodError`
-- [ ] Discovered channels are collected and appear on the graph view
-- [ ] Go/no-go for the full crawl (slice 8) recorded; governor numbers tightened if the canary showed pressure
+- [x] Canary crawl (1–3 seeds, depth 1) completes with @SpamBot clean before and after — 2026-07-23, 2 seeds (`rybar`, `wargonzo`), user confirmed @SpamBot clean before and after
+- [x] FloodWait frequency observed < ~1/hr; zero `PeerFloodError` — zero of either across the whole run
+- [x] Discovered channels are collected and appear on the graph view — both seeds collected (`rybar` id=1326223284, `wargonzo` id=1135021433); no further neighbors discovered from this message sample, not a failure of the mechanism (see bug below, now fixed)
+- [x] Go/no-go for the full crawl (slice 8) recorded; governor numbers tightened if the canary showed pressure — **GO**, no governor numbers tightened (see below)
+
+**Bug found and fixed during this canary** (blocked the first attempt entirely): `TelethonChannelSource._rpc_get_entity` passed numeric channel IDs to Telethon's `client.get_entity()` as **strings**; Telethon parses an all-digit string as a phone-number contact lookup rather than a cached numeric-peer-ID lookup, so it raised `ValueError` on every attempt to re-collect an already-known channel by ID — exactly what the crawler's expansion step does for every neighbor. The exception wasn't one of the crawler's recognized pausing exceptions, so it silently killed the background task while leaving the persisted crawl status frozen at `"running"` forever, indistinguishable from a hang. Fixed in `sidecar/telegram_channel_source.py` (`_as_entity_ref`, converts numeric refs to `int` before calling Telethon) with a regression test in `test_telegram_channel_source.py` that reproduces Telethon's real string-vs-int behavior (the prior fake stub accepted any ref uncritically, which is why this shipped undetected). Full sidecar suite (81 tests) green after the fix.
+
+Governor behaved exactly as designed throughout: paused cleanly on the metadata hourly ceiling (6 calls during 20% cold-start warm-up) mid-run with frontier state intact, resumed correctly once the hourly window rolled over, no manual intervention needed beyond waiting. No tightening warranted — the cold-start ceiling is doing its job.
 
 ### Blocked by
 

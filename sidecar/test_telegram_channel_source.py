@@ -93,7 +93,14 @@ class _FakeClient:
         self._messages = messages or []
         self._get_entity_error = get_entity_error
 
-    async def get_entity(self, ref: str):
+    async def get_entity(self, ref):
+        if isinstance(ref, str) and ref.isdigit():
+            # Faithful to real Telethon: an all-digit *string* is parsed as a phone
+            # number for contact lookup, not a cached numeric peer id — it fails for
+            # any peer that isn't a saved contact. A bare `int` resolves via the
+            # session/entity cache instead. See `_get_entity_from_string` in
+            # telethon/client/users.py.
+            raise ValueError(f'Cannot find any entity corresponding to "{ref}"')
         if self._get_entity_error is not None:
             raise self._get_entity_error
         return self._entity
@@ -177,6 +184,24 @@ async def test_fetch_recent_messages_maps_to_domain_records():
     assert records[0].text == "hello"
     assert records[0].view_count == 5
     assert "hello" in records[0].raw_json
+
+
+@pytest.mark.asyncio
+async def test_fetch_channel_metadata_resolves_numeric_ref_by_id_not_phone_lookup():
+    """A `ref` that's an already-known channel's numeric peer id (e.g. the crawler
+    re-collecting a neighbor by id, `crawl_service.real_expand_channel`) must resolve
+    via Telethon's entity cache, not get misparsed as a phone-number string lookup —
+    see `_FakeClient.get_entity`'s docstring for the real Telethon behavior this
+    reproduces."""
+    entity = _FakeEntity(id=1326223284, username="rybar", title="Rybar", broadcast=True)
+    client = _FakeClient(
+        entity=entity,
+        full_channel_result=_FakeFullChannelResult(_FakeFullChat(participants_count=1577252)),
+    )
+
+    meta = await _source_for(client).fetch_channel_metadata("1326223284")
+
+    assert meta.id == 1326223284
 
 
 @pytest.mark.asyncio
