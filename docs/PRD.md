@@ -17,8 +17,8 @@ the deployed read-only public map; **producers** (analysts) build the data (ADR
 
 Gabriel v2.0 generalises beyond military ORBATs into a **project-agnostic OSINT data-fusion
 environment** — source-rated entities of any type (corporate, maritime, financial) in a single
-auditable structure. This PRD describes the product as it stands today; the v2.0 direction and its
-module plan live in [`timelines/ROADMAP.md`](timelines/ROADMAP.md).
+auditable structure. This PRD describes the product as it stands today; the v2.0 capability plan
+lives in [`GABRIEL_V2_PRD.md`](GABRIEL_V2_PRD.md).
 
 ## Target Users
 
@@ -98,4 +98,4 @@ Analysts who want to share a snapshot of their work. They access the deployed re
 - **Resolved 2026-07-13:** `reactflow` is *not* unused — it renders the live "Hierarchy" tab
   (`modules/orbat/ui/TreeView.tsx`, `MilitarySymbolNode.tsx`), reachable from both `EditPage` and
   `ViewPage` via `AppShell`'s map/tree toggle. Product decision: keep the Hierarchy tab and the
-  dependency. See `timelines/ROADMAP.md` item A10 for the full history.
+  dependency.

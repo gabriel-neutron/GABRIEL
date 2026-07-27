@@ -1,7 +1,13 @@
 # Implementation Timeline — Telegram OSINT Module
 
-This timeline covers the implementation of the Telegram OSINT Graph Module described in `TELEGRAM_OSINT_PRD.md`.  
-See [`ROADMAP.md`](./ROADMAP.md) for the parent project's master roadmap.
+This timeline covers the implementation of the Telegram OSINT Graph Module described in `TELEGRAM_OSINT_PRD.md`.
+
+> **2026-07-22 — Phases 3 and 5 superseded by a slice-based issue breakdown.** Once real
+> Telegram collection work started, execution moved from the phase checklists below to the
+> tracer-bullet slices in [Slice-Based Execution](#slice-based-execution-phase-35-2026-07-22-)
+> below (folded in from the now-removed `docs/issues/TELEGRAM_PHASE3_ISSUES.md`). Phase 3 and
+> Phase 5's status blocks and task checkboxes are historical and no longer reflect real
+> progress — read the slice section for current status.
 
 ## Principles
 
@@ -18,11 +24,13 @@ See [`ROADMAP.md`](./ROADMAP.md) for the parent project's master roadmap.
 
 ## Phase 1 — External Tool Validation (Weeks 1-2)
 
-**Status:** in progress — blocked on human-run steps. Validation scripts for every tool
-live in `sidecar/validation/` (`README.md` there has the run order); results go in
-`sidecar/validation/RESULTS.md`. SQLite volume test has been run once (see results) —
-everything else requires a phone-verified Telegram account, a private test channel, and
-manually-sourced Russian message samples, none of which an agent can provide.
+**Status:** the collection-blocking items are resolved — see Slice 0 in
+[Slice-Based Execution](#slice-based-execution-phase-35-2026-07-22-) (member visibility is
+admins-only/NO-GO, first rate-limit floor measured, known shapes reconfirmed), and Phase 3/5's
+real work proceeded on those findings. The OpenAI NER and tgspyder validation tasks below were
+never run (tgspyder is dead per the 2026-07-16 audit; NER validation is still open, gating
+Phase 4). Validation scripts live in `sidecar/validation/` (`README.md` there has the run
+order); results in `sidecar/validation/RESULTS.md`.
 
 **Goal**: Validate each external dependency in isolation before any integration code is written. Exit criteria are hard stops — a failed validation blocks all subsequent phases.
 
@@ -128,7 +136,13 @@ Foundation infrastructure only. The sidecar must start, connect to Telegram, and
 
 ## Phase 3 — Small-Scale Collection Proof-of-Concept (Weeks 3-4)
 
-**Status:** not started for real collection (still correctly gated on Phase 1). Two of the
+**Status: superseded by the slice-based execution below** — real collection (`ChannelSource`
+seam, `expand_channel`, hardened governor) shipped as Slices 1-3, not as the tasks/checkboxes
+in this section. Left as historical record of the original plan.
+
+<details><summary>Original phase plan (superseded, click to expand)</summary>
+
+**Status (original):** not started for real collection (still correctly gated on Phase 1). Two of the
 four Phase 3 pieces have zero Telegram dependency and were built ahead of the gate: seed
 import (`sidecar/seed.py`, `POST /seed/import`, `GET /channels`, `SeedImportPanel.tsx` —
 live-tested in a real browser, seeded 3 channels, confirmed in both `/channels` and the graph
@@ -165,6 +179,8 @@ Manual seed import and single-hop collection only. No BFS traversal yet. Focus o
 - [ ] Data is stored correctly in `.tgdb` and queryable via `GET /channels`.
 - [x] Rate limit handler tested: sidecar survives a FloodWaitError and resumes collection. → verified with simulated errors (see task list above); not yet tested against a real FloodWaitError from live Telegram, since no collector.py calls it yet.
 - [ ] Collected data shape is confirmed; any schema deviations from PRD are documented and resolved.
+
+</details>
 
 ---
 
@@ -211,7 +227,13 @@ Analysis runs on the ≤ 20 channels collected in Phase 3. Validate accuracy on 
 
 ## Phase 5 — BFS Discovery Crawler (Weeks 5-6)
 
-**Status:** the traversal algorithm itself is built and tested; the Telegram-facing parts
+**Status: superseded by the slice-based execution below** — the Telegram-facing crawl wiring,
+WebSocket progress, and canary authorization shipped as Slices 5-7, not as the tasks/checkboxes
+in this section. Left as historical record of the original plan.
+
+<details><summary>Original phase plan (superseded, click to expand)</summary>
+
+**Status (original):** the traversal algorithm itself is built and tested; the Telegram-facing parts
 (edge discovery, WebSocket progress, and the real `expand_channel` implementation) are
 correctly not started. `sidecar/crawler.py`'s `run_crawl`/`start_session`/`load_session` is
 generic BFS parameterized by an injected `expand_channel(channel_id) -> list[int]` callback —
@@ -255,6 +277,161 @@ Full BFS traversal using the three confirmed discovery signals: linked channels,
 - [ ] WebSocket streams real-time progress to a browser client.
 - [ ] Crawl completes within an acceptable time window given Phase 1 rate limit measurements.
 
+</details>
+
+---
+
+## Slice-Based Execution (Phase 3→5, 2026-07-22)
+
+> Folded in from the now-removed `docs/issues/TELEGRAM_PHASE3_ISSUES.md`. This is the
+> **authoritative execution record** for Phase 3 and Phase 5 — supersedes the checklists above.
+> AFK-ready issue breakdown for real Telegram crawling (collector → expander → crawler wiring),
+> sliced as tracer bullets. Derived from `gabriel-telegram-phase3-collector-handoff.md` and an
+> adversarial critique pass (validation-first / architecture-seams / account-safety lenses).
+
+**Ordering principle:** reach real Telegram data through *product code* as early as possible
+(slice 1), settle open validation questions before building on them (slice 0), and never let
+the most ban-dangerous operations onto the automated critical path. Each slice is
+independently verifiable.
+
+**Legend:** `AFK` = implementable + mergeable without human interaction · `HITL` = requires a
+human (live ban-risk API run or a design/go-no-go decision). Slices are listed in dependency
+order; do blockers first.
+
+### 0 — Live validation spike: settle member visibility + first rate number
+
+**Type:** HITL (no product code) — **done, 2026-07-22**
+
+- [x] `01c_participant_visibility.py` run on the live session — result: non-member
+  `get_participants` returns **admins-only** (see `sidecar/validation/RESULTS.md`)
+- [x] Member-overlap go/no-go documented — **NO-GO**; Slice 4 dropped, member-overlap edge
+  removed from scope
+- [x] Rate-limit burst run on one channel — 40 tight-loop `get_messages` calls, zero
+  FloodWait, floor is ">40 calls" for this call type
+- [x] Known shape landmines reconfirmed: `participants_count` is `None` from `get_entity`
+  (needs `GetFullChannelRequest`); `get_participants` raises `ChatAdminRequiredError` on
+  broadcast channels
+
+### 1 — First live single-channel collect through the ChannelSource seam
+
+**Type:** AFK build + HITL accept — **done**
+
+Introduced a domain-typed `ChannelSource` seam (real Telethon adapter + fake adapter for
+tests); pinned the identity contract (`channels.id` **is** the Telegram peer ID, seeds stored
+username-keyed until resolved); raw JSON as the authoritative sink with
+`UNIQUE(channel_id, message_id)`; a minimal non-bypassable choke (jittered delay,
+FloodWait/PeerFlood hard-stop, cold-start cap); `POST /collect/{channel_id}`.
+
+- [x] `channels.id` equals the Telegram peer ID; no duplicate rows for a seed's later-discovered self
+- [x] Only the `ChannelSource` adapter imports Telethon
+- [x] Collector maps a real channel into `raw_json` + provisional typed columns; idempotent re-collection
+- [x] Unit tests cover the fake adapter's `None` member-count and broadcast-channel branches
+- [x] Every Telegram call passes through the choke; cold-start cap not configurable
+- [x] No send/join/invite call anywhere in the collect path
+- [x] Collected data covered by a documented per-investigation archival/deletion expectation (PII)
+- [x] **HITL:** `/collect` against a real seed channel enriches its node on the graph view, verified live
+
+### 2 — `resolve_username` seam + `expand_channel` expander
+
+**Type:** AFK — **done**
+
+Ran the `edges.py` extractors (linked-channel + keyword-mention) on real collected text; added
+a governed `resolve_username(str) -> int | None` seam; `expand_channel(id) -> list[int]`
+composes collected text → extract → resolve → identity-upsert → resolved peer IDs.
+Unresolvable usernames are dropped and logged.
+
+- [x] `expand_channel` returns real peer IDs for resolvable neighbors
+- [x] Username resolution goes through its own governed seam
+- [x] Discovered-but-uncollected neighbors upserted as placeholder rows per the identity contract
+- [x] Unit tests exercise the expander against a fake resolver + real Slice 1 data
+- [x] `expand_channel` issues no member-enumeration call
+
+### 3 — Hardened rate governor
+
+**Type:** AFK — **done**
+
+Promoted Slice 1's minimal choke into the full non-bypassable governor: min inter-call delay +
+jitter, per-call-type + global hourly ceilings + rolling 24h cap, warm-up ramp, post-FloodWait
+cooldown, a persistent cross-restart budget ledger in SQLite, a process-wide kill-switch latch,
+an `@SpamBot` preflight probe, and a per-run call-count ceiling. Config may only tighten coded
+floors.
+
+- [x] Governor enforces per-type + global + daily ceilings; config cannot raise past the coded floor
+- [x] Budget ledger persists across a sidecar restart
+- [x] `PeerFloodError` trips a process-wide kill-switch
+- [x] `FloodWaitError` triggers automatic cooldown; repeated FloodWaits auto-tighten
+- [x] `@SpamBot` status checkable, invoked as crawl preflight
+- [x] Per-run ceiling auto-pauses a run after K calls
+- [x] Unit tests (fake clock) prove throttling, floor-enforcement, ledger persistence, kill-switch
+
+### 4 — Gated member enumeration
+
+**Type:** AFK — **DROPPED, 2026-07-22.** Slice 0's result is admins-only; member enumeration
+is not built. Member-overlap edge removed from scope; BFS discovery relies only on Slice 2's
+linked-channel and keyword-mention signals.
+
+### 5 — Wire `expand_channel` into the crawler + `/crawl/*` endpoints
+
+**Type:** AFK — **done**
+
+Fed Slice 2's real `expand_channel` into `crawler.py::run_crawl`; exposed
+`POST /crawl/start|pause|resume`, `GET /crawl/status`. BFS is FloodWait-aware (pauses/resumes
+frontier expansion without losing state). Hard invariant enforced structurally: the crawler's
+`expand_channel` callback issues zero member-enumeration calls (expander module cannot import
+the participants function).
+
+- [x] `/crawl/start|pause|resume` and `/crawl/status` drive `run_crawl` with the real expander
+- [x] Pause/resume continues from the correct persisted frontier
+- [x] `FloodWaitError` mid-crawl pauses and resumes without losing state
+- [x] Crawl path issues no `GetParticipants` call
+- [x] Every expansion step routes through the governor
+
+### 6 — Canary crawl: authorize the full run
+
+**Type:** HITL — **done, GO, 2026-07-23**
+
+1–3 seed, depth-1 human-supervised crawl to authorize the full crawl (Slice 8).
+
+- [x] Canary (2 seeds: `rybar`, `wargonzo`) completed with `@SpamBot` clean before and after
+- [x] FloodWait frequency < ~1/hr observed; zero `PeerFloodError` across the run
+- [x] Discovered channels collected and appeared on the graph view
+- [x] Go/no-go recorded — **GO**, no governor numbers tightened
+
+**Bug found and fixed during this canary:** `TelethonChannelSource._rpc_get_entity` passed
+numeric channel IDs to Telethon's `client.get_entity()` as **strings**; Telethon parses an
+all-digit string as a phone-number lookup rather than a cached numeric-peer-ID lookup, raising
+`ValueError` on every re-collection of an already-known channel by ID — exactly what crawler
+expansion does for every neighbor. The exception wasn't a recognized pausing exception, so it
+silently killed the background task while the persisted crawl status stayed frozen at
+`"running"`, indistinguishable from a hang. Fixed in `sidecar/telegram_channel_source.py`
+(`_as_entity_ref`) with a regression test reproducing Telethon's real string-vs-int behavior.
+Full sidecar suite (81 tests) green after the fix.
+
+### 7 — WebSocket crawl progress + live graph
+
+**Type:** AFK — **done**
+
+`WS /ws/crawl` streams node/edge/frontier counts; the Sigma graph view reflects newly
+discovered nodes as the crawl runs.
+
+- [x] `WS /ws/crawl` streams node/edge counts and current frontier size in real time
+- [x] Graph view shows newly discovered nodes appearing during a live crawl
+- [x] Disconnect/reconnect of the WebSocket does not crash the crawl or the UI
+
+### 8 — Full 18-seed depth-3 crawl + shape/PII validation
+
+**Type:** HITL — **not started.** Next up: run the full crawl from the 18 real seed channels
+to depth 3, confirm collected data shape matches the schema, measure real message volume and
+tune `N`, confirm PII/archival handling holds at volume.
+
+- [ ] Full crawl from 18 seeds reaches a meaningful discovered-channel count (target ≥ 200 @ depth 3)
+- [ ] Collected data shape confirmed against schema; deviations documented and resolved
+- [ ] Real message volume per channel measured; `N` tuned
+- [ ] No credentials in logs; per-investigation archival/deletion expectation holds at volume
+- [ ] Governor held: no `PeerFloodError`; FloodWait handled without state loss across the full run
+
+**Blocked by:** Slice 6 (clean canary) — satisfied.
+
 ---
 
 ## Phase 6 — React Graph Module (Weeks 6-8)
@@ -269,7 +446,7 @@ auto-off above 500 nodes per the Phase 1 finding) and a real `leftPanels` entry
 on the graph tab (screenshot-confirmed). Node-click → `detailRenderer` for `telegram-channel`,
 `GraphSearch` UI, and `CrawlControls` are NOT built — they need real collected channel data and
 a running crawler, neither of which exist yet.  
-**Prerequisite:** Phase 5 exit criteria passed; Sigma.js performance validated in Phase 1; ROADMAP.md E4 (module registry) landed — see ADR [0007](./adr/0007-shell-module-registry.md).
+**Prerequisite:** Phase 5 exit criteria passed; Sigma.js performance validated in Phase 1; the shell module registry (E4) landed — see ADR [0007](../adr/0007-shell-module-registry.md).
 
 **Goal**: Build the interactive Telegram graph view in the React app. The analyst can open a `.tgdb` file, view the network, search, and inspect nodes — inside the same `AppShell`/`MainLayout` shell `orbat`/`osm` already use, not a separate page.
 

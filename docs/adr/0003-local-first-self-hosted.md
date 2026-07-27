@@ -9,7 +9,7 @@ Two audiences are made explicit and are separately addressed:
 
 ## Why
 
-The v2.0 roadmap (see `docs/timelines/ROADMAP.md`) requires a Python/FastAPI Telegram sidecar, ETL connectors to external registries, AIS/ADS-B feeds, and satellite-tile processing. None of these fit inside a browser tab. The FNF proposal budgets for hosting explicitly. Continuing to claim "browser-only" would force the already-specified Telegram module to be declared "not part of Gabriel" — splitting a single v2.0 deliverable across two repos to defend a constraint the roadmap has already abandoned.
+The v2.0 roadmap (see `docs/GABRIEL_V2_PRD.md`) requires a Python/FastAPI Telegram sidecar, ETL connectors to external registries, AIS/ADS-B feeds, and satellite-tile processing. None of these fit inside a browser tab. The FNF proposal budgets for hosting explicitly. Continuing to claim "browser-only" would force the already-specified Telegram module to be declared "not part of Gabriel" — splitting a single v2.0 deliverable across two repos to defend a constraint the roadmap has already abandoned.
 
 ## Considered options
 

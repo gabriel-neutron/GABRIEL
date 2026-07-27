@@ -2,9 +2,8 @@
 
 ## File & Folder Structure
 
-Gabriel is moving from a type-first layout to a **feature-first** `core / shell / modules` layout
-(ADR [0005](adr/0005-feature-first-modular-architecture.md)). New code goes in the target layout;
-the reorg migrates existing code stream by stream (see `timelines/ROADMAP.md`).
+Gabriel uses a **feature-first** `core / shell / modules` layout
+(ADR [0005](adr/0005-feature-first-modular-architecture.md)). New code goes in this layout.
 
 **Target layout:**
 ```
@@ -95,7 +94,7 @@ boundary, enforced by branded `LatLng` / `LngLat` types.
 - **Enrichment services** (`services/enrichment/`): unit tests for all public functions.
 - **Layered research** (`services/research/`): unit tests for BFS ordering and skip logic.
 - **GeoPackage round-trip**: the persistence integration test is the gate for any schema
-  migration (the Stream-2 epics in `timelines/ROADMAP.md` must round-trip existing `.gpkg` files).
+  migration — every migration must round-trip existing `.gpkg` files.
 - **Test runner**: Vitest only. No Jest.
 - **Storybook stories** required for: `EntityInspector`, `EnrichDrawer`, `OsmObjectInspector`,
   `GeometryActionMenu`, `NetworkLinksLayer` (with 500-entity fixture for performance testing).

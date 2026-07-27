@@ -1,4 +1,4 @@
-contin# PRD — Telegram OSINT Graph Module
+# PRD — Telegram OSINT Graph Module
 
 **Type:** Feature module  
 **Target app:** Existing React web application (ORBAT mapping tool)  
@@ -8,6 +8,9 @@ contin# PRD — Telegram OSINT Graph Module
 
 **Telethon source of truth (for all AI agents and contributors):** use `https://codeberg.org/Lonami/Telethon`. The GitHub mirror is not up to date and must not be treated as canonical.  
 **Telethon documentation source of truth:** use `https://docs.telethon.dev/en/stable/` for API and usage references.
+
+> Scope below reflects validated findings from `timelines/TELEGRAM_TIMELINE.md`, not the original
+> April 2026 scoping — read that file for how/why each item changed.
 
 ---
 
@@ -33,7 +36,6 @@ React App (port 5173)
 FastAPI sidecar (port 8000)
        │
    Telethon (MTProto)
-   tgspyder (private channel scraping)
        │
   Telegram servers
 ```
@@ -50,10 +52,9 @@ The Python sidecar manages all Telegram interaction and the `.tgdb` SQLite file.
 
 - Seed import: CSV upload or manual channel username/ID entry (FR-1)
 - Automated BFS discovery crawler with depth limit and manual pause/resume (FR-2)
-- Discovery signals: linked channels (t.me/ links), shared admins/members, keyword mentions (FR-2)
+- Discovery signals: linked channels (t.me/ links), keyword mentions (FR-2)
 - Channel/group metadata collection: name, description, member count, admins, links (FR-3)
 - Recent message collection: last 1,000–5,000 messages per channel (FR-3)
-- Member list and admin scraping via Telethon + tgspyder for private channels (FR-3)
 - Military relevance scoring: rule-based keyword/regex first, OpenAI gpt-4o-mini for ambiguous content (FR-4)
 - Entity extraction from message text via OpenAI gpt-4o-mini: units, persons, locations, equipment, MUNs (FR-5)
 - Graph storage in a separate `project.tgdb` SQLite file alongside `project.gpkg` (FR-6)
@@ -61,7 +62,6 @@ The Python sidecar manages all Telegram interaction and the `.tgdb` SQLite file.
 - Graph search: find channels by unit name, MUN, person, keyword (FR-7)
 - OOB match proposals: propose + manual confirm before writing channel URL to `.gpkg` `sources` field (FR-2)
 - Export: GraphML and Neo4j Cypher statements for external analysis (FR-7)
-- Private channel access via invite links and tgspyder (law enforcement authorized context)
 
 ### Out of Scope (v1)
 
@@ -74,6 +74,7 @@ The Python sidecar manages all Telegram interaction and the `.tgdb` SQLite file.
 - Multi-tenant or public-facing deployment
 - Integration with paid external data services
 - Automated OOB writes without analyst confirmation
+- Member enumeration and any member/admin-overlap discovery signal — not built (see `timelines/TELEGRAM_TIMELINE.md`)
 
 ---
 
@@ -91,10 +92,10 @@ No multi-tenant or public-facing requirements for v1.
 The user can import a list of Telegram channel usernames or IDs (CSV or manual entry) as the starting seed set.
 
 **FR-2 — Automated discovery**  
-BFS crawler expands the seed set by following: (a) t.me/ links found in channel descriptions and messages, (b) shared admin/member membership overlap, (c) keyword mentions that reference known entity names. Depth limit is user-configurable; the crawl can be paused and resumed at any time. When a discovered channel matches an existing OOB unit (confidence > 0.75), the system creates a match proposal for analyst review; if accepted, the channel URL is written to the unit's `sources` field.
+BFS crawler expands the seed set by following: (a) t.me/ links found in channel descriptions and messages, (b) keyword mentions that reference known entity names. Depth limit is user-configurable; the crawl can be paused and resumed at any time. When a discovered channel matches an existing OOB unit (confidence > 0.75), the system creates a match proposal for analyst review; if accepted, the channel URL is written to the unit's `sources` field.
 
 **FR-3 — Collection**  
-For each discovered channel/group, collect: full Telethon entity JSON, description, member count, admin list, recent messages (last 1,000–5,000), and linked channel references. Member lists and private channel content are scraped via tgspyder where Telethon alone is insufficient.
+For each discovered channel/group, collect: full Telethon entity JSON, description, member count, admin list, recent messages (last 1,000–5,000), and linked channel references.
 
 **FR-4 — Military relevance filter (dual-mode)**  
 Each collected channel receives a relevance score:
@@ -147,7 +148,7 @@ entities_extracted (id, source_id, source_type, entity_type,
 
 -- Edges
 edges (id, from_id, to_id, edge_type, weight, collected_at)
--- edge_type: 'LINKED_CHANNEL' | 'SHARED_ADMIN' | 'SHARED_MEMBER' | 'MENTIONS'
+-- edge_type: 'LINKED_CHANNEL' | 'MENTIONS'
 
 -- Crawl state
 crawl_sessions (id, started_at, status, depth_limit,
@@ -191,7 +192,6 @@ GET  /export/neo4j         → Cypher statements download
 |---|---|---|
 | HTTP server | FastAPI + uvicorn | Async, auto-generates OpenAPI docs, WebSocket support |
 | Telegram collection | Telethon | MTProto, handles rate limits, members, messages |
-| Private channel scraping | tgspyder | Actively maintained (Feb 2026), OSINT-focused |
 | Graph database | SQLite (aiosqlite) | Zero install, handles medium scale comfortably |
 | NER / classification | OpenAI gpt-4o-mini | Best accuracy for Russian military text, batched |
 | Graph visualization | Sigma.js + @react-sigma | WebGL, 100K+ nodes, best TypeScript support |
@@ -227,10 +227,8 @@ GET  /export/neo4j         → Cypher statements download
 |---|---|
 | Telethon rate limits / flood bans | Validate limits empirically before building crawler; implement FloodWaitError backoff |
 | **Collection account permanently banned** | See [Account Safety](#account-safety) — this is the highest-likelihood operational risk, not a tuning concern |
-| tgspyder private channel capabilities unverified | Run isolated test against a known private channel before integrating |
 | OpenAI cost at scale | Cache all extractions in SQLite; validate cost per 1K messages before enabling at scale |
 | Sigma.js performance at 5K+ nodes | Test with mock data before building crawl pipeline |
-| Telegram invite-link join may be patched | Validate tgspyder path; document manual-join fallback |
 | `.session` file contains credentials | Never commit; add to `.gitignore`; document in setup guide |
 
 ---
@@ -307,36 +305,7 @@ per-investigation archival/deletion practice and local legal obligations around 
 
 ## Open Items (Resolve Before Phase 2)
 
-1. Telegram credentials: user must supply `api_id` + `api_hash` from my.telegram.org.
+1. Telegram credentials: user must supply `api_id` + `api_hash` from my.telegram.org, stored only in `sidecar/.env` (gitignored) — never in this doc or version control.
 2. Russian military keyword dictionary: needed for rule-based relevance scoring. Build from scratch or import from existing OSINT resource?
 3. Which `.gpkg` file does the sidecar load for OOB matching? Needs a configurable path or file-picker integration.
 4. Forward chains (not selected for v1): revisit for v2 — they are the strongest signal for Russian military Telegram intelligence.
-
-
----
-
-## Credentials
-
-#telegram
-app_id=38723789
-apps_api_hash=f24b56beee4756ff947f24954710089d
-app_name=myapp
-test_ip=149.154.167.40:443
-
------BEGIN RSA PUBLIC KEY-----
-MIIBCgKCAQEAyMEdY1aR+sCR3ZSJrtztKTKqigvO/vBfqACJLZtS7QMgCGXJ6XIR
-yy7mx66W0/sOFa7/1mAZtEoIokDP3ShoqF4fVNb6XeqgQfaUHd8wJpDWHcR2OFwv
-plUUI1PLTktZ9uW2WE23b+ixNwJjJGwBDJPQEQFBE+vfmH0JP503wr5INS1poWg/
-j25sIWeYPHYeOrFp/eXaqhISP6G+q2IeTaWTXpwZj4LzXq5YOpk4bYEQ6mvRq7D1
-aHWfYmlEGepfaYR8Q0YqvvhYtMte3ITnuSJs171+GDqpdKcSwHnd6FudwGO4pcCO
-j4WcDuXc2CTHgH8gFTNhp/Y8/SpDOhvn9QIDAQAB
------END RSA PUBLIC KEY-----
-149.154.167.50:443
------BEGIN RSA PUBLIC KEY-----
-MIIBCgKCAQEA6LszBcC1LGzyr992NzE0ieY+BSaOW622Aa9Bd4ZHLl+TuFQ4lo4g
-5nKaMBwK/BIb9xUfg0Q29/2mgIR6Zr9krM7HjuIcCzFvDtr+L0GQjae9H0pRB2OO
-62cECs5HKhT5DZ98K33vmWiLowc621dQuwKWSQKjWf50XYFw42h21P2KXUGyp2y/
-+aEyZ+uVgLLQbRA1dEjSDZ2iGRy12Mk5gpYc397aYp438fsJoHIgJ2lgMv5h7WY9
-t6N/byY9Nw9p21Og3AoXSL2q/2IJ1WRUhebgAdGVMlV1fkuOQoEzR7EdpqtQD9Cs
-5+bfo3Nhmcyvk5ftB0WkJ9z6bNZ7yxrP8wIDAQAB
------END RSA PUBLIC KEY-----

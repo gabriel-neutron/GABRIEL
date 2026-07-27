@@ -16,7 +16,7 @@
 | Draw tools | leaflet-draw | ^1.0 |
 | Military symbols | milsymbol (NATO MIL-STD-2525) | ^3.0 |
 | Geospatial utils | @turf/turf | ^7.3 |
-| Flow diagrams | reactflow | ^11.11 — unused in UI, slated for removal (ROADMAP Stream-1 cleanup) |
+| Flow diagrams | reactflow | ^11.11 — renders the Hierarchy tab (`modules/orbat/ui/TreeView.tsx`); kept (see `docs/PRD.md`) |
 | Class utilities | clsx + tailwind-merge | ^2.1 / ^3.4 |
 
 ## State Management

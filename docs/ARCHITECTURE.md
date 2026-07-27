@@ -1,8 +1,7 @@
 # Architecture — Gabriel
 
 > **Scope:** this document describes the code **as it is today** — the feature-first `core / shell /
-> modules` layout from ADR [0005](adr/0005-feature-first-modular-architecture.md), which Stream 1 of
-> [`timelines/ROADMAP.md`](timelines/ROADMAP.md) completed. Generic `Entity` + `Profile`, first-class
+> modules` layout from ADR [0005](adr/0005-feature-first-modular-architecture.md). Generic `Entity` + `Profile`, first-class
 > `Source` / `Claim`, and other architectural decisions live in the ADRs
 > ([0003](adr/0003-local-first-self-hosted.md)–[0007](adr/0007-shell-module-registry.md)). Update this
 > file as the architecture evolves, so it never describes something the code does not have.

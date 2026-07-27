@@ -71,4 +71,5 @@ For architecture and implementation details:
 
 - `docs/ARCHITECTURE.md`
 - `docs/CONSTRAINTS.md`
-- `docs/timelines/ROADMAP.md`
+- `docs/adr/` (architecture decisions)
+- `docs/timelines/` (live phase/status tracking)
