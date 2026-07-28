@@ -1,5 +1,5 @@
 """
-Crawl orchestration (Slice 5, docs/issues/TELEGRAM_PHASE3_ISSUES.md) — the real,
+Crawl orchestration (Slice 5, docs/timelines/TELEGRAM_TIMELINE.md) — the real,
 Telegram-reaching composition of `crawler.py`'s generic BFS engine with Slice 2's
 `expander.expand_channel`, plus the background-task bookkeeping `/crawl/*`
 (`sidecar/main.py`) needs so a request that starts/resumes a crawl returns immediately

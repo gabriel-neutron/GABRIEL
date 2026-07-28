@@ -112,7 +112,7 @@ async def seed_import(body: SeedImportRequest) -> dict:
 
 @app.post("/collect/{channel_id}")
 async def collect(channel_id: str) -> dict:
-    """Slice 1 (docs/issues/TELEGRAM_PHASE3_ISSUES.md). Fetches one channel's metadata
+    """Slice 1 (docs/timelines/TELEGRAM_TIMELINE.md). Fetches one channel's metadata
     + a page of recent messages through the `ChannelSource` seam and persists them
     (`raw_json` authoritative, typed columns provisional). `channel_id` may be a
     username or a numeric Telegram peer id — Telethon's `get_entity` accepts either, and
@@ -225,7 +225,7 @@ class CrawlStartRequest(BaseModel):
 
 @app.post("/crawl/start")
 async def crawl_start(body: CrawlStartRequest) -> dict:
-    """Slice 5 (docs/issues/TELEGRAM_PHASE3_ISSUES.md). Starts a BFS crawl session and
+    """Slice 5 (docs/timelines/TELEGRAM_TIMELINE.md). Starts a BFS crawl session and
     spawns its loop as a background task (`sidecar/crawl_service.py`) — returns
     immediately rather than blocking the request on a run that makes many governed,
     rate-limited calls. Read-only, same as `/collect`: every Telegram call this crawl
@@ -270,7 +270,7 @@ async def crawl_status(session_id: int) -> dict:
 
 @app.websocket("/crawl/ws/{session_id}")
 async def crawl_ws_stream(websocket: WebSocket, session_id: int) -> None:
-    """Slice 7 (docs/issues/TELEGRAM_PHASE3_ISSUES.md). Streams `crawl_ws.progress_stream`'s
+    """Slice 7 (docs/timelines/TELEGRAM_TIMELINE.md). Streams `crawl_ws.progress_stream`'s
     node/edge/frontier counts to the browser. Deliberately reads only durable state
     (`crawl_ws.py`'s docstring) — this handler never touches `crawl_service`'s in-memory
     orchestration state, so a client disconnecting (tab closed, network blip, whatever)

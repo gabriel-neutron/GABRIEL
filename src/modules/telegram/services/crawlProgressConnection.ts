@@ -33,7 +33,7 @@ function isCrawlProgressPayload(value: unknown): value is CrawlProgressMessage |
 
 /**
  * Owns WS connection lifecycle for one crawl session (Slice 7,
- * docs/issues/TELEGRAM_PHASE3_ISSUES.md): reconnects after `reconnectDelayMs` on an
+ * docs/timelines/TELEGRAM_TIMELINE.md): reconnects after `reconnectDelayMs` on an
  * unexpected close (network blip, sidecar restart mid-crawl), and never reconnects once
  * `close()` has been called explicitly (component unmount, or the caller switched to a
  * different session) — a stray reconnect timer firing after that would leak a socket and

@@ -87,7 +87,7 @@ CREATE TABLE IF NOT EXISTS oob_proposals (
     decided_at TEXT
 );
 
--- Slice 3's persistent budget ledger (docs/issues/TELEGRAM_PHASE3_ISSUES.md,
+-- Slice 3's persistent budget ledger (docs/timelines/TELEGRAM_TIMELINE.md,
 -- sidecar/governor.py) — a single row (id=1, enforced by the CHECK) so the governor can
 -- reload it on every governed call instead of trusting any in-memory-only counter (the
 -- anti-pattern `sidecar/choke.py`'s `_cold_start_call_count` module global is; a
@@ -143,7 +143,7 @@ async def migrate_messages_columns(conn: aiosqlite.Connection) -> None:
 async def migrate_channels_identity(conn: aiosqlite.Connection) -> None:
     """Rebuilds `channels` if it still has the old `id INTEGER PRIMARY KEY` schema —
     SQLite has no `ALTER TABLE ... DROP CONSTRAINT`, so a pre-existing table (from before
-    Slice 1's identity-contract fix, docs/issues/TELEGRAM_PHASE3_ISSUES.md) must be
+    Slice 1's identity-contract fix, docs/timelines/TELEGRAM_TIMELINE.md) must be
     recreated. `id` stops being SQLite's rowid alias so a not-yet-collected seed row can
     genuinely have no id, instead of an autoincrement surrogate that collides with real
     Telegram peer ID space. Existing `type='seed'` rows (never collected) have their

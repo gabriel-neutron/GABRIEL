@@ -43,7 +43,7 @@ async def import_seeds(usernames: list[str], path=DEFAULT_TGDB_PATH) -> list[str
     Deliberately does not assign `id` (per the identity contract, `channels.id` IS the
     Telegram peer ID — a seed row has no real id yet, so it stays NULL and is looked up
     by `username` until `collector.py`'s reconciliation upsert resolves it on first
-    collection; see docs/issues/TELEGRAM_PHASE3_ISSUES.md Slice 1). Returning `username`
+    collection; see docs/timelines/TELEGRAM_TIMELINE.md Slice 1). Returning `username`
     instead of a surrogate rowid keeps callers from treating the row's SQLite rowid as a
     meaningful identifier."""
     now = datetime.now(timezone.utc).isoformat()

@@ -1,5 +1,5 @@
 """
-`expand_channel` (Slice 2, docs/issues/TELEGRAM_PHASE3_ISSUES.md) — turns one collected
+`expand_channel` (Slice 2, docs/timelines/TELEGRAM_TIMELINE.md) — turns one collected
 channel into the real peer ids of its resolvable neighbors, for the BFS crawler (wired in
 Slice 5) to enqueue. Thin composition, no Telegram call of its own beyond username
 resolution:

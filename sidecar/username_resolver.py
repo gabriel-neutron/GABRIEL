@@ -1,5 +1,5 @@
 """
-`UsernameResolver` seam (Slice 2, docs/issues/TELEGRAM_PHASE3_ISSUES.md) — resolves a
+`UsernameResolver` seam (Slice 2, docs/timelines/TELEGRAM_TIMELINE.md) — resolves a
 bare username to its Telegram peer id. Its own governed RPC, not a free sub-step of text
 parsing: `sidecar/expander.py`'s `expand_channel` depends on this protocol, never
 Telethon directly, so unit tests assert on plain `int | None`, never emulated Telethon

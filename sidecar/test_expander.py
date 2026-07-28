@@ -1,5 +1,5 @@
 """
-`expand_channel` tests (Slice 2, docs/issues/TELEGRAM_PHASE3_ISSUES.md) — against a real
+`expand_channel` tests (Slice 2, docs/timelines/TELEGRAM_TIMELINE.md) — against a real
 temp SQLite file populated by actually running `collector.collect_channel` (Slice 1)
 against a `FakeChannelSource`, never synthetic rows inserted by hand, and a
 `FakeUsernameResolver` double — never a live Telegram call or an emulated Telethon

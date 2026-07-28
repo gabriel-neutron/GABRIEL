@@ -4,7 +4,7 @@ BFS discovery crawler — session state, frontier persistence, pause/resume (Pha
 The traversal algorithm itself (frontier management, depth limiting, visited-set loop
 prevention, pause/resume) is generic graph BFS with no Telegram dependency —
 parameterized by an injected `expand_channel` callback, so it's fully testable with a
-fake graph, no live connection needed. Slice 5 (docs/issues/TELEGRAM_PHASE3_ISSUES.md)
+fake graph, no live connection needed. Slice 5 (docs/timelines/TELEGRAM_TIMELINE.md)
 wires the real `expander.expand_channel` composition (via `sidecar/crawl_service.py`)
 into `/crawl/*` endpoints — actually *unleashing* a real crawl remains additionally
 gated on the hardened governor (Slice 3) and the canary (Slice 6).

@@ -1,5 +1,5 @@
 """
-`crawl_service` tests (Slice 5, docs/issues/TELEGRAM_PHASE3_ISSUES.md) — full
+`crawl_service` tests (Slice 5, docs/timelines/TELEGRAM_TIMELINE.md) — full
 start-to-completion cycles against `FakeChannelSource`/`FakeUsernameResolver` (never
 Telegram, zero delay, same fakes `test_expander.py`/`test_collector.py` already use).
 `_wait_for_active_task` lets these tests observe the spawned background task's actual
@@ -95,7 +95,7 @@ async def test_unexpected_exception_persists_failed_status(tgdb_path):
     exception but leave the persisted status at whatever it last was (typically
     "running") forever — indistinguishable from a healthy long-running crawl via
     `/crawl/status`. This bit for real during Slice 8's live 18-seed crawl
-    (docs/issues/TELEGRAM_PHASE3_ISSUES.md). A seed id with no corresponding fake
+    (docs/timelines/TELEGRAM_TIMELINE.md). A seed id with no corresponding fake
     metadata raises a bare `KeyError` deep in `collector.collect_channel` — not one of
     `crawler.PAUSING_EXCEPTIONS`, not `NotAChannelError` — so it reaches the catch-all,
     which must now persist `status="failed"`."""

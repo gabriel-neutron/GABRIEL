@@ -1,5 +1,5 @@
 """
-@SpamBot preflight probe (Slice 3, docs/issues/TELEGRAM_PHASE3_ISSUES.md).
+@SpamBot preflight probe (Slice 3, docs/timelines/TELEGRAM_TIMELINE.md).
 
 THIS IS THE SIDECAR'S ONE DELIBERATE, NAMED EXCEPTION TO "NO SEND CALL ANYWHERE". Every
 other module in this sidecar is read-only collection — see

@@ -1,6 +1,6 @@
 """
 Tests for `sidecar/spambot_check.py` — the sidecar's one deliberate exception to "no
-send call anywhere" (Slice 3, docs/issues/TELEGRAM_PHASE3_ISSUES.md). Exercises the real
+send call anywhere" (Slice 3, docs/timelines/TELEGRAM_TIMELINE.md). Exercises the real
 adapter's mapping against a fake Telethon client (never the network) and asserts the
 isolation guardrail: no other collection-path module imports this module.
 """

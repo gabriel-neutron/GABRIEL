@@ -1,6 +1,6 @@
 """
 `TelethonChannelSource` — the ONLY module that imports Telethon RPCs (Slice 1,
-docs/issues/TELEGRAM_PHASE3_ISSUES.md). Every call goes through `sidecar/governor.py`'s
+docs/timelines/TELEGRAM_TIMELINE.md). Every call goes through `sidecar/governor.py`'s
 `governed_rpc` (Slice 3's hardened governor — persistent budget ledger, warm-up ramp,
 FloodWait cooldown, kill-switch latch; promoted from Slice 1's minimal
 `sidecar/choke.py`, which remains in place but is no longer the production choke-point
@@ -149,7 +149,7 @@ class TelethonChannelSource:
 
 class TelethonUsernameResolver:
     """`UsernameResolver` seam's real adapter (Slice 2,
-    docs/issues/TELEGRAM_PHASE3_ISSUES.md). Reuses `_rpc_get_entity` — the identical
+    docs/timelines/TELEGRAM_TIMELINE.md). Reuses `_rpc_get_entity` — the identical
     `governed_rpc("metadata")`-wrapped call `fetch_channel_metadata` uses — so username
     resolution shares the exact same governor choke-point and budget ledger, not a
     separate/parallel rate-limit path."""

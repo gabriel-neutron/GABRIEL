@@ -1,5 +1,5 @@
 """
-Collector tests (Slice 1, docs/issues/TELEGRAM_PHASE3_ISSUES.md), against a real
+Collector tests (Slice 1, docs/timelines/TELEGRAM_TIMELINE.md), against a real
 temp SQLite file and the `FakeChannelSource` test double — never a live Telegram call
 or an emulated Telethon shape.
 """

@@ -1,5 +1,5 @@
 """
-`run_crawl` tests (Slice 5, docs/issues/TELEGRAM_PHASE3_ISSUES.md) — FAKE
+`run_crawl` tests (Slice 5, docs/timelines/TELEGRAM_TIMELINE.md) — FAKE
 `expand_channel` callbacks only (plain async functions, no Telegram, no real sleep).
 Proves the pause/resume contract: any of `PAUSING_EXCEPTIONS` (FloodWaitError,
 AccountHardStopped, BudgetCeilingExceeded, GovernorKillSwitchTripped) raised mid-crawl

@@ -1,5 +1,5 @@
 """
-The hardened rate governor (Slice 3, docs/issues/TELEGRAM_PHASE3_ISSUES.md) —
+The hardened rate governor (Slice 3, docs/timelines/TELEGRAM_TIMELINE.md) —
 promotes Slice 1's minimal choke (`sidecar/choke.py`) into the full, non-bypassable
 governor. Still the single choke-point inside `TelethonChannelSource` — there is no
 other path to Telegram than through `governed_rpc`.

@@ -1,6 +1,6 @@
 """
 Phase 1 / Slice 0 validation — where does FloodWaitError first fire on a tight loop of
-low-risk calls? (docs/issues/TELEGRAM_PHASE3_ISSUES.md Slice 0: "A separate metered
+low-risk calls? (docs/timelines/TELEGRAM_TIMELINE.md Slice 0: "A separate metered
 rate-limit burst on a single channel records a first real data point for where
 FloodWaitError begins.")
 

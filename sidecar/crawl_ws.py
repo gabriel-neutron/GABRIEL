@@ -1,5 +1,5 @@
 """
-WS crawl-progress streaming (Slice 7, docs/issues/TELEGRAM_PHASE3_ISSUES.md).
+WS crawl-progress streaming (Slice 7, docs/timelines/TELEGRAM_TIMELINE.md).
 
 Reads exactly the same durable state `GET /crawl/status/{id}` already reads
 (`crawler.load_session`) plus graph counts (`graph.get_graph_counts`) — this is a

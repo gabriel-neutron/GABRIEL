@@ -1,6 +1,6 @@
 """
 The non-bypassable choke every outbound Telegram call must pass through (Slice 1,
-docs/issues/TELEGRAM_PHASE3_ISSUES.md). Two pieces, composed innermost-out:
+docs/timelines/TELEGRAM_TIMELINE.md). Two pieces, composed innermost-out:
 
     with_flood_wait_retry()(governed(rpc))
 
@@ -9,7 +9,7 @@ pays its own jittered delay and spends a cold-start token — a retry storm can'
 the choke by looping inside the retry decorator.
 
 This is deliberately the *minimal* choke, not the full tunable governor (that's Slice 3,
-`docs/issues/TELEGRAM_PHASE3_ISSUES.md`). The numbers below are placeholders — no Phase 0
+`docs/timelines/TELEGRAM_TIMELINE.md`). The numbers below are placeholders — no Phase 0
 live measurement exists yet for real FloodWait onset (see
 `sidecar/validation/RESULTS.md`, `01c_participant_visibility.py` still unrun) — so they
 are picked deliberately conservative and, per the Slice 1 spec, are NOT read from any

@@ -26,7 +26,7 @@ async def get_graph(path=DEFAULT_TGDB_PATH) -> dict:
     nodes = [
         {
             # Not-yet-collected seed rows have `id IS NULL` (see identity contract,
-            # docs/issues/TELEGRAM_PHASE3_ISSUES.md Slice 1) — falling back to
+            # docs/timelines/TELEGRAM_TIMELINE.md Slice 1) — falling back to
             # `str(row["id"])` for all of them would collapse every uncollected seed
             # onto the same "None" node key, so key by the real peer id once known and
             # by the row's own SQLite rowid (unique per seed) until then.

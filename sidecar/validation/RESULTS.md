@@ -170,7 +170,7 @@ Requested `limit=200`, received exactly **5** participants, all `ChannelParticip
 return rank-and-file members to a non-member.
 
 **Go/no-go decision: NO-GO on member-overlap as a non-member signal.** The PRD's member-overlap
-channel-similarity signal (Slice 4, docs/issues/TELEGRAM_PHASE3_ISSUES.md) cannot be built
+channel-similarity signal (Slice 4, docs/timelines/TELEGRAM_TIMELINE.md) cannot be built
 without joining every discovered group first — a materially worse ban-risk profile than the
 PRD's Account Safety section assumes for that signal. Per Slice 4's own conditional framing:
 **do not build Slice 4**; drop the member-overlap edge from scope. BFS discovery relies only on

@@ -1,5 +1,5 @@
 """
-Governor tests (Slice 3, docs/issues/TELEGRAM_PHASE3_ISSUES.md) — real temp-SQLite-file
+Governor tests (Slice 3, docs/timelines/TELEGRAM_TIMELINE.md) — real temp-SQLite-file
 tests (`tgdb_path` fixture, same pattern as `sidecar/test_collector.py`), fake clock
 (`monkeypatch`s `governor._now`/`governor.asyncio.sleep`, same no-real-sleep pattern as
 `sidecar/test_choke.py`), never a live Telegram call.

@@ -1,5 +1,5 @@
 """
-Slice 1 collector (docs/issues/TELEGRAM_PHASE3_ISSUES.md) — fetches one channel through
+Slice 1 collector (docs/timelines/TELEGRAM_TIMELINE.md) — fetches one channel through
 a `ChannelSource` and persists it. `raw_json` is authoritative; the typed columns
 (`title`, `member_count`, ...) are a provisional projection, promoted only once real
 collected shapes are confirmed at volume (Phase 5).

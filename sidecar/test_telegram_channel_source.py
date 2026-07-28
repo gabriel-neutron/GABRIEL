@@ -2,7 +2,7 @@
 Unit tests for `TelethonChannelSource`'s own mapping/exception-handling logic. Stubs a
 fake Telethon client object (not the real network) — assertions target the returned
 domain `ChannelMeta`/`MessageRecord`, never the stub's shape, per Slice 1's TDD note
-(docs/issues/TELEGRAM_PHASE3_ISSUES.md): "assert on domain records, never emulated
+(docs/timelines/TELEGRAM_TIMELINE.md): "assert on domain records, never emulated
 Telethon shapes."
 """
 

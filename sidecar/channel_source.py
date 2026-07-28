@@ -1,5 +1,5 @@
 """
-`ChannelSource` seam (Slice 1, docs/issues/TELEGRAM_PHASE3_ISSUES.md) — the narrow
+`ChannelSource` seam (Slice 1, docs/timelines/TELEGRAM_TIMELINE.md) — the narrow
 protocol `sidecar/collector.py` depends on. `TelethonChannelSource`
 (`sidecar/telegram_channel_source.py`) is the only module that imports Telethon RPCs;
 everything else, including all unit tests, talks to this protocol and its plain

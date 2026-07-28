@@ -1,6 +1,6 @@
 """
 Tests for `sidecar/db.py`'s identity-contract migration (Slice 1,
-docs/issues/TELEGRAM_PHASE3_ISSUES.md): a pre-existing `channels` table with the old
+docs/timelines/TELEGRAM_TIMELINE.md): a pre-existing `channels` table with the old
 `id INTEGER PRIMARY KEY` schema must be rebuilt so `id` can genuinely be NULL for
 not-yet-collected seed rows, without losing already-collected data.
 """

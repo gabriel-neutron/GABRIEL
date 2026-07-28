@@ -65,6 +65,6 @@ def is_connected() -> bool:
 
 def _get_client() -> TelegramClient | None:
     """Not public API — `sidecar/telegram_channel_source.py`'s `TelethonChannelSource` is
-    the only caller (Slice 1's `ChannelSource` seam, docs/issues/TELEGRAM_PHASE3_ISSUES.md).
+    the only caller (Slice 1's `ChannelSource` seam, docs/timelines/TELEGRAM_TIMELINE.md).
     No other module may reach the raw Telethon client; go through `ChannelSource` instead."""
     return _client

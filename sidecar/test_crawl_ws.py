@@ -1,5 +1,5 @@
 """
-`crawl_ws` tests (Slice 7, docs/issues/TELEGRAM_PHASE3_ISSUES.md) — pure unit tests
+`crawl_ws` tests (Slice 7, docs/timelines/TELEGRAM_TIMELINE.md) — pure unit tests
 against a real (but temp) `.tgdb` and fake crawl-session/channel/edge rows, no Telegram
 and no live WS client needed for this layer (see that module's docstring for why it's
 just a read-only poll of durable state, same source `get_status`/`get_graph` already read).
