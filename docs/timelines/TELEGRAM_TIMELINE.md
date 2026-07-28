@@ -420,15 +420,74 @@ discovered nodes as the crawl runs.
 
 ### 8 — Full 18-seed depth-3 crawl + shape/PII validation
 
-**Type:** HITL — **not started.** Next up: run the full crawl from the 18 real seed channels
-to depth 3, confirm collected data shape matches the schema, measure real message volume and
-tune `N`, confirm PII/archival handling holds at volume.
+**Type:** HITL — **done, 2026-07-28.** Crawl session 2 ran to `status="completed"` with an
+empty frontier: **37 channels collected, 51 nodes visited** (visited includes nodes skipped as
+non-channels), **3,725 messages**.
 
-- [ ] Full crawl from 18 seeds reaches a meaningful discovered-channel count (target ≥ 200 @ depth 3)
-- [ ] Collected data shape confirmed against schema; deviations documented and resolved
-- [ ] Real message volume per channel measured; `N` tuned
-- [ ] No credentials in logs; per-investigation archival/deletion expectation holds at volume
-- [ ] Governor held: no `PeerFloodError`; FloodWait handled without state loss across the full run
+- [x] Full crawl reached completion — but at **37 discovered channels, well short of the ≥ 200
+      target.** Accepted as a legitimate result, not a failure (the slice anticipated it:
+      "document if the real graph is sparser than that"). Four compounding causes: the seed base
+      was already down 18 → 13 before the crawl started (see below); governed pacing meant only a
+      few days of real wall-clock, though the frontier emptied *naturally* at depth 3 rather than
+      being cut short by a ceiling; discovery is text-signal-only (linked channels + keyword
+      mentions — member overlap is permanently out of scope per Slice 4), and this seed set may
+      simply not cross-link densely in message text; and a meaningful fraction of *discovered*
+      candidate usernames were themselves non-channel or unresolvable. On the positive side the
+      mechanism did surface genuinely significant nodes — `rt_russian`, `vedomosti`,
+      `mod_russia` (the Russian MoD's official channel) — so it finds real, relevant channels,
+      just not at volume.
+- [x] Data shape confirmed against schema — `raw_json` plus every typed column (`id`, `username`,
+      `title`, `member_count`, `description`, `broadcast`/`megagroup`/`restricted`) populated
+      correctly, Cyrillic intact. **No deviations found; nothing needs promoting to a new typed
+      column.**
+- [x] Message volume measured; **`N` (`message_limit=100`) left as-is.** Most channels landed near
+      the default. A few (`rybar`, `wargonzo`) show 200+ because they were collected twice days
+      apart (Slice 6's canary on 07-23, this crawl on 07-27/28) and post fast enough that the two
+      "most recent 100" windows barely overlapped — a real property of high-velocity channels
+      sampled repeatedly, not a sampling defect. Two genuine low-volume outliers:
+      `zapiskiveterana` (5 messages, confirmed across two separate collects) and `grey_zone`
+      (**0** messages — collected successfully with metadata present, but no retrievable history;
+      not independently verified whether that is a fully empty channel or some other restriction).
+- [x] No credentials in logs — `sidecar/sidecar.log` grepped for token / credential /
+      session-string patterns, clean.
+- [x] Governor held — **zero `PeerFloodError` across the whole run**, no FloodWait state loss. The
+      only crash was bug 1 below, since fixed.
+
+**Seed attrition, 18 → 13.** `colonelcassad`, `Osetin` and `frontovik` resolve to Telegram *user*
+accounts rather than channels; `wagner_group_pmc` and `ngp_rzv` do not resolve at all
+(`ValueError: No user has "X" as username` — likely renamed, deleted or banned since the seed list
+was written). All five dropped by explicit user decision; the crawl ran on the remaining 13. Also
+cleaned up in passing: a stale duplicate seed row from a username-casing mismatch
+(`ZapiskiVeterana` vs. Telethon's canonical `zapiskiveterana`) — **a real identity-reconciliation
+gap that is still present in the code**, worked around by deleting the one duplicate row rather
+than fixed. Worth a narrow slice if it recurs at the next username-cased seed.
+
+**Two bugs found live and fixed** (commit `aceb61f`) — both surfaced only at real 18-seed/depth-3
+scale; Slice 6's 2-seed depth-1 canary exercised neither path:
+
+1. **`NotAChannelError`** (new, `sidecar/channel_source.py`). BFS expansion killed the entire
+   background task the first time a *discovered* neighbor resolved to a user account rather than
+   a channel — `GetFullChannelRequest`'s `TypeError: Cannot cast InputPeerUser to any kind of
+   InputChannel` was uncaught inside `crawl_service.real_expand_channel`. Now raised as a named
+   exception from `telegram_channel_source.py` and caught in `crawler.run_crawl`, which skips
+   that one node (marks it visited, zero neighbors) instead of dying. Same underlying condition
+   as the seed-resolution failures above — it just also happens mid-crawl on discovered nodes,
+   which nothing previously handled.
+2. **Silent-crash status gap** (`crawl_service._run_in_background`). The catch-all for a genuinely
+   unexpected exception logged and did nothing else, leaving `crawl_sessions.status` frozen at
+   `"running"` forever — indistinguishable from a healthy long-running crawl via `/crawl/status`.
+   This is exactly the gap Slice 6 flagged as "worth a narrow follow-up if it recurs"; it
+   recurred (bug 1 killed the task this way for hours overnight while `/crawl/status` still
+   reported `"running"`). Now persists `status="failed"`. `resume_crawl` already permits resuming
+   any non-`"completed"` status, so a failed session resumes as-is once its root cause is fixed.
+
+Both have regression tests (`test_telegram_channel_source.py`, `test_crawler.py`,
+`test_crawl_service.py`); full sidecar suite green at 84 tests.
+
+**Follow-up in flight:** crawl session 3 — same 13 seeds at `depth_limit=4` — was started
+2026-07-28 to test whether the depth-3 frontier was genuinely exhausted or merely depth-capped.
+Because `visited` is per-session, it re-walks all 51 nodes before reaching the new hop-4 layer.
+Its result determines whether 37 is the accepted final Phase 3 number.
 
 **Blocked by:** Slice 6 (clean canary) — satisfied.
 
