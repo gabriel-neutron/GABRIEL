@@ -270,7 +270,8 @@ Full BFS traversal using the three confirmed discovery signals: linked channels,
 - [ ] Run a full crawl from 10 seed channels to depth 3; measure time and final graph size.
 - [ ] Validate: at least 200 channels discovered; graph is acyclic-safe (visited set prevents loops).
 
-**Exit Criteria**
+**Exit Criteria** (historical — settled by [Slice 8](#8--full-18-seed-depth-3-crawl--shapepii-validation),
+which measured 37 channels from 13 seeds at depth 3, not ≥ 200)
 - [ ] Crawl from 10 seeds reaches ≥ 200 channels at depth 3.
 - [ ] Pause and resume work: restarting from a paused session continues from the correct frontier.
 - [ ] FloodWaitError during crawl does not lose state.
@@ -425,8 +426,11 @@ empty frontier: **37 channels collected, 51 nodes visited** (visited includes no
 non-channels), **3,725 messages**.
 
 - [x] Full crawl reached completion — but at **37 discovered channels, well short of the ≥ 200
-      target.** Accepted as a legitimate result, not a failure (the slice anticipated it:
-      "document if the real graph is sparser than that"). Four compounding causes: the seed base
+      target.** Recorded as a measured result rather than a passed criterion: the crawl ran to a
+      naturally empty frontier, so 37 is what this seed set yields at depth 3, and the Risk
+      Register's prescribed response for this signal (`< 200 channels found at depth 3` → "Add
+      forward-chain edge type in v2; document gap") is **still owed** — no v2 gap entry or ADR has
+      been filed. Four compounding causes: the seed base
       was already down 18 → 13 before the crawl started (see below); governed pacing meant only a
       few days of real wall-clock, though the frontier emptied *naturally* at depth 3 rather than
       being cut short by a ceiling; discovery is text-signal-only (linked channels + keyword
@@ -438,8 +442,9 @@ non-channels), **3,725 messages**.
       just not at volume.
 - [x] Data shape confirmed against schema — `raw_json` plus every typed column (`id`, `username`,
       `title`, `member_count`, `description`, `broadcast`/`megagroup`/`restricted`) populated
-      correctly, Cyrillic intact. **No deviations found; nothing needs promoting to a new typed
-      column.**
+      correctly, Cyrillic intact. **No schema deviations; nothing needs promoting to a new typed
+      column.** One open data question, not a schema one: `grey_zone` returned zero messages and
+      the cause was never established (see below) — unresolved, tracked here rather than closed.
 - [x] Message volume measured; **`N` (`message_limit=100`) left as-is.** Most channels landed near
       the default. A few (`rybar`, `wargonzo`) show 200+ because they were collected twice days
       apart (Slice 6's canary on 07-23, this crawl on 07-27/28) and post fast enough that the two
@@ -449,7 +454,9 @@ non-channels), **3,725 messages**.
       (**0** messages — collected successfully with metadata present, but no retrievable history;
       not independently verified whether that is a fully empty channel or some other restriction).
 - [x] No credentials in logs — `sidecar/sidecar.log` grepped for token / credential /
-      session-string patterns, clean.
+      session-string patterns, clean. **Only half of this criterion is evidenced:** the
+      per-investigation archival/deletion expectation at volume was never exercised or tested.
+      Still owed.
 - [x] Governor held — **zero `PeerFloodError` across the whole run**, no FloodWait state loss. The
       only crash was bug 1 below, since fixed.
 
@@ -483,6 +490,27 @@ scale; Slice 6's 2-seed depth-1 canary exercised neither path:
 
 Both have regression tests (`test_telegram_channel_source.py`, `test_crawler.py`,
 `test_crawl_service.py`); full sidecar suite green at 84 tests.
+
+**Open follow-ups raised by the review of `aceb61f` (2026-07-28), none yet fixed:**
+
+- **`"failed"` is not propagated past the sidecar's own status endpoint.**
+  `src/modules/telegram/services/sidecar.service.ts` still types crawl status as
+  `"running" | "paused" | "completed"`, and `crawl_ws.progress_stream` terminates only on
+  `"completed"` — so a failed session streams progress frames to the live graph forever. That is
+  the *same* "a dead crawl is indistinguishable from a healthy one" symptom bug 2 above set out
+  to close, displaced one layer up into the WS path. The legal status set also lives only in a
+  trailing comment on `CrawlState.status`; a shared `CrawlStatus` literal plus a terminal-status
+  predicate would stop the next value from drifting the same way.
+- **`NotAChannelError`'s `except TypeError` is too broad.** In
+  `telegram_channel_source.py` the guarded block spans the RPC *and* the
+  `full.full_chat.participants_count` / `.about` reads that follow it, so an unrelated `TypeError`
+  from either attribute walk is relabelled "resolves to a Telegram user" and the crawler silently
+  marks a legitimate channel visited with zero neighbours. An `isinstance(entity, User)` check
+  before the call would be exact; narrowing the `try` to the RPC alone is the minimum.
+- **`TelethonUsernameResolver` still admits user accounts to the frontier.** It shares
+  `_rpc_get_entity` but not the channel guard, so every discovered user account costs a governed
+  RPC before being skipped — Slice 1 identity-contract territory, along with the
+  `ZapiskiVeterana` casing duplicate above.
 
 **Follow-up in flight:** crawl session 3 — same 13 seeds at `depth_limit=4` — was started
 2026-07-28 to test whether the depth-3 frontier was genuinely exhausted or merely depth-capped.
