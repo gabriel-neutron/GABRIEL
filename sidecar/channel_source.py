@@ -31,11 +31,21 @@ class MessageRecord:
     raw_json: str
 
 
+class NotAChannelError(Exception):
+    """Raised by `fetch_channel_metadata` when `ref` resolves to a Telegram entity that
+    isn't a channel/supergroup — in practice, a user account (e.g. a seed username that
+    turns out to name a person, or a BFS-discovered neighbor whose linked/mentioned
+    username belongs to a user, not a channel). Distinct from "not found": the entity
+    exists, collection just doesn't apply to it. A caller expanding many discovered
+    neighbors should treat this as "skip this one node," not as a reason to stop."""
+
+
 class ChannelSource(Protocol):
     async def fetch_channel_metadata(self, ref: str) -> ChannelMeta:
         """`ref` is a username or numeric-id string. Wraps `get_entity` +
         `GetFullChannelRequest` — `participants_count` is `None` from `get_entity` alone
-        (see sidecar/validation/RESULTS.md)."""
+        (see sidecar/validation/RESULTS.md). Raises `NotAChannelError` if `ref` names a
+        user rather than a channel/supergroup."""
         ...
 
     async def fetch_recent_messages(self, ref: str, limit: int) -> list[MessageRecord]:

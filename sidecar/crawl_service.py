@@ -96,11 +96,18 @@ async def _run_in_background(state: CrawlState, source: ChannelSource, resolver:
         # A background task's exception has nowhere else to go — crawler.run_crawl
         # already converts every expected pausing condition (FloodWaitError,
         # AccountHardStopped, BudgetCeilingExceeded, GovernorKillSwitchTripped) into a
-        # persisted "paused" state without raising, so anything reaching here is
-        # genuinely unexpected. Log it rather than let asyncio silently swallow it
-        # (an un-awaited task's exception otherwise only surfaces via a destructor
-        # warning), and leave whatever was last persisted as the durable record.
+        # persisted "paused" state without raising, and NotAChannelError into a skipped
+        # node, so anything reaching here is genuinely unexpected. Log it rather than
+        # let asyncio silently swallow it (an un-awaited task's exception otherwise
+        # only surfaces via a destructor warning). Persist `status="failed"` — Slice 8's
+        # live crawl hit exactly this gap: leaving the last-persisted status (typically
+        # "running") untouched made a silently-dead background task indistinguishable
+        # from a healthy long-running one via `/crawl/status`. Frontier/visited are left
+        # exactly as last persisted, so a future `resume_crawl` (once the underlying bug
+        # is fixed) still continues from the right place.
         logger.exception("crawl_service: background crawl for session_id=%s failed unexpectedly", state.session_id)
+        state.status = "failed"
+        await crawler.persist_state(state, path)
     finally:
         _pause_requested.pop(state.session_id, None)
         _active_tasks.pop(state.session_id, None)

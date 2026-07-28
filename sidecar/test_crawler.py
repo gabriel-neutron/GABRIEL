@@ -15,6 +15,7 @@ import pytest_asyncio
 from telethon.errors import FloodWaitError
 
 from sidecar import crawler, db, governor
+from sidecar.channel_source import NotAChannelError
 from sidecar.governor import BudgetCeilingExceeded, GovernorKillSwitchTripped
 from sidecar.rate_limiter import AccountHardStopped
 
@@ -194,6 +195,27 @@ async def test_account_hard_stopped_pauses_without_losing_state(tgdb_path):
 
     assert resumed.status == "completed"
     assert resumed.visited == await _run_to_completion_reference()
+
+
+@pytest.mark.asyncio
+async def test_not_a_channel_error_skips_the_node_without_pausing(tgdb_path):
+    """Regression: a BFS-discovered neighbor that turns out to be a Telegram user, not
+    a channel, must not crash or pause the whole run — Slice 8's live crawl hit exactly
+    this (a user-linked mention among a channel's discovered neighbors) and it silently
+    killed the background task before `NotAChannelError` was caught here. The node is
+    skipped (marked visited, zero neighbors contributed) and the crawl keeps going."""
+
+    async def expand_with_unchannelable_node(channel_id: int) -> list[int]:
+        if channel_id == 2:
+            raise NotAChannelError(f"{channel_id!r} resolves to a Telegram user, not a channel")
+        return list(GRAPH.get(channel_id, []))
+
+    state = await crawler.start_session([1], depth_limit=3, path=tgdb_path)
+    state = await crawler.run_crawl(state, expand_with_unchannelable_node, path=tgdb_path)
+
+    assert state.status == "completed"
+    assert 2 in state.visited  # skipped, not stuck at the front of the frontier
+    assert 4 not in state.visited  # only reachable via node 2's real neighbors
 
 
 @pytest.mark.asyncio

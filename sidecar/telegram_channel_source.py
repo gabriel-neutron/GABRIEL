@@ -28,7 +28,7 @@ from telethon.errors import ChatAdminRequiredError, UsernameInvalidError, Userna
 from telethon.tl.functions.channels import GetFullChannelRequest
 
 from sidecar import telegram_client
-from sidecar.channel_source import ChannelMeta, MessageRecord
+from sidecar.channel_source import ChannelMeta, MessageRecord, NotAChannelError
 from sidecar.governor import governed_rpc
 from sidecar.logging_config import logger
 
@@ -93,6 +93,15 @@ class TelethonChannelSource:
                 "GetFullChannelRequest forbidden for %r (broadcast channel) — member_count unknown",
                 ref,
             )
+        except TypeError as e:
+            # `ref` resolved (via `get_entity`) but to a Telegram *user*, not a
+            # channel/supergroup — `GetFullChannelRequest` can only take a channel-like
+            # peer, so Telethon's own `utils.get_input_channel` raises `TypeError:
+            # Cannot cast InputPeerUser to any kind of InputChannel` here. Surfaces as a
+            # named, catchable condition rather than a bare `TypeError` reaching a
+            # caller (e.g. the crawler's BFS expansion, which must skip this node
+            # rather than crash the whole run — see `sidecar/crawler.py`).
+            raise NotAChannelError(f"{ref!r} resolves to a Telegram user, not a channel") from e
 
         is_broadcast = bool(getattr(entity, "broadcast", False))
         username = getattr(entity, "username", None)

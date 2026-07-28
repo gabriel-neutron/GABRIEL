@@ -15,6 +15,7 @@ import pytest_asyncio
 from telethon.errors import ChatAdminRequiredError, UsernameInvalidError, UsernameNotOccupiedError
 
 from sidecar import db, governor
+from sidecar.channel_source import NotAChannelError
 from sidecar.telegram_channel_source import TelethonChannelSource, TelethonUsernameResolver
 
 
@@ -166,6 +167,25 @@ async def test_fetch_channel_metadata_degrades_gracefully_on_chat_admin_required
     assert meta.member_count is None
     assert meta.description is None
     assert meta.id == 789
+
+
+@pytest.mark.asyncio
+async def test_fetch_channel_metadata_raises_not_a_channel_error_for_user_entity():
+    """A `ref` that resolves (via `get_entity`) to a Telegram *user* rather than a
+    channel/supergroup makes `GetFullChannelRequest` fail with a real Telethon
+    `TypeError` ("Cannot cast InputPeerUser to any kind of InputChannel") — reproduced
+    live during Slice 8's crawl when BFS discovery surfaced a user-linked mention as a
+    neighbor, which crashed the whole background task before this was caught. Must
+    surface as `NotAChannelError`, not the bare `TypeError`, so callers (the crawler)
+    can catch it specifically and skip just that one node."""
+    entity = _FakeEntity(id=321, username="someuser", title="Some User")
+    client = _FakeClient(
+        entity=entity,
+        full_channel_error=TypeError("Cannot cast InputPeerUser to any kind of InputChannel."),
+    )
+
+    with pytest.raises(NotAChannelError):
+        await _source_for(client).fetch_channel_metadata("someuser")
 
 
 @pytest.mark.asyncio

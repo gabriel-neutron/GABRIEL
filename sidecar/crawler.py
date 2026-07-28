@@ -18,6 +18,7 @@ from typing import Awaitable, Callable
 import aiosqlite
 from telethon.errors import FloodWaitError
 
+from sidecar.channel_source import NotAChannelError
 from sidecar.db import DEFAULT_TGDB_PATH
 from sidecar.governor import BudgetCeilingExceeded, GovernorKillSwitchTripped, is_run_ceiling_hit
 from sidecar.logging_config import logger
@@ -35,12 +36,18 @@ ExpandChannel = Callable[[int], Awaitable[list[int]]]
 # human or a clock," never "crash the crawl and lose the frontier."
 PAUSING_EXCEPTIONS = (FloodWaitError, AccountHardStopped, BudgetCeilingExceeded, GovernorKillSwitchTripped)
 
+# `NotAChannelError` is different in kind: it means *this one node* isn't collectible
+# (a BFS-discovered neighbor's linked/mentioned username turned out to name a Telegram
+# user, not a channel) — not "stop calling Telegram right now." Handled separately in
+# the loop below: skip the node (mark visited, zero neighbors), keep going, rather than
+# pausing or (before this was caught at all) crashing the whole background task.
+
 
 @dataclass
 class CrawlState:
     session_id: int
     depth_limit: int
-    status: str  # "running" | "paused" | "completed"
+    status: str  # "running" | "paused" | "completed" | "failed" (crawl_service.py, an unexpected exception)
     frontier: list[tuple[int, int]] = field(default_factory=list)  # (channel_id, depth)
     visited: set[int] = field(default_factory=set)
 
@@ -131,6 +138,11 @@ async def run_crawl(
     first, so a resumed crawl reaches an identical final `visited` set to one that was
     never interrupted at all.
 
+    If `expand_channel` instead raises `NotAChannelError` (module-level comment), the
+    channel is marked visited with zero neighbors, exactly like a depth-limited leaf —
+    it's not collectible, but that's a property of that one node, not a reason to pause
+    the whole run.
+
     `should_pause`, if given, is checked at the top of every iteration, before popping —
     a `True` result is handled exactly like a pausing exception (pause, persist, return)
     so a caller (e.g. a background-task orchestrator) can request a cooperative pause
@@ -175,6 +187,9 @@ async def run_crawl(
             neighbor_ids = await expand_channel(channel_id)
         except PAUSING_EXCEPTIONS as e:
             return await _pause(f"channel_id={channel_id} raised {type(e).__name__}: {e}")
+        except NotAChannelError as e:
+            logger.warning("run_crawl: skipping channel_id=%s (not a channel) — %s", channel_id, e)
+            neighbor_ids = []
 
         _mark_visited(channel_id)
         steps += 1

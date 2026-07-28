@@ -90,6 +90,25 @@ async def test_pause_then_resume_reaches_same_final_state_as_uninterrupted_run(t
 
 
 @pytest.mark.asyncio
+async def test_unexpected_exception_persists_failed_status(tgdb_path):
+    """Regression: `_run_in_background`'s catch-all used to log an unexpected
+    exception but leave the persisted status at whatever it last was (typically
+    "running") forever — indistinguishable from a healthy long-running crawl via
+    `/crawl/status`. This bit for real during Slice 8's live 18-seed crawl
+    (docs/issues/TELEGRAM_PHASE3_ISSUES.md). A seed id with no corresponding fake
+    metadata raises a bare `KeyError` deep in `collector.collect_channel` — not one of
+    `crawler.PAUSING_EXCEPTIONS`, not `NotAChannelError` — so it reaches the catch-all,
+    which must now persist `status="failed"`."""
+    source, resolver = _fakes()
+
+    state = await crawl_service.start_crawl([9999], depth_limit=2, path=tgdb_path, source=source, resolver=resolver)
+    await crawl_service._wait_for_active_task(state.session_id)
+
+    final = await crawler.load_session(state.session_id, path=tgdb_path)
+    assert final.status == "failed"
+
+
+@pytest.mark.asyncio
 async def test_get_status_reflects_reality_after_completion(tgdb_path):
     source, resolver = _fakes()
 
