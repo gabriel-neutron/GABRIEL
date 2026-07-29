@@ -834,3 +834,161 @@ narrowed to the four structured schemes and criterion 26b pins the new behaviour
 the second owner-authorised amendment to `SLICE_1_CRITERIA.md`. **No migration is needed and none
 ever will be:** the normalised form is recomputed at every comparison and has never been
 persisted. Ruled before the first consumer, exactly as this entry asked.
+
+---
+
+## Q32 — are all eight `SaveGeoPackageOptions` fields required, or only the three that are positional-required today?
+
+**Raised by:** planning agent (Phase 1), Slice 2A.
+
+**Question.** Spec ordering item 1 says only "Convert `saveGeoPackage` to an options
+object". It does not say which members are required. Naming the eight params kills
+wrong-slot bugs but not the failure the spec actually names — "omission silently wipes a
+table". Only requiredness makes omission a compile error. Against that: making every field
+required forces churn on ~13 test call sites that legitimately care about three of the
+eight, and grows two test files that are at or over the 300-line cap
+(`project-gpkg-fixture.test.ts` 299, `geopackage.service.test.ts` 321 — see Q35).
+
+**Guess I would have made.** Mirror today's optionality (`layers`/`entities`/`geometries`
+required, the other five `?`-optional) for a zero-churn, zero-behaviour-change refactor.
+
+**Conservative reading implemented.** The opposite, and deliberately: **all eight are
+required properties**, with the five legitimately-absent ones typed `T | undefined` rather
+than `?`, so "nothing here" must be written as an explicit `undefined` and a forgotten key
+is a compile error. Frozen as criterion 4 in `SLICE_2A_CRITERIA.md`, with a `@ts-expect-error`
+type test (criterion 5) giving it teeth under `tsc -b`. The decisive argument is that the
+same spec section applies the identical remedy to the store one item later — "Make
+`relationships` and `integrityEvents` **required** on `setProject` ... Turns 'forgot a call
+site' into a compile error ... highest-value change in the slice"
+(`GABRIEL_V2_SLICE_0_1_BUILD.md:592-595`) — and states the principle at `:571-572`: "An
+optional record field a call site forgets is a record that silently does not exist."
+Requiredness on the save side is that ruling applied to the other half of the same data path.
+It is also what makes Slice 2B's two new fields break every un-updated call site at compile
+time, which is the point of doing this conversion first.
+
+**What a reader should decide.** Whether the test verbosity is the trade you want. If not,
+the reversal is mechanical — add `?` to the five, delete the explicit `undefined`s — but
+criterion 4 is frozen, so it must be recorded as a failed criterion rather than edited, and
+Slice 2B then inherits an options object that can still be silently under-filled.
+
+---
+
+## Q33 — what distinguishes "the store never successfully loaded" from "this project is legitimately empty", and what should the refusal say?
+
+**Raised by:** planning agent (Phase 1), Slice 2A.
+
+**Question.** Spec ordering item 3 says a failed load must not arm a destructive save and
+that the guard belongs inside `performProjectSave` (~6 lines). It does not say what signal
+the guard reads. There is no existing one: the `restoreSession` catch
+(`useProjectIO.ts:128-132`) leaves the store at `initialState()` and sets only a hook-local
+`error` that `handleSave` clears at `:225` and that `performProjectSave` cannot see;
+`restoredFromSession` is never set by `handleOpen` and self-clears after 4 s;
+`useProjectStore` has no "loaded" field and must not gain one (Prohibition 5 — it is 343
+lines against a 300 cap).
+
+**Guess I would have made.** Add a `hasLoaded` flag to `useProjectStore` and thread it into
+`ProjectSaveInput`.
+
+**Conservative reading implemented.** No new flag anywhere. The guard derives its answer
+from what `performProjectSave` already holds: it refuses when `deps.loadProject()` returned
+a buffer with `byteLength > 0` **and** the snapshot is empty in all four data dimensions
+(`entities`, `geometries`, `claims`, `sources` all length 0). That conjunction is exactly the
+failed-restore state and is not reachable by a normal New Project, because `handleNew` calls
+`clearProject()` at `:162` first, so `loadProject()` resolves `null`. Frozen as criterion 24.
+
+**Two things a reader must rule on.**
+1. **The residual false positive.** A user who deliberately empties a real project and saves
+   is refused, with no in-app override. That is the safe direction, but the same spec section
+   warns at `:576-578` that "blocking save on an irreplaceable working file is the wrong
+   failure direction" — said of integrity-event gating, not of this guard, which the spec
+   orders explicitly. If an override is wanted it is a new UI affordance, not a Slice 2A edit.
+2. **The message wording.** Criterion 25 pins `/refusing to overwrite/i` because a test needs
+   a string to assert. Nobody has read the sentence for tone or actionability; it is surfaced
+   verbatim to the analyst through `handleSave`'s error banner and should say what to do next
+   (reload the project), not merely that the save was refused.
+
+---
+
+## Q34 — where does `projectStateFromLoadResult` live, and what is its signature?
+
+**Raised by:** planning agent (Phase 1), Slice 2A.
+
+**Question.** Spec ordering item 2 names the function and the two literal sites it replaces
+(`useProjectIO.ts:114-120` and `:194-200`) and nothing else — no module, no signature, no
+return type name. Both sites are preceded by an identical
+`const next = applyGeoPackageResult(result, null)` (`:113`, `:193`), so the duplication is
+seven lines, not five.
+
+**Guess I would have made.** Put it in `src/core/persistence/geopackage/applyResult.ts`
+beside `applyGeoPackageResult`, and mint a new exported type name for the return value.
+
+**Conservative reading implemented.** Same file as `performProjectSave`
+(`src/hooks/useProjectIO.ts`), exported, plain function, no new module and no new domain
+type — following the precedent `performProjectSave` already sets in that file: a React-free,
+separately-testable function living in the hook module. It takes the `GeoPackageLoadResult`
+and absorbs the `applyGeoPackageResult(result, null)` call, returning the five-field object
+`setProject` takes. Frozen as criteria 31-34. `useProjectIO.ts` is 242 lines and stays well
+under the cap.
+
+**What a reader should decide.** Whether it belongs in `core/persistence/geopackage/` once
+Slice 2B adds `relationships` and `integrityEvents` to the same object — at that point it is
+arguably load-result-shaping, not hook plumbing, and moving it is cheap while it has two
+callers.
+
+---
+
+## Q35 — two test files hit the 300-line cap because of the options-object conversion, and Prohibition 5 forbids fixing one of them
+
+**Raised by:** planning agent (Phase 1), Slice 2A.
+
+**Question.** Converting each positional call site to a required-eight-member object adds
+roughly five lines per site. `project-gpkg-fixture.test.ts` is 299 lines with **9** call
+sites (the handoff brief says 8; there are 9 — lines 68, 102, 128, 151, 164, 205, 231, 264,
+281) and lands around 338. `geopackage.service.test.ts` is **already 321** with 4 call sites
+and lands around 350. `CONSTRAINTS.md:113` caps files at 300; Prohibition 5 forbids fixing
+pre-existing violations.
+
+**Guess I would have made.** Split both files by concern.
+
+**Conservative reading implemented.** Split only the file the handoff explicitly authorised.
+`project-gpkg-fixture.test.ts` was compliant at BASE, so letting it cross the cap would be a
+**new** violation — criterion 20 requires it to end at 300 lines or fewer, or be split by
+concern. `geopackage.service.test.ts` was already over, so splitting it would be *fixing* a
+pre-existing violation, which Prohibition 5 forbids — criterion 21 therefore records its size
+without gating on it, and forbids restructuring it beyond call-site conversion.
+
+**What a reader should decide.** Whether `geopackage.service.test.ts` gets its own splitting
+task. Also worth noting: this repo has no `max-len` ESLint rule and no Prettier config
+(verified — no `.prettierrc*`, no `prettier.config.*`), so line-count pressure is entirely a
+function of how the converting agent chooses to wrap the object literals. That is a genuine
+per-file judgement, not a mechanical outcome.
+
+---
+
+## Q36 — the NUL byte-scan command printed in the slice docs cannot fail, and neither can the `--text` workaround
+
+**Raised by:** planning agent (Phase 1), Slice 2A.
+
+**Question.** Trap T7 (`GABRIEL_V2_SLICE_0_1_BUILD.md:488`) and Phase 6 step 1
+(`SLICE_BUILD_LOOP.md:120`) both prescribe `rg -c $'\x00' src/` as the NUL byte-scan. The
+handoff brief for this slice notes that form is broken in Git Bash here and suggests
+`rg --text -c $'\x00'` instead.
+
+**Measured, not guessed.** Both forms are broken, identically. Against a control file
+containing `hello\nworld\n` and no NUL byte at all, `rg --text -c $'\x00' file` prints `2`
+and exits 0; against a file that does contain a NUL it also prints `2`. Git Bash collapses
+`$'\x00'` to an empty-string argument, so `rg` matches the empty pattern on every line. The
+check can never fail and can never distinguish a clean file from a dirty one — it has been
+reporting green vacuously for every slice that ran it.
+
+**Conservative reading implemented.** Criterion 48 of `SLICE_2A_CRITERIA.md` replaces it
+with a Node byte scan (`fs.readFileSync(p).includes(0)`) over the changed and untracked
+files, and explicitly forbids the verifying agent from reporting an `rg`-based NUL check as
+evidence. This planning agent may not edit the two source documents, so the broken command
+still stands in both.
+
+**What a reader should do.** Correct `GABRIEL_V2_SLICE_0_1_BUILD.md:488` and
+`SLICE_BUILD_LOOP.md:120`. Worth a moment's thought too: this run's own doc append was
+mojibaked by a PowerShell encoding default and caught only by a follow-up grep, which
+suggests the byte-level checks in this loop deserve a small shared script rather than a
+command line copied between documents.
