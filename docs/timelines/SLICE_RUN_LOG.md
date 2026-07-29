@@ -437,6 +437,10 @@ private repository's git history and that the pre-migration commit is pinned bef
 first runs. Slice 2 is that migration, and until the push these 20 commits existed on one machine
 only — the ADR's safety net did not exist. Pushing is what creates it.
 
+> **Pre-migration pin: `5b0d2ed`**, pushed to `origin/telegram-osint-sidecar` on 2026-07-29.
+> This is the last commit before Slice 2 touches `public/project.gpkg`. It is the revert point
+> ADR 0010 requires, and it now exists off this machine.
+
 ### Ruling 6 — both uncommitted leftovers committed, separately
 
 - **`e8b6e13`** — `docs: drop the STANAG source-rating timeline, superseded by the shipped
