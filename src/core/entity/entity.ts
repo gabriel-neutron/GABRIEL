@@ -1,4 +1,5 @@
 import type { OrganisationType } from "@/types/organisation.types"
+import type { ExternalId } from "./externalId"
 
 export type PositionMode = "own" | "parent" | "none"
 
@@ -22,6 +23,14 @@ export type EntityCore = {
    * Latin↔Cyrillic alias spellings. Absent/`[]` means "no known aliases".
    */
   aliases?: string[]
+  /**
+   * Registry and sanctions-list identifiers this entity is known by (ADR 0010,
+   * Slice 1): an IMO number, an INN, an LEI, an OFAC SDN id. Unlike aliases,
+   * these are exact-match keys — they are what lets a record here be tied to a
+   * row in an external register without relying on a name. Absent means "no
+   * recorded external ids", and an empty array is persisted as absent.
+   */
+  externalIds?: ExternalId[]
   /** Free-form notes. */
   notes?: string | null
   /** ISO timestamp of the latest completed batch analysis for this entity. */

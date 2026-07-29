@@ -110,6 +110,37 @@ describe("public/project.gpkg round-trip (real pre-E1 fixture)", () => {
   )
 
   it(
+    "persists external ids through a reopen-and-save against the real pre-Slice-1 fixture",
+    async () => {
+      // The real fixture predates the external_ids column, so this drives
+      // ensureOptionalColumns' ALTER TABLE ... ADD COLUMN path (reopen via baseBuffer) —
+      // the only path where a constraints clause on the descriptor (Trap T4) can fire.
+      // Everything stays in memory: public/project.gpkg is never written to.
+      const fileBytes = readFileSync(resolve(process.cwd(), "public/project.gpkg"))
+      const buffer = Uint8Array.from(fileBytes).buffer
+      const first = await loadGeoPackage(buffer)
+
+      const target = first.entities.find((e) => e.kind === "unit")!
+      const withIds = first.entities.map((e) =>
+        e.id === target.id ? { ...e, externalIds: [{ scheme: "imo" as const, value: "9074729" }] } : e,
+      )
+
+      const bytes = await saveGeoPackage(first.layers, withIds, first.geometries, first.sourceCache, buffer)
+      const second = await loadGeoPackage(Uint8Array.from(bytes).buffer)
+
+      expect(second.entities.find((e) => e.id === target.id)!.externalIds).toEqual([
+        { scheme: "imo", value: "9074729" },
+      ])
+      // Every other row stays clean. Trap T6: decodeRow assigns every descriptor prop
+      // unconditionally, so an in-operator presence test reports true on all ~1027 rows —
+      // only a != null test distinguishes them. If this reports more than 1,
+      // decodeExternalIds is returning [] where it must return undefined (Trap T5).
+      expect(second.entities.filter((e) => e.externalIds != null)).toHaveLength(1)
+    },
+    60_000,
+  )
+
+  it(
     "derives Source/Claim provenance from the real fixture's legacy sources strings, and a double round-trip doesn't duplicate them (ADR 0006, E2 Slice A)",
     async () => {
       const buffer = Uint8Array.from(readFileSync(resolve(process.cwd(), "public/project.gpkg"))).buffer

@@ -522,3 +522,296 @@ already treats a blank field as absent (`Q17`), so "a second person is missing" 
 finding there, not "the same person twice"; and the narrower predicate cannot be fooled by a
 non-object value. No validation rule changed — the same edges violate, with the same code, and
 only the wording of `detail` differs.
+
+---
+
+## Q21 — where the nine UI labels live, and what the constant is called
+
+**Raised by:** planning agent freezing `SLICE_1_CRITERIA.md`, 2026-07-29, Slice 1.
+
+**Question.** Spec:407-408 gives nine label strings ("Labels for the UI: `"IMO number"`, `"INN"`,
+...") but names no constant and no home for them. The Slice 1 "Files" block (spec:367-371) lists
+only `externalId.ts`, `entity.ts` and `units.table.ts`, and spec:41-42 puts "any UI" out of scope.
+
+**Guess I would have made.** A `SCHEME_LABELS` map in a UI file, or an inline object at the
+future picker's call site.
+
+**Conservative reading implemented.** `export const EXTERNAL_ID_LABELS: Record<ExternalIdScheme,
+string>` in `src/core/entity/externalId.ts` — the only file in the block that can hold them, and
+the `Record<ExternalIdScheme, string>` annotation makes `tsc` enforce exhaustiveness. Criterion
+62 additionally forbids any consumer in this slice, so the strings ship dead until the picker
+lands.
+
+---
+
+## Q22 — does `isValidExternalId` validate the raw value or the normalised one?
+
+**Raised by:** planning agent freezing `SLICE_1_CRITERIA.md`, 2026-07-29, Slice 1.
+
+**Question.** Spec:397-399 says `isValidExternalId` checks "structural validity only … a
+wrong-length or wrong-charset value". `ExternalId.value` is "the raw string the analyst typed,
+preserved as entered" (spec:385-386). The spec never says which form is checked.
+
+**Guess I would have made.** Check the raw string, since that is the field being validated.
+
+**Conservative reading implemented.** Validate the **normalised** form. Checking the raw string
+would make `{ scheme: "imo", value: "IMO 9074729" }` invalid while `externalIdKey` treats it as
+identical to the valid `"9074729"` — a value that is simultaneously a duplicate of a valid id and
+invalid itself. Criterion 13 pins `isValidExternalId({ scheme: "imo", value: "IMO 9074729" })`
+to `true`.
+
+---
+
+## Q23 — the spec names no test files for Slice 1
+
+**Raised by:** planning agent freezing `SLICE_1_CRITERIA.md`, 2026-07-29, Slice 1.
+
+**Question.** The Slice 1 "Tests" subsection (spec:434-444) lists four bullets but no file paths.
+The same gap was recorded for Slice 0 as Q2.
+
+**Guess I would have made.** One new `externalId.test.ts` and bolt everything else onto it.
+
+**Conservative reading implemented.** Four files, fixed in the criteria header:
+`src/core/entity/externalId.test.ts` (new, colocated per repo convention);
+`src/core/persistence/geopackage/validation.test.ts` (existing — `decodeAliases`'s tests are
+already there); `src/core/persistence/geopackage/units.table.externalIds.test.ts` (new — the
+descriptor-shape and synthetic round-trip tests, split out because `units.table.test.ts` is
+already 282 lines against the 300-line cap at `CONSTRAINTS.md:113`); and the hard gate appended
+to `src/core/persistence/geopackage/project-gpkg-fixture.test.ts`, which spec:440 names as the
+thing it is cloned from.
+
+---
+
+## Q24 — how `decodeExternalIds` gets its runtime scheme allowlist
+
+**Raised by:** planning agent freezing `SLICE_1_CRITERIA.md`, 2026-07-29, Slice 1.
+
+**Question.** Spec:379-381 declares `ExternalIdScheme` as a hand-written union, not as
+`typeof X[number]` over a runtime array (the shape Slice 0 used for `ENTITY_KINDS`).
+`decodeExternalIds` has to reject an unknown persisted scheme at runtime, which needs a value,
+not a type. Prohibition 7 forbids inventing a constant the spec references but does not define.
+
+**Guess I would have made.** Add `export const EXTERNAL_ID_SCHEMES = [...] as const` and derive
+the union from it, silently replacing the spec's printed declaration.
+
+**Conservative reading implemented.** The union is written exactly as spec:379-381 prints it.
+The runtime allowlist is derived from `EXTERNAL_ID_LABELS` (Q21), whose
+`Record<ExternalIdScheme, string>` type already forces it to have exactly the nine keys — so no
+second list can drift out of step. Whether an implementer additionally exports a plain array is
+left free by the criteria, provided criterion 12's `Object.keys(EXTERNAL_ID_LABELS).length === 9`
+and criterion 9's nine-literal check both hold.
+
+---
+
+## Q25 — which separators normalisation strips, for the five free-form schemes
+
+**Raised by:** planning agent freezing `SLICE_1_CRITERIA.md`, 2026-07-29, Slice 1.
+
+**Question.** Spec:389-390 says normalisation is "upper-case, strip separators and scheme
+prefixes", and gives exactly one worked example (`"IMO 9074729"` → `"9074729"`). For `ofac`,
+`eu_fsf`, `uk_hmt`, `opensanctions` and `registry` the values are free-form, so aggressive
+separator stripping could merge two genuinely different registry ids into one dedup key.
+
+**Guess I would have made.** Strip every non-alphanumeric character for every scheme.
+
+**Conservative reading implemented.** The criteria pin only the guarantees the spec actually
+commits to: upper-case, trim, idempotence, never throws (criteria 26-27), plus the IMO worked
+example (criterion 25). The separator policy for the five free-form schemes is left to the
+implementer and must be stated in a comment. Nothing in Slice 1 consumes `externalIdKey`, so a
+later slice can tighten it without breaking a call site — but tightening it after ids are on
+disk would change dedup behaviour, which is why it is recorded here rather than left silent.
+
+---
+
+## Q26 — does `decodeExternalIds` drop bad entries or reject the whole array?
+
+**Raised by:** planning agent freezing `SLICE_1_CRITERIA.md`, 2026-07-29, Slice 1.
+
+**Question.** Spec:431-432 says it "returns `undefined` for absent, empty, or corrupt values",
+which reads either way for an array where *some* entries are corrupt.
+
+**Guess I would have made.** Return `undefined` for the whole array if any entry is malformed —
+discarding every good id alongside the bad one, on load, silently.
+
+**Conservative reading implemented.** Mirror `decodeAliases` (`validation.ts:23-33`) exactly:
+filter to the well-formed entries, and return `undefined` only if none survive (criteria 35-36).
+Two further consequences are pinned: `"[]"` decodes to `undefined` and never `[]` (Trap T5,
+criterion 48), and a well-shaped id that fails *structural* validation — a bad IMO check digit —
+is **kept**, because decoding is not validation and dropping it would silently delete what the
+analyst typed on the next save (criterion 37).
+
+---
+
+## Q27 — INN and OGRN carry check digits that Slice 1 does not verify
+
+**Raised by:** coding agent (Phase 2), Slice 1, Task A (`src/core/entity/externalId.ts`).
+
+**Question.** Spec:404-405 defines `inn` as "10 or 12 digits" and `ogrn` as "13 or 15 digits" —
+length and charset only. Both schemes in fact carry a control digit (INN: one for the 10-digit
+legal-entity form, two for the 12-digit individual form; OGRN: the number mod 11, last digit
+dropped, compared against the final digit). The spec calls out the missing LEI mod-97 check as a
+"known gap" (spec:404) but says nothing about these two, so a typo'd INN or OGRN passes
+`isValidExternalId` exactly as a typo'd LEI does — and unlike LEI, that gap is not recorded
+anywhere in the shipped code.
+
+**Guess I would have made.** Implement the INN and OGRN control digits anyway, because they are
+standard and cheap. That is inventing scope: the spec states the rule for each scheme in one
+clause, and criteria 21-22 pin exactly the length/charset behaviour it states. Adding a checksum
+would reject values the frozen criteria do not test and the spec does not exclude.
+
+**Conservative reading implemented.** Length and charset only, exactly as spec:404-405 states.
+`isValidExternalId` remains structural. No comment about INN/OGRN was added to
+`externalId.ts` either, because only the LEI gap is spec-stated (criterion 20 requires that one
+in prose) and asserting a second "known gap" in the source would be this agent's claim rather
+than the spec's.
+
+**For the reader to decide before a picker ships.** Whether Slice 1's structural validation is
+meant to be uniformly length-and-charset (in which case the LEI mod-97 comment should say so for
+all four structured schemes), or whether the three Russian/global registry checksums should land
+together in a later slice. Both INN and OGRN checksums are additive and would break no existing
+call site — nothing consumes `isValidExternalId` in this slice.
+
+---
+
+## Q28 — what "strip scheme prefixes" means when the prefix can be part of a legitimate value
+
+**Raised by:** coding agent (Phase 2), Slice 1, Task A (`src/core/entity/externalId.ts`).
+
+**Question (a).** Spec:389-390 says normalisation strips "scheme prefixes" and gives one worked
+example, `"IMO 9074729"` → `"9074729"` (criterion 25). A LEI is 20 characters of `[0-9A-Z]` and
+may legitimately *begin* with the letters `LEI` — `"LEI3001KJTIIGC8Y1R12"` is a well-formed LEI.
+An unconditional prefix strip turns it into 17 characters and `isValidExternalId` then rejects a
+valid id. The spec does not say the strip is conditional.
+
+**Guess I would have made.** Strip the prefix unconditionally whenever the upper-cased,
+separator-free value starts with it, and never notice the LEI case.
+
+**Conservative reading implemented.** The prefix (`IMO`, `INN`, `OGRN`, `LEI`) is dropped **only
+if what remains has a length the scheme expects** — 7 for IMO, 10 or 12 for INN, 13 or 15 for
+OGRN, 20 for LEI. `"LEI 5493001KJTIIGC8Y1R12"` (23 after separator removal) loses the prefix;
+`"LEI3001KJTIIGC8Y1R12"` (20 already) keeps it. The guard also makes the function idempotent for
+free, since a value already at the expected length is never shortened again. Documented in the
+JSDoc on `normalizeExternalId`. The five free-form schemes strip no prefix at all — a registry id
+may legitimately start with its own registry's name, and there is no expected length to guard
+with.
+
+**Question (b).** `isValidExternalId` takes a typed `ExternalId`, but persisted JSON is not
+type-checked. What should it do with a scheme string that is not one of the nine?
+
+**Guess I would have made.** Fall through to the free-form branch, so an unknown scheme with any
+non-empty value reports valid.
+
+**Conservative reading implemented.** Fail closed: a scheme outside the nine returns `false`. The
+allowlist is a `Set` over `Object.keys(EXTERNAL_ID_LABELS)` (the runtime list Q24 settled on), so
+it cannot drift from the union. Likewise a `value` that is not a string at runtime normalises to
+`""`, which every rule rejects. Neither case is reachable from typed code and neither is pinned by
+a criterion; both are recorded because they are behaviour a later caller could come to rely on.
+
+---
+
+## Q29 — Q24's scheme allowlist collides with criterion 62, so `decodeExternalIds` cannot read `EXTERNAL_ID_LABELS`
+
+**Raised by:** coding agent (Phase 2), Slice 1, Task B (`entity.ts`, `validation.ts`,
+`units.table.ts`).
+
+**Question.** Q24 settles the runtime scheme allowlist for `decodeExternalIds` as "derived from
+`EXTERNAL_ID_LABELS`". `decodeExternalIds` lives in
+`src/core/persistence/geopackage/validation.ts` (spec:430-431), so deriving it there means
+importing `EXTERNAL_ID_LABELS` into that file. Criterion 62 is a `[MACHINE]` criterion requiring
+that `rg -l "EXTERNAL_ID_LABELS" src/` list **only** `externalId.ts` and `externalId.test.ts`.
+The two cannot both hold. The criteria file is frozen (Prohibition 2), so criterion 62 wins over
+Q24's prose, but Q24 named no fallback.
+
+**Guess I would have made.** Import `EXTERNAL_ID_LABELS` into `validation.ts` because Q24 says
+so, and quietly fail criterion 62 — a criterion whose grep no one re-runs after the tests go
+green.
+
+**Conservative reading implemented.** `externalId.ts` gains one export:
+
+```
+export const EXTERNAL_ID_SCHEMES: readonly ExternalIdScheme[] = Object.keys(
+  EXTERNAL_ID_LABELS,
+) as ExternalIdScheme[]
+```
+
+`KNOWN_SCHEMES` inside `externalId.ts` is rebuilt from it, and `validation.ts` builds
+`VALID_EXTERNAL_ID_SCHEMES` from it exactly as `decodeOrganisationType` builds its Set from
+`ORGANISATION_TYPES`. So: no second hand-written list of the nine literals anywhere, the labels
+record stays the single source (its `Record<ExternalIdScheme, string>` type still forces the nine
+keys, so nothing can drift), and `EXTERNAL_ID_LABELS` itself keeps the zero consumers criterion 62
+demands. Q24 explicitly leaves this open — "Whether an implementer additionally exports a plain
+array is left free by the criteria, provided criterion 12's
+`Object.keys(EXTERNAL_ID_LABELS).length === 9` and criterion 9's nine-literal check both hold" —
+and both still hold, verified.
+
+**Two things a reviewer should confirm.** (a) This is a Task B agent editing a file authored by
+the Task A agent, one line replaced and one export added; nothing else in `externalId.ts` was
+touched, and criterion 57 lists that path as in-scope. (b) `EXTERNAL_ID_SCHEMES` is a constant
+the spec does not name (Prohibition 7). It is a derived alias for a list the spec does define
+(spec:379-381) rather than a new fact, and it exists only because criterion 62 forbids the
+obvious import — but if the reviewer prefers no new export, the alternative is a
+`Record<ExternalIdScheme, true>` literal local to `validation.ts`, which is drift-proof through
+`tsc` but restates the nine literals a second time.
+
+---
+
+## Q30 — criterion 54's second backtick grep has no comment exclusion, so prose comments cannot use backticks either
+
+**Raised by:** test-author agent (Phase 3), Slice 1.
+
+**Question.** Criterion 54 states the rule as "no backtick template literals ... in code
+position (backticks inside JSDoc comment lines are fine)", and its **first** grep
+(`rg -n "^\s*[^\s*/].*\x60" ...`, for `externalId.ts` and
+`units.table.externalIds.test.ts`) implements that exclusion — a line starting with `*` or
+`/` is skipped. Its **second** grep, over the diff of the five modified files
+(`git diff -- ... | rg -n "^\+[^+].*\x60"`), does not: an added `//` comment line whose prose
+quotes an identifier in backticks matches it, because the diff's `+` prefix means the line no
+longer starts with `/`. The hard gate's comment in `project-gpkg-fixture.test.ts` originally
+read "the real fixture predates the `external_ids` column"; that is a comment, is not a
+template literal, and cannot produce a NUL byte, but it failed the criterion's literal
+command. The criterion is frozen (Prohibition 2), so the command cannot be adjusted.
+
+**Guess I would have made.** That the prose exclusion in the criterion's sentence governs and
+the second grep's omission is an oversight, so leaving backticks in the added comments is
+fine — and quietly failing a `[MACHINE]` grep that Phase 6 runs verbatim.
+
+**Conservative reading implemented.** Backticks were removed from every comment the test
+author added to a modified file; identifiers are named in bare prose instead
+(`external_ids`, `!= null`, "an in-operator presence test"). Both greps now exit `1`. The
+new files this agent authored (`externalId.test.ts`,
+`units.table.externalIds.test.ts`) contain no backtick at all, in code or comment.
+
+**What a reader should decide before Slice 2.** Whether the intended rule is "no backticks
+anywhere in a touched line" (in which case criterion 54's prose parenthetical should be
+dropped in future criteria files) or "no backticks in code position" (in which case the
+diff-side grep needs a `^\+\s*[^\s+*/]` form). Slice 1 satisfies the stricter of the two, so
+either answer leaves it green.
+
+---
+
+## Q31 — the free-form branch upper-cases, so two case-distinct sanctions ids collapse onto one dedup key
+
+**Raised by:** simplify agent (Phase 5), Slice 1.
+
+**Question.** Q25 records which separators the free-form branch of `normalizeExternalId`
+strips; it does not record the decision to **upper-case** those values.
+`externalIdKey({ scheme: "opensanctions", value: "NK-A7bC" })` and
+`externalIdKey({ scheme: "opensanctions", value: "nk-a7bc" })` both return
+`"opensanctions:NK-A7BC"`, so two distinct register rows dedup as one. OpenSanctions entity
+ids are case-sensitive tokens; the same applies to a `registry` id whose case is meaningful.
+
+**Guess I would have made.** That upper-casing is scheme-family-specific — structured schemes
+upper-case, free-form schemes preserve case — and quietly diverging from spec:389 and from
+frozen criterion 26.
+
+**Conservative reading implemented.** No change. Spec:389 says normalisation is "upper-case",
+and criterion 26 pins it as a `[MACHINE]` assertion for **all nine** schemes ("the result
+equals its own `toUpperCase()`"). The criteria are frozen (Prohibition 2), so this stays as
+built. It is harmless inside Slice 1: `externalIdKey` has no consumer (criterion 62 forbids
+one), so nothing dedups on it yet.
+
+**What a reader should decide before a consumer ships.** Whether case-folding free-form
+registry and sanctions ids is acceptable for dedup. It becomes a silent entity merge the
+moment a dedup path or the Stage 3 OpenSanctions connector reads the key — before that, the
+fix is one branch in `normalizeExternalId` plus a criterion amendment in the slice that adds
+the consumer.

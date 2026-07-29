@@ -270,7 +270,86 @@ not a regex, decides how these thirteen sentences read.
 
 ### Slice 1 — External Ids
 
-**Not started.** It is a separate run with its own criteria file. Nothing in this tree touches
-`externalId.ts` or the `external_ids` column; criterion 65 asserts that machine-checkably.
+Started from the Slice 0 commit. Phase 0 baseline: `npm run verify` green at `ee93a0c`.
 
-_Slice 1 appended below when it runs._
+**One iteration. No red build at any point.** Phases 1–6 ran once, straight through: the planner
+froze `docs/timelines/SLICE_1_CRITERIA.md`, two coding agents (`externalId.ts`, then the
+`EntityCore` field + `decodeExternalIds` + the column descriptor), a separate test author, an
+independent runner, a review, a simplification pass, and an independent grader.
+
+**The loop-control defect found in Slice 0 was fixed before this run.** The repeat-failure check
+now keys on the **criterion number** rather than the file path, so two identical failures stop the
+run as `SLICE_BUILD_LOOP.md` requires. It never had to fire — the build went green first time —
+but the fixing agents were also given a new standing instruction: if the criteria and the spec
+contradict each other, record it and **stop**, never resolve it by editing either side. That is
+the judgement Slice 0 proved a machine should not make alone.
+
+#### The four traps this slice was built around — all verified by reading the source
+
+The grader was required to confirm these by reading `columnDescriptor.ts`, not by trusting a
+passing test, because each one fails *silently* or *only on a path the ordinary tests miss*.
+
+| trap | what it would have done | verified |
+|---|---|---|
+| **T3** | `optional: true` without `fallbackSql` makes `buildSelectClause` throw on **every read** — total load failure, not degradation | descriptor carries `fallbackSql: "NULL"`; regression-tested by physically `ALTER TABLE units DROP COLUMN external_ids` and reading through `readEntities` |
+| **T4** | `ensureOptionalColumns` splices `constraints` into `ALTER TABLE ADD COLUMN`; SQLite rejects `ADD COLUMN ... NOT NULL` without a constant default, and it surfaces **only on the reopened-old-file path** | descriptor has **no** `constraints` key at all; emitted DDL is `ALTER TABLE units ADD COLUMN external_ids TEXT` |
+| **T5** | decoding an empty array to `[]` instead of `undefined` makes the hard gate's "every other row stays clean" assertion read **1027 instead of 1** | every exit in `decodeExternalIds` is `undefined` or a non-empty array; the stored cell is asserted to be literally SQL `NULL` via a raw `SELECT` |
+| **T6** | `decodeRow` assigns every prop unconditionally, so `"externalIds" in entity` is `true` even when the value is undefined | no `in` or `hasOwnProperty` test against an entity anywhere in the diff; the one presence check is `!= null` |
+
+**The persistence hard gate passes against the real file.** It loads `public/project.gpkg`, sets
+`externalIds` on one entity, saves through the `baseBuffer` reopen path, reloads, and finds exactly
+one row carrying the field. `public/project.gpkg` was confirmed **byte-identical** afterwards by
+md5 against `git show` — the irreplaceable file was read and never written.
+
+#### Criterion 60 — a defective criterion, not a failed build
+
+The grader returned **BLOCKED** on the third sub-clause of criterion 60, which required
+`rg -ln "migrat" src/core/persistence/` to find nothing. It was **unsatisfiable at authoring time**:
+the grep matches pre-existing JSDoc prose (`"pre-migration schema"`) and the legacy
+`migrateLegacyOrganisations` helper. Run against a clean `git archive HEAD` extraction containing
+no Slice 1 code, it returns the same seven files and exits `0`; `git diff HEAD -- src/` adds zero
+matching lines. It would have failed on an empty slice.
+
+The grader was right to report it rather than waive it — a frozen criterion is a result to report,
+not a line to edit. **Ruling 3, owner, 2026-07-29:** amend it, same disposal as criterion 23. The
+sub-clause is struck with a dated note; its other two sub-clauses pass untouched; the substantive
+intent (no migration file added) is satisfied and independently proven by criterion 57.
+
+That is now **two frozen criteria in two slices** defeated by a proxy grep that contradicted the
+thing it proxied for. The pattern is worth naming for whoever writes Slice 2's criteria: a
+criterion phrased as "this string appears nowhere" is fragile against ordinary prose, and should be
+scoped to the diff (`git diff | rg "^\+..."`) rather than to the tree.
+
+#### Review — no correctness findings
+
+Reviewed against `ee93a0c`. The reviewer re-derived the IMO check digit independently on seven
+numbers (`9074729`, `1234567`, `9319466`, `5000005`, `0000000` valid; `9704729`, `9074728`
+rejected) and the implementation agreed on all seven. The spec's misprinted `7·7` first term was
+**not** copied — the test writes `9*7` and names the typo. The nine UI labels match the spec
+character for character.
+
+Four style findings, none applied, each with a reason:
+
+- **`project-gpkg-fixture.test.ts` is now 299 lines against the 300-line cap** — one line of head-
+  room, and Slice 2 explicitly plans another real-WASM test in that same file. **This is a Slice 2
+  prerequisite:** split the file by concern before adding to it. Not done here because moving tests
+  between files would break the frozen criteria that reference them by path.
+- The free-form branch upper-cases, so two case-distinct sanctions ids collapse onto one dedup key
+  (**Q31**). Spec-conformant (`spec:389` says "upper-case") and pinned by frozen criterion 26.
+  Harmless today because `externalIdKey` has no consumer; becomes a silent entity merge the moment
+  the Stage 3 OpenSanctions connector reads it. **Decide before that consumer ships.**
+- `isValidExternalId` validates the normalised form, so separators never register as a charset
+  violation (**Q22**). Deliberate and coherent — validating raw would reject `"IMO 9074729"` while
+  `externalIdKey` treats it as identical to the valid `"9074729"`.
+- Comment volume in `externalId.ts` exceeds neighbouring files, with some restatement of what the
+  code does rather than why.
+
+#### Open questions
+
+Slice 1 added **Q21–Q31**. The ones that are decisions rather than notes: **Q31** (dedup case-
+folding, above), **Q27** (INN and OGRN checksums are not verified — length and charset only, as the
+spec specifies), and **Q28** (scheme-prefix stripping versus values that legitimately begin with
+their registry's name). The **LEI mod-97 gap is deliberate and spec-stated**, locked by a test named
+so the next reader knows it was known, not forgotten.
+
+### Slice 1 — commit
