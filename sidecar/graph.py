@@ -39,6 +39,13 @@ async def get_graph(path=DEFAULT_TGDB_PATH) -> dict:
         }
         for row in channel_rows
     ]
+    # An edge is written the moment a neighbor resolves (expander.py), which is before
+    # the crawler has collected that neighbor — until then its `channels` row has
+    # `id IS NULL` and is therefore keyed `seed-<rowid>`, not by the peer id the edge
+    # points at. Emitting that edge would hand graphology a target node it has never
+    # seen, which throws rather than degrades. Drop the dangling ones here; each starts
+    # rendering on its own once its endpoint is collected and gains a real id.
+    node_keys = {node["key"] for node in nodes}
     edges = [
         {
             "key": f"edge-{row['id']}",
@@ -47,6 +54,7 @@ async def get_graph(path=DEFAULT_TGDB_PATH) -> dict:
             "attributes": {"edgeType": row["edge_type"], "weight": row["weight"]},
         }
         for row in edge_rows
+        if str(row["from_id"]) in node_keys and str(row["to_id"]) in node_keys
     ]
     return {"nodes": nodes, "edges": edges}
 

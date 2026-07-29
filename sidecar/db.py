@@ -114,6 +114,12 @@ CREATE INDEX IF NOT EXISTS idx_messages_channel_id ON messages(channel_id);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_messages_channel_message_unique ON messages(channel_id, message_id);
 CREATE INDEX IF NOT EXISTS idx_edges_from_id ON edges(from_id);
 CREATE INDEX IF NOT EXISTS idx_edges_to_id ON edges(to_id);
+-- Discovery re-expands a channel every time the crawler reaches it — a resumed session
+-- retries the node it paused on, and a deeper re-run re-walks the whole known graph — so
+-- the same (from, to, type) triple is offered repeatedly. `UNIQUE` + `INSERT OR IGNORE`
+-- in `expander.py` is what makes that idempotent, the same shape as `messages`'
+-- `UNIQUE(channel_id, message_id)`.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_edges_unique ON edges(from_id, to_id, edge_type);
 CREATE INDEX IF NOT EXISTS idx_oob_proposals_status ON oob_proposals(status);
 """
 

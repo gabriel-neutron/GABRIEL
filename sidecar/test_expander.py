@@ -186,10 +186,18 @@ def test_expand_channel_issues_no_member_enumeration_call():
     actual code (imports + function bodies), not by trusting a docstring."""
     for module in (expander, username_resolver):
         for _, obj in inspect.getmembers(module):
-            if inspect.isfunction(obj) or inspect.isclass(obj):
-                code = inspect.getsource(obj)
-                assert "GetParticipants" not in code
-                assert "fetch_participants" not in code
+            if not (inspect.isfunction(obj) or inspect.isclass(obj)):
+                continue
+            # Only what this module actually defines. Imported names are in scope too,
+            # and a C-implemented stdlib class (datetime, imported for the edges write)
+            # has no retrievable source at all — `getsource` raises OSError on it. Each
+            # module in this tuple is scanned in its own right anyway, so nothing that
+            # matters goes unchecked.
+            if getattr(obj, "__module__", None) != module.__name__:
+                continue
+            code = inspect.getsource(obj)
+            assert "GetParticipants" not in code
+            assert "fetch_participants" not in code
 
     assert not any(name == "telethon" for name in getattr(expander, "__dict__", {}))
     assert not any(name == "telethon" for name in getattr(username_resolver, "__dict__", {}))
@@ -197,6 +205,95 @@ def test_expand_channel_issues_no_member_enumeration_call():
     resolver_source = inspect.getsource(telegram_channel_source.TelethonUsernameResolver)
     assert "GetParticipants" not in resolver_source
     assert "fetch_participants" not in resolver_source
+
+
+async def _edge_rows(path: Path) -> list[dict]:
+    async with aiosqlite.connect(path) as conn:
+        conn.row_factory = aiosqlite.Row
+        rows = await conn.execute_fetchall("SELECT * FROM edges")
+    return [dict(row) for row in rows]
+
+
+async def _collect_chana(tgdb_path, description: str, messages=None) -> None:
+    source = FakeChannelSource(
+        metadata={
+            "chana": ChannelMeta(
+                id=1001, username="chana", title="Chan A", description=description,
+                member_count=10, type="channel", is_private=False, raw_json="{}",
+            )
+        },
+        messages={"chana": messages} if messages else {},
+    )
+    await collector.collect_channel("chana", source, path=tgdb_path)
+
+
+@pytest.mark.asyncio
+async def test_expand_channel_persists_an_edge_per_resolved_neighbor(tgdb_path):
+    """The discovered relationship is the point of the crawl — before this it lived only
+    in the return value, so `graph.py`/`export.py` read an `edges` table nothing wrote."""
+    await _collect_chana(tgdb_path, "Join https://t.me/chanb and https://t.me/chand")
+
+    resolver = FakeUsernameResolver({"chanb": 2002})  # chand unresolvable
+    await expander.expand_channel(1001, resolver, path=tgdb_path)
+
+    rows = await _edge_rows(tgdb_path)
+    assert len(rows) == 1
+    assert (rows[0]["from_id"], rows[0]["to_id"]) == (1001, 2002)
+    assert rows[0]["edge_type"] == expander.EDGE_TYPE_LINK
+    assert rows[0]["collected_at"] is not None
+
+
+@pytest.mark.asyncio
+async def test_re_expanding_the_same_channel_does_not_duplicate_edges(tgdb_path):
+    """The crawler re-expands on every revisit — a resumed session retries its paused
+    node, and a deeper re-run re-walks the whole known graph."""
+    await _collect_chana(tgdb_path, "https://t.me/chanb")
+    resolver = FakeUsernameResolver({"chanb": 2002})
+
+    await expander.expand_channel(1001, resolver, path=tgdb_path)
+    await expander.expand_channel(1001, resolver, path=tgdb_path)
+    await expander.expand_channel(1001, resolver, path=tgdb_path)
+
+    assert len(await _edge_rows(tgdb_path)) == 1
+
+
+@pytest.mark.asyncio
+async def test_edge_type_records_which_signal_found_the_neighbor(tgdb_path):
+    await seed.import_seeds(["chanc"], path=tgdb_path)
+    await _collect_chana(
+        tgdb_path,
+        "Linked: https://t.me/chanb",
+        messages=[
+            MessageRecord(message_id=1, text="Shoutout to ChanC", date="2026-07-29",
+                          view_count=1, raw_json="{}")
+        ],
+    )
+
+    resolver = FakeUsernameResolver({"chanb": 2002, "chanc": 3003})
+    await expander.expand_channel(1001, resolver, path=tgdb_path)
+
+    by_target = {row["to_id"]: row["edge_type"] for row in await _edge_rows(tgdb_path)}
+    assert by_target == {2002: expander.EDGE_TYPE_LINK, 3003: expander.EDGE_TYPE_MENTION}
+
+
+@pytest.mark.asyncio
+async def test_a_linked_and_name_dropped_neighbor_records_the_stronger_link_signal(tgdb_path):
+    await seed.import_seeds(["chanb"], path=tgdb_path)
+    await _collect_chana(
+        tgdb_path,
+        "https://t.me/chanb",
+        messages=[
+            MessageRecord(message_id=1, text="ChanB is worth reading", date="2026-07-29",
+                          view_count=1, raw_json="{}")
+        ],
+    )
+
+    resolver = FakeUsernameResolver({"chanb": 2002})
+    await expander.expand_channel(1001, resolver, path=tgdb_path)
+
+    rows = await _edge_rows(tgdb_path)
+    assert len(rows) == 1
+    assert rows[0]["edge_type"] == expander.EDGE_TYPE_LINK
 
 
 def test_edges_extractors_used_by_expander_are_the_real_slice1_module():
