@@ -353,3 +353,35 @@ their registry's name). The **LEI mod-97 gap is deliberate and spec-stated**, lo
 so the next reader knows it was known, not forgotten.
 
 ### Slice 1 — commit
+
+- **SHA: `cfaf80b`** — `feat(entity): add External Ids and the external_ids column (Slice 1)`,
+  committed on branch `telegram-osint-sidecar`, not pushed.
+- Iterations: **1**. No red build at any point.
+- `npm run verify`: green on the tree committed — 63 test files, 501 tests (29 added by this
+  slice), lint clean, `tsc -b && vite build` clean. Node byte scan: 302 files, **0 NUL bytes**.
+- `public/project.gpkg` byte-identical before and after, no stray `gabriel-*.gpkg` left behind.
+- Files: `externalId.ts` + its test, the `EntityCore` field, `decodeExternalIds` in
+  `validation.ts` + its test, the `external_ids` descriptor in `units.table.ts`, a new
+  `units.table.externalIds.test.ts`, and the hard gate appended to `project-gpkg-fixture.test.ts`
+  — eight paths under `src/`, matching criterion 57 exactly.
+- Revert point: `ee93a0c` (the Slice 0 run-log commit).
+
+### Not committed — left deliberately for the reader
+
+Two changes sat uncommitted in the tree before this run began and were **excluded from both slice
+commits** by using path-limited commits rather than `git commit -a`:
+
+- `docs/adr/0009-machine-never-confirms.md` — modified (+19 lines, a "Standing maintenance
+  obligations" section). Unrelated to either slice. Still unstaged.
+- `docs/timelines/STANAG_SOURCE_RATING_TIMELINE.md` — deleted and **already staged** (`D ` in the
+  index) before this session started. Because it is staged, a bare `git commit` **will** sweep it
+  into whatever is committed next. Commit or unstage it deliberately.
+
+### What Slice 2 must do before it starts
+
+1. **Split `project-gpkg-fixture.test.ts`.** It is at 299 lines against the 300-line cap, and
+   Slice 2 plans another real-WASM test in it. It breaks on the first line added.
+2. **Answer Q31** (dedup case-folding) before anything consumes `externalIdKey`.
+3. **Do not phrase a criterion as "this string appears nowhere in a directory."** Two slices, two
+   frozen criteria defeated by exactly that shape. Scope such checks to the diff, not the tree.
+4. Read the 5 `[HUMAN]` criteria from Slice 0 (44–48) and the open questions Q1–Q31.
