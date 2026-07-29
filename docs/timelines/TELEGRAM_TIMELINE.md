@@ -519,6 +519,35 @@ Its result determines whether 37 is the accepted final Phase 3 number.
 
 **Blocked by:** Slice 6 (clean canary) — satisfied.
 
+### 9 — Persist discovered edges
+
+**Type:** AFK — **done, 2026-07-29** (commit `57af402`).
+
+Found while checking on session 3: **the `edges` table had zero rows and no production
+code path ever wrote to it.** `expander.expand_channel` returned neighbor ids for the
+crawler to enqueue and discarded the relationship, while `graph.py`, `export.py` and Slice
+7's WS `edge_count` all read that table. Sessions 1 and 2 had therefore produced 37
+collected channels and **no graph at all** — the Sigma view rendered disconnected dots,
+export carried no relationships, and `edge_count` streamed 0 throughout. Slice 6 and 7's
+criteria ("discovered channels appeared on the graph view", "graph view shows newly
+discovered nodes") were satisfied by the *nodes*, so nothing caught it.
+
+- [x] An `edges` row is written per resolved neighbor, tagged `link` (a `t.me/` URL) or
+      `mention` (a bare in-text name); a neighbor found both ways keeps the stronger `link`
+- [x] Re-expansion is idempotent — `UNIQUE(from_id, to_id, edge_type)` + `INSERT OR IGNORE`.
+      Load-bearing, not defensive: a resumed session retries its paused node and a deeper
+      re-run re-walks the whole known graph, so every edge is offered repeatedly
+- [x] `get_graph` withholds an edge whose endpoints aren't both real nodes yet. An edge is
+      written when a neighbor *resolves*, which precedes collecting it; until then that row
+      has `id IS NULL` and is keyed `seed-<rowid>`, so emitting the edge would name a node
+      graphology has never seen and throw. Each starts rendering once its endpoint lands
+- [x] Sidecar suite 90 passed; `npm run verify` green
+
+**Backfill:** none needed as a separate task — session 3's depth-4 re-walk re-expands every
+already-known node, so it writes the missing edges for the existing 37 channels as it goes.
+That re-walk was pure cost before this slice; it is now the backfill. `edge_count` on
+`/crawl/ws` is the signal that it's working.
+
 ---
 
 ## Phase 6 — React Graph Module (Weeks 6-8)
