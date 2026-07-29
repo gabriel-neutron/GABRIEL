@@ -248,6 +248,11 @@ rename as a possibility rather than doing it. The new glossary terms went into a
 which is the concept they generalise), not into the existing `## Relationships` section.
 The human answering criterion 47 still has the full decision.
 
+**RESOLVED — owner ruling, 2026-07-29.** The guess was right. `## Relationships` is renamed
+`## Model invariants`, with a lead-in sentence distinguishing it from the domain term, and the
+`## Flagged ambiguities` entry moves from unresolved to resolved. **Relationship** now means
+the typed edge and nothing else in `CONTEXT.md`. Criterion 47 is answered.
+
 ---
 
 ## Q9 — how much of the deferred migration decision belongs in ADR 0010
@@ -815,3 +820,17 @@ registry and sanctions ids is acceptable for dedup. It becomes a silent entity m
 moment a dedup path or the Stage 3 OpenSanctions connector reads the key — before that, the
 fix is one branch in `normalizeExternalId` plus a criterion amendment in the slice that adds
 the consumer.
+
+**RESOLVED — owner ruling, 2026-07-29. It does not case-fold.** The guess above was right, and
+the decisive argument was already written in the code it contradicted: the same doc comment that
+refuses to strip a hyphen or a dot from a free-form value, because doing so "could merge two
+distinct ids onto one dedup key", was upper-casing that value three lines earlier. One rule, two
+answers. `toUpperCase()` moves into the structured branch, so `imo`, `inn`, `ogrn` and `lei`
+normalise exactly as before and the five free-form schemes now only collapse whitespace.
+
+Three of those five (`ofac`, `eu_fsf`, `uk_hmt`) carry numeric ids, so the change is inert for
+them; it exists for `opensanctions` and `registry`, where case is meaningful. Criterion 26 is
+narrowed to the four structured schemes and criterion 26b pins the new behaviour — recorded as
+the second owner-authorised amendment to `SLICE_1_CRITERIA.md`. **No migration is needed and none
+ever will be:** the normalised form is recomputed at every comparison and has never been
+persisted. Ruled before the first consumer, exactly as this entry asked.

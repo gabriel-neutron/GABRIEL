@@ -105,7 +105,11 @@ Free-text analyst annotation containing only: (1) recent organisational changes 
 A note flagging uncertainty or contradiction: "identity unconfirmed," "conflicting sources on HQ location," "possibly a placeholder unit." Lives inside Notes.
 _Avoid_: comment, remark, observation
 
-## Relationships
+## Model invariants
+
+Sentences that always hold between the concepts above. Not to be confused with **Relationship**,
+the domain term for a typed edge between two Entities — this section was called `## Relationships`
+until that term was defined, and was renamed to free the word.
 
 - An **Enrichment Run** produces zero or more **Enrichment Proposals**
 - Each **Enrichment Proposal** is backed by one or more **Research Citations**
@@ -116,5 +120,5 @@ _Avoid_: comment, remark, observation
 ## Flagged ambiguities
 
 - **"sources"** was used to mean both the Provenance Ledger (entity field) and Research Citations (enrichment evidence). Resolved: "sources" in user-facing language always means the Provenance Ledger; evidence backing proposals is called Research Citations. In code, `EnrichmentProposal.sources` should be renamed to `EnrichmentProposal.citations`.
-- **"relationship"** now carries two senses in this file: the domain term above (a typed edge between two Entities) and the `## Relationships` section below, which lists sentences about how the model's *concepts* relate. Unresolved — the section may want renaming (e.g. "Model invariants"); flagged here rather than renamed unilaterally.
+- **"relationship"** carried two senses in this file: the domain term above (a typed edge between two Entities) and a `## Relationships` section listing sentences about how the model's *concepts* relate. Resolved 2026-07-29: that section is now `## Model invariants`, and **Relationship** means the typed edge and nothing else.
 - **"notes"** was used loosely for any free text. Resolved: Notes is a constrained field — only organisational changes and Epistemic Caveats; battle history and operational movements are excluded.

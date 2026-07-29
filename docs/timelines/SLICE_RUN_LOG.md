@@ -377,11 +377,83 @@ commits** by using path-limited commits rather than `git commit -a`:
   index) before this session started. Because it is staged, a bare `git commit` **will** sweep it
   into whatever is committed next. Commit or unstage it deliberately.
 
+**Both disposed of, 2026-07-29** — see the ruling session below. The tree is clean going into
+Slice 2.
+
+---
+
+## Owner ruling session — 2026-07-29, before Slice 2
+
+Four items blocked Slice 2. All four are now ruled.
+
+### The five `[HUMAN]` criteria (44–48)
+
+| # | subject | verdict |
+| --- | --- | --- |
+| **44** | The thirteen `publicDefinition` strings | **Accepted verbatim, no edit.** The three load-bearing clauses were checked present and intact: `corporate_parent`'s "no ownership share, controlling interest or acquisition date has been established … not, on its own, a statement of legal control"; `owned_by`'s "No minimum threshold is applied"; and `acts_for` opening on "ASSESSMENT — not a documentary record". Two wordings were raised as optional refinements (`officer_of` calling a registered agent an office-holder, `owned_by`'s "registered" excluding unregistered holdings) and both were declined — the prose ships as authored. |
+| **45** | ADR 0010's prose and its supersession of 0004 | **Conforms.** It names the two superseded points and leaves the rest of 0004 standing, records the `corporate_parent` / `owned_by` split as a publication-risk decision, and states the `ExportOverride` two-person rule as ceremony and attribution rather than authentication, because Gabriel has no identity system. |
+| **46** | The supersession line added to ADR 0004 | **Conforms, does not overclaim.** It says field-*less* profiles only and keeps the `Entity` field mirror deferred. |
+| **47** | The `CONTEXT.md` glossary | **Conforms, and its one open decision is ruled** — see below. |
+| **48** | Every open question read before Slice 2 | **Done.** Q1–Q31 reviewed. Only Q31 needed a decision; Q27 (no INN/OGRN checksum) and Q28 (scheme-prefix stripping) are spec-conformant with no consumer and stay as notes. **Q15 was already stale** — it asks a human to strike "and no semicolon" from `GABRIEL_V2_SLICE_0_1_BUILD.md:333-334`, which Ruling 1 had already done in the same commit; the line carries no semicolon rule today. |
+
+### Ruling 3 — `CONTEXT.md` `## Relationships` is renamed `## Model invariants` (Q19, criterion 47)
+
+The section listing sentences about how the *concepts* relate collided with **Relationship**, the
+new domain term for a typed edge. Renamed, with a lead-in sentence recording the old name so the
+rename is not a silent one, and the `## Flagged ambiguities` entry moved from unresolved to
+resolved. **Relationship** now means the typed edge and nothing else in that file.
+
+### Ruling 4 — `normalizeExternalId` does not case-fold free-form ids (Q31)
+
+`toUpperCase()` was applied before the scheme branch, so all nine schemes were upper-cased and
+`opensanctions:NK-A7bC` collided with `opensanctions:nk-a7bc`.
+
+What made this decidable rather than a toss-up: **the code already carried the argument against
+itself.** The doc comment refusing to strip a hyphen or dot from a free-form value — because doing
+so "could merge two distinct ids onto one dedup key" — sat three lines below the `toUpperCase()`
+that merged them on case. One rule, two answers.
+
+- `toUpperCase()` moves into the structured branch. `imo`, `inn`, `ogrn`, `lei` normalise exactly
+  as before; the five free-form schemes now only collapse whitespace.
+- Inert for `ofac`, `eu_fsf`, `uk_hmt` (numeric ids). It exists for `opensanctions` and `registry`.
+- **Frozen criterion 26 narrowed** to the four structured schemes, and **criterion 26b added** to
+  pin the new behaviour — the second owner-authorised amendment to `SLICE_1_CRITERIA.md`. Unlike
+  the Slice 0 semicolon amendment, criterion 26 was satisfiable as written; it was ruled wrong,
+  not defective.
+- **No migration, now or ever.** The normalised form is recomputed at every comparison and has
+  never been persisted. `externalIdKey` still has no consumer, so the ruling landed before the
+  Stage 3 OpenSanctions connector could turn the collision into a silent entity merge.
+
+### Ruling 5 — the branch stays `telegram-osint-sidecar`
+
+Considered and declined: merging into `main` and branching `gabriel-v2-foundation` for Slice 2.
+The name no longer describes the contents — 16 of the 20 commits ahead of `main` are not Telegram
+work — and that is accepted as known drift rather than fixed now. `main` holds one commit the
+branch lacks (`f8eeaa7`, a near-duplicate of `991b002`); a test merge conflicts in
+`docs/README.md` alone, both sides having added index entries. That merge is deferred, not avoided.
+
+**The branch is pushed before Slice 2 runs.** ADR 0010 says the backup for the migration is the
+private repository's git history and that the pre-migration commit is pinned before the migration
+first runs. Slice 2 is that migration, and until the push these 20 commits existed on one machine
+only — the ADR's safety net did not exist. Pushing is what creates it.
+
+### Ruling 6 — both uncommitted leftovers committed, separately
+
+- **`e8b6e13`** — `docs: drop the STANAG source-rating timeline, superseded by the shipped
+  feature`. The staged deletion, committed on purpose rather than swept into Slice 2. The timeline
+  planned work that landed in `3a37ccb` while its phases still read "not started"; its governing
+  decisions survive in ADRs 0006, 0008 and 0009, and nothing in `docs/` linked to it.
+- **`43156db`** — `docs: record the standing maintenance obligations for AI-assessed ratings`.
+  The ADR 0009 addition, unrelated to either slice. Both files it references
+  (`independenceClusters.ts`, `diagonalCollapse.eval.test.ts`) were confirmed to exist.
+
 ### What Slice 2 must do before it starts
 
 1. **Split `project-gpkg-fixture.test.ts`.** It is at 299 lines against the 300-line cap, and
    Slice 2 plans another real-WASM test in it. It breaks on the first line added.
-2. **Answer Q31** (dedup case-folding) before anything consumes `externalIdKey`.
+2. ~~**Answer Q31** (dedup case-folding) before anything consumes `externalIdKey`.~~ **Done —
+   Ruling 4.**
 3. **Do not phrase a criterion as "this string appears nowhere in a directory."** Two slices, two
    frozen criteria defeated by exactly that shape. Scope such checks to the diff, not the tree.
-4. Read the 5 `[HUMAN]` criteria from Slice 0 (44–48) and the open questions Q1–Q31.
+4. ~~Read the 5 `[HUMAN]` criteria from Slice 0 (44–48) and the open questions Q1–Q31.~~ **Done —
+   see the table above.**
