@@ -15,8 +15,15 @@
 | `ARCHITECTURE.md` | Current component tree, data flows, coordinate contract, enrichment pipeline | Active |
 | `TELEGRAM_OSINT_PRD.md` | PRD for the Telegram scraper + graph module (work-in-progress) | WIP |
 | `adr/` | Architecture Decision Records — one decision per file, numbered | Active |
+| `SLICE_BUILD_LOOP.md` | The unattended agent build loop, invoked as a prompt — six phases, iteration cap, prohibitions | Active |
+| `GABRIEL_V2_PRD.md` | Capability plan for Gabriel v2.0 (OSINT data fusion) — the master PRD, sliced per stage | Active |
+| `timelines/GABRIEL_V2_TIMELINE.md` | Stage status and order for v2.0 — the master tracker | WIP |
+| `timelines/GABRIEL_V2_SLICE_0_1_BUILD.md` | Authoritative build spec for v2.0 Slices 0 and 1 (relationship vocabulary, `Relationship` type, External Ids). Supersedes `GABRIEL_V2_FOUNDATION_SPEC.md` for those two slices | Active |
+| `timelines/GABRIEL_V2_FOUNDATION_SPEC.md` | Build spec for v2.0 Stage 1 (Relationships, vocabulary, External Ids, hierarchy seam, Proposal spine). **Superseded for Slices 0–1 by `timelines/GABRIEL_V2_SLICE_0_1_BUILD.md`** — it still describes the revised-away plan (`parentId` deletion, `query.ts`, seven violation codes, an eight-slice Stage 1). Do not read it for Slices 0–1 except where the Slice 0/1 build spec cites it | Superseded (Slices 0–1) |
+| `timelines/SLICE_0_CRITERIA.md` | Frozen `[MACHINE]`/`[HUMAN]` success criteria for Slice 0 — no later agent may weaken or delete an entry | Active |
+| `timelines/SLICE_0_1_OPEN_QUESTIONS.md` | Append-only record of every question an agent had to guess at in Slices 0–1, and the conservative reading it implemented instead | Active |
+| `timelines/SLICE_RUN_LOG.md` | Append-only log of `SLICE_BUILD_LOOP.md` runs — iterations, commit SHAs, recorded guesses, and the `[HUMAN]` review list | Active |
 | `timelines/TELEGRAM_TIMELINE.md` | Phase plan + live execution log for the Telegram OSINT module | WIP |
-| `timelines/STANAG_SOURCE_RATING_TIMELINE.md` | Phase plan for STANAG source-rating work | WIP |
 
 The **canonical glossary** (domain language) lives at the repo root: [`../CONTEXT.md`](../CONTEXT.md).
 `ARCHITECTURE.md` describes the code *as it is today*; the *target* architecture and the decisions
@@ -49,3 +56,7 @@ For `/phase-start` and other agent planning commands, use this set by default:
 
 Do **not** include `TELEGRAM_OSINT_PRD.md` or `timelines/TELEGRAM_TIMELINE.md` unless the task
 explicitly targets Telegram OSINT work.
+
+Do **not** include `timelines/GABRIEL_V2_FOUNDATION_SPEC.md` for v2.0 Slices 0–1 — it is
+superseded there by `timelines/GABRIEL_V2_SLICE_0_1_BUILD.md`, and reading it will hand you a
+revised-away plan.

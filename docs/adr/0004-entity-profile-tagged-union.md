@@ -1,5 +1,7 @@
 # MapEntity generalises to Entity + a flat typed Profile
 
+**Superseded in part by ADR [0010](0010-first-class-relationships.md)**: relations between Entities become first-class typed edges, so Hierarchy is one derived view (over `subordinate_to` / `corporate_parent`) rather than the core relation and `parentId` becomes derived and non-authoritative; and "G2-strict" is relaxed only far enough to author `vessel`, `person` and `equipment_class` as **field-less** profiles that carry a `kind` and nothing else — field-bearing profiles and the `Entity` field mirror stay deferred, and the flat tagged union below is unchanged.
+
 `MapEntity` (a military unit: echelon, affiliation, NATO symbol, `militaryUnitId`) generalises to a domain-agnostic **`Entity`**: a node that is *sourced, source-rated, geolocated, and hierarchable*. Every `Entity` carries a common core — `id`, a `kind` discriminant, `name`, geometry/position, Provenance Ledger, source rating, `parentId` — plus a type-specific **Profile**. The military unit becomes the **Unit Profile**, the only profile populated today.
 
 The generalisation is done **strictly** ("G2-strict"): the core becomes generic and the Unit Profile is carved out, but **no other profile (vessel, company, person) is authored**. Future profiles are a modelling exercise deferred to the investigation that needs them.

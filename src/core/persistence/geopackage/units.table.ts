@@ -1,4 +1,5 @@
 import type { GeoPackage } from "@ngageoint/geopackage"
+import { ENTITY_KINDS, type EntityKind } from "@/core/entity/entity"
 import type { MapEntity } from "@/types/domain.types"
 import {
   buildCreateTableColumnDefs,
@@ -11,6 +12,20 @@ import {
 import { decodeAliases, decodeOrganisationType, decodePositionMode } from "./validation"
 
 export const UNITS_TABLE = "units"
+
+const VALID_ENTITY_KINDS = new Set<EntityKind>(ENTITY_KINDS)
+
+/**
+ * Allowlist rather than a two-branch ternary. A narrower return type is
+ * assignable to the wider one, so a decoder that names only some of the kinds
+ * keeps typechecking after the union widens while quietly rewriting every
+ * unnamed kind on the way in — no compiler error, no failing test, wrong data.
+ * Unknown and absent values still fall back to "unit": every row predating this
+ * column was a unit (ADR 0004, E1).
+ */
+function decodeEntityKind(raw: unknown): EntityKind {
+  return typeof raw === "string" && VALID_ENTITY_KINDS.has(raw as EntityKind) ? (raw as EntityKind) : "unit"
+}
 
 /**
  * `analyzed_at`, `position_mode`, `is_exact_position`, and `kind` are `optional`
@@ -48,7 +63,7 @@ export const unitColumns: ColumnDescriptor<MapEntity>[] = [
     optional: true,
     fallbackSql: "'unit'",
     encode: (v) => String(v ?? "unit"),
-    decode: (raw) => (raw === "corporate" ? "corporate" : "unit"),
+    decode: (raw) => decodeEntityKind(raw),
   },
   {
     prop: "type",

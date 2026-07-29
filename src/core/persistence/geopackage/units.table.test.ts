@@ -1,6 +1,7 @@
 import { readdirSync, rmSync } from "node:fs"
 import { GeoPackageAPI, type GeoPackage } from "@ngageoint/geopackage"
 import { afterEach, describe, expect, it } from "vitest"
+import { ENTITY_KINDS } from "@/core/entity/entity"
 import type { MapEntity } from "@/types/domain.types"
 import { createUnitsTable, readEntities, readLegacyUnitSourcesColumn, writeEntities } from "./units.table"
 
@@ -141,6 +142,67 @@ describe("units.table", () => {
         geoPackage.connection.run("ALTER TABLE units DROP COLUMN kind")
         const columns = geoPackage.connection.all("PRAGMA table_info(units)") as Array<{ name: string }>
         expect(columns.map((c) => c.name)).not.toContain("kind")
+
+        const [loaded] = readEntities(geoPackage)
+        expect(loaded.kind).toBe("unit")
+      } finally {
+        geoPackage.close()
+      }
+    },
+    30_000,
+  )
+
+  it(
+    "round-trips every ENTITY_KINDS value through the kind column",
+    async () => {
+      const geoPackage = await createTestGeoPackage()
+      try {
+        createUnitsTable(geoPackage)
+        const entities: MapEntity[] = ENTITY_KINDS.map((kind) => ({
+          kind,
+          id: "e-" + kind,
+          name: "Entity of kind " + kind,
+          layerId: "layer-1",
+          parentId: null,
+        }))
+        writeEntities(geoPackage, entities)
+        const loaded = readEntities(geoPackage)
+
+        expect(loaded).toHaveLength(ENTITY_KINDS.length)
+        // Trap T2: a narrower decoder return type stays assignable after the kind
+        // union widens, so a persisted "vessel" row would silently come back as
+        // "unit" with no compiler error. Every kind must survive verbatim.
+        for (const kind of ENTITY_KINDS) {
+          expect(loaded.find((e) => e.id === "e-" + kind)?.kind).toBe(kind)
+        }
+      } finally {
+        geoPackage.close()
+      }
+    },
+    30_000,
+  )
+
+  it(
+    "falls back to unit for an unknown persisted kind",
+    async () => {
+      const geoPackage = await createTestGeoPackage()
+      try {
+        createUnitsTable(geoPackage)
+        const entity: MapEntity = {
+          kind: "wormhole" as never,
+          id: "e-unknown-kind",
+          name: "Unknown Kind",
+          layerId: "layer-1",
+          parentId: null,
+        }
+        writeEntities(geoPackage, [entity])
+
+        // Asserted at the column so the fallback is proven to happen on decode,
+        // not because encode quietly rewrote the value on the way in.
+        const stored = geoPackage.connection.all(
+          "SELECT kind FROM units WHERE id = 'e-unknown-kind'",
+        ) as Array<{ kind: string }>
+        expect(stored[0].kind).toBe("wormhole")
 
         const [loaded] = readEntities(geoPackage)
         expect(loaded.kind).toBe("unit")

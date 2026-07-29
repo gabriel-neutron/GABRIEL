@@ -68,12 +68,38 @@ export type CorporateProfile = {
 }
 
 /**
+ * Vessel, Person and Equipment Class profiles (ADR 0010). Intentionally bare —
+ * each carries the discriminant and nothing else. Entity below is a
+ * hand-mirrored flattening, not an intersection with Profile, so a field added
+ * here would not be readable on Entity without editing that mirror too. Keeping
+ * these three empty is what lets the mirror stay untouched in this slice. Their
+ * real field sets, and the matching mirror edits, land in Slice 5.
+ */
+export type VesselProfile = { kind: "vessel" }
+export type PersonProfile = { kind: "person" }
+export type EquipmentClassProfile = { kind: "equipment_class" }
+
+/**
  * Flat tagged union of every Entity profile, discriminated by `kind` (ADR 0004
  * — flat, never nested: `entity.echelon`, not `entity.profile.echelon`). Future
- * profiles (vessel, person) are a modelling exercise deferred to the
- * investigation that needs them.
+ * profiles arrive bare (ADR 0010): the discriminant only, so that the Entity
+ * field mirror below stays untouched until Slice 5 gives them field sets.
  */
-export type Profile = UnitProfile | CorporateProfile
+export type Profile =
+  | UnitProfile
+  | CorporateProfile
+  | VesselProfile
+  | PersonProfile
+  | EquipmentClassProfile
+
+/**
+ * Runtime companion to the Profile discriminant, in declaration order. Anything
+ * validating a persisted or externally supplied kind checks this allowlist
+ * instead of re-deriving the union by hand — a hand-written check silently
+ * falls behind the day the union widens, and still typechecks.
+ */
+export const ENTITY_KINDS = ["unit", "corporate", "vessel", "person", "equipment_class"] as const
+export type EntityKind = typeof ENTITY_KINDS[number]
 
 /**
  * A sourced, source-rated, geolocated, hierarchable node — core + a flat

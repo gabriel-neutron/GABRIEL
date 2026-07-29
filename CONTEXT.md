@@ -7,14 +7,16 @@ Local-first, self-hosted OSINT data-fusion environment. Analysts build source-ra
 ### Entities and structure
 
 **Entity** (code: `MapEntity` today → generalises to `Entity`):
-The core node of any Gabriel map — something **sourced, source-rated, geolocated, and hierarchable**. Carries a common core (id, `type` discriminant, name, geometry/position, Provenance Ledger, source rating, `parentId`) plus a type-specific **Profile**. Today only the military profile is populated; corporate, vessel, and person profiles are future domains the core is designed to accept without change.
+The core node of any Gabriel map — something **sourced, source-rated, geolocated, and hierarchable**. Carries a common core (id, `kind` discriminant, name, geometry/position, Provenance Ledger, source rating, `parentId`) plus a kind-specific **Profile**. Only the Unit and Corporate profiles carry fields today; `vessel`, `person` and `equipment_class` exist as **field-less profiles** — declared so the edge vocabulary can name them as endpoint kinds, with their fields deferred (ADR 0010).
 _Was_: `MapEntity`, defined as "a military unit." That definition is now the **Unit Profile**, not the whole Entity.
 
 **Profile**:
-The type-specific payload attached to an Entity, selected by its `type` discriminant. The **Unit Profile** (military: echelon, affiliation, NATO symbol, unit IDs) is the only profile that exists today. Profiles are a **typed discriminated union**, never an open attribute bag — this preserves strong typing and the column-by-column GeoPackage round-trip.
+The kind-specific payload attached to an Entity, selected by its `kind` discriminant. `ENTITY_KINDS` is the closed list: `unit`, `corporate`, `vessel`, `person`, `equipment_class`. The **Unit Profile** (military: echelon, affiliation, NATO symbol, unit IDs) and the **Corporate Profile** are the only two that carry fields; the other three are bare. Profiles are a **typed discriminated union**, never an open attribute bag — this preserves strong typing and the column-by-column GeoPackage round-trip.
+_Note_: `Entity` is a hand-mirrored flattening of core + profile, not `EntityCore & Profile`, so adding a field to a profile does **not** make it readable on `Entity` until the mirror is edited too. That is why the three new profiles are bare.
 
 **Hierarchy**:
-The parent/child relation between Entities — a **core** property of any Entity, not a military one (a corporate control chain and a shipowner chain are also trees). Traversed by the shared Hierarchy index.
+The parent/child relation between Entities — not a military one (a corporate control chain and a shipowner chain are also trees). Traversed by the shared Hierarchy index.
+_Superseded in part by [ADR 0010](docs/adr/0010-first-class-relationships.md)_: Hierarchy is no longer the **core** relation, but **one derived view** over typed edges — `subordinate_to` and `corporate_parent`. The `relationships` records are the source of truth; `parentId` becomes derived and non-authoritative.
 
 **ORBAT** (Order of Battle):
 The **military view** of the generic Hierarchy — the presentation of Unit-Profile Entities as a command tree. One module's lens on a core capability; no longer Gabriel's only structure.
@@ -33,6 +35,28 @@ _Cycle policy_: a fully disconnected cyclic component gets a synthetic root at i
 lexicographically smallest id, so it renders and ancestor/depth walks can't infinite-loop.
 `src/utils/treeLayout.ts` (`computeTreeXIndex`) builds on the Orbat module to give `TreeView` and
 `OrganisationTreeView` an identical horizontal-layout algorithm.
+
+### Typed relationships (edges)
+
+**Relationship** (`core/relationship`, one record per edge):
+A first-class **directed, typed edge between two Entities** — the general form of which Hierarchy is one derived view. Carries its own id, a type from the closed vocabulary, optional start/end dates (an edge with no end date is active), and a per-type metadata bag. It is the unit the export gate acts on. See [ADR 0010](docs/adr/0010-first-class-relationships.md).
+_Direction_: every type reads as "A *type* B", so `fromId` is always A — `subordinate_to` runs child → formation, `owned_by` runs asset → owner. No type is symmetric.
+_Avoid_: "link" and "association" as the domain term. A **network link** is the line the map draws; a Relationship is the record it may be drawn from.
+
+**Edge vocabulary** (`EDGE_TYPES`, `EDGE_VOCABULARY_VERSION`):
+The **closed** set of thirteen relationship types — twelve Record tier, one Assessment tier — each with a fixed direction, an **Edge layer**, advisory endpoint kinds, and a `publicDefinition` that ships **verbatim** in the CC-BY dataset. Closed means a type outside it is a validation violation, not an extension point; amending it edits the vocabulary and its lock test together and bumps the version.
+
+**Record tier**:
+The twelve types asserting something a source **documents** — an order of battle, a registry filing, a bill of lading, an insurance cover. Publishable under the ordinary rules (sourcing, and the natural-person clause that gates `owned_by`), with no extra ceremony.
+
+**Assessment tier**:
+Gabriel's own **analytical judgement** about a relation, not a documentary record — today the single type `acts_for`. Excluded from the public dataset by default, and labelled inside its own `publicDefinition` ("ASSESSMENT — not a documentary record"), so the caveat travels with the data into a reuser's tooling instead of living in our UI.
+
+**Edge layer** (`EdgeLayer`):
+The investigative surface a record-tier type belongs to — `orbat`, `military-industrial`, `industrial`, `financial`, `logistics`, `shipping`. It groups and filters edges for the analyst; it constrains nothing. Assessment-tier types are not confined to one layer and carry `null`.
+
+**ExportOverride**:
+Per-edge authorisation to publish **one** assessment-tier edge under CC-BY. Records a proposer, a **different** confirmer, a date, and a rationale. The two-person rule is **ceremony and attribution, not authentication** — Gabriel has no identity system, so the names are free text and git history carries the real attribution. Absent means excluded (the gate fails closed); present on a Record-tier edge it is a violation, because there it authorises nothing while reading as if it did.
 
 ### Enrichment pipeline
 
@@ -92,4 +116,5 @@ _Avoid_: comment, remark, observation
 ## Flagged ambiguities
 
 - **"sources"** was used to mean both the Provenance Ledger (entity field) and Research Citations (enrichment evidence). Resolved: "sources" in user-facing language always means the Provenance Ledger; evidence backing proposals is called Research Citations. In code, `EnrichmentProposal.sources` should be renamed to `EnrichmentProposal.citations`.
+- **"relationship"** now carries two senses in this file: the domain term above (a typed edge between two Entities) and the `## Relationships` section below, which lists sentences about how the model's *concepts* relate. Unresolved — the section may want renaming (e.g. "Model invariants"); flagged here rather than renamed unilaterally.
 - **"notes"** was used loosely for any free text. Resolved: Notes is a constrained field — only organisational changes and Epistemic Caveats; battle history and operational movements are excluded.

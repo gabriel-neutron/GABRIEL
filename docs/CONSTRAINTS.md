@@ -10,6 +10,7 @@ Gabriel uses a **feature-first** `core / shell / modules` layout
 src/
   core/                 # deep shared spine — no domain-specific code leaks in
     entity/             # Entity, Profile (flat typed union), hierarchy.ts (generic parent/child)
+    relationship/       # typed directed edges: closed vocabulary + validation (ADR 0010)
     provenance/         # Provenance Ledger storage (source rating → Source/Claim, ADR 0006)
     persistence/        # store-agnostic port; geopackage/ is one adapter
     coordinates/        # branded LatLng / LngLat
