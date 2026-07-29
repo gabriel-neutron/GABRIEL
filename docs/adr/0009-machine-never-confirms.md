@@ -25,3 +25,22 @@ Grouping citations by registrable domain — the cheap heuristic first proposed 
 - v1 corroboration signals fed to / computed for the pass: near-duplicate snippet clustering (MinHash over full bodies deferred to v1.5), interested-party collapse ([ADR 0008](0008-reliability-as-capped-type-prior.md)), publication/observation dates, and stated-attribution extraction (a bounded task the model is reliable at, unlike open-ended independence judgment).
 - The stored evidence (clusters, dates, citations, query, model+prompt version) is the auditable record; the LLM's free-text rationale is persisted as **"model narrative (not verified),"** demoted below that evidence, never presented as the justification of record.
 - The review queue is where a human can promote `2 → 1`; the "Confirm" affordance exists only there, and only when ≥2 distinct clusters with dates are present. Machine-tier vocabulary avoids "confirmed / verified / trusted."
+
+### Standing maintenance obligations
+
+Because every AI-assessed rating is stamped with its `model` and `promptVersion`, the stamp is
+also the maintenance handle:
+
+- **On any model or prompt change:** bump the `promptVersion` / `model` stamp, and queue ratings
+  produced under the old version for re-assessment — they are findable by their stamp. (The
+  parallel rule for the deterministic reliability table is `mappingVersion`, recorded in
+  [ADR 0008](0008-reliability-as-capped-type-prior.md).)
+- **Periodically:** review the interested-party list against newly-observed state-media and
+  belligerent sources. It is deliberately small and curated, not a maintained platform, so it
+  only stays useful if it is revisited.
+- The diagonal-collapse eval needs no cadence rule: `diagonalCollapse.eval.test.ts` runs on every
+  `npm run verify`.
+- **Known residual:** MinHash near-duplicate clustering runs over retrieval *snippets*, not full
+  article bodies, because Gabriel has no body-fetch capability (see `independenceClusters.ts`).
+  Gabriel v2's document ingestion stores extracted full text in the project file, which is what
+  would make full-body clustering possible — see `docs/timelines/GABRIEL_V2_TIMELINE.md`.
