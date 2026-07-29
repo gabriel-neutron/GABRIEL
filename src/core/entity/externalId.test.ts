@@ -37,6 +37,9 @@ const ALL_SCHEMES = Object.keys(EXTERNAL_ID_LABELS) as ExternalIdScheme[]
 
 const FREE_FORM_SCHEMES: ExternalIdScheme[] = ["ofac", "eu_fsf", "uk_hmt", "opensanctions", "registry"]
 
+/** The schemes with a known length and charset — the only ones normalisation upper-cases. */
+const STRUCTURED_SCHEMES: ExternalIdScheme[] = ["imo", "inn", "ogrn", "lei"]
+
 function imo(value: string): ExternalId {
   return { scheme: "imo", value }
 }
@@ -143,14 +146,30 @@ describe("normalizeExternalId", () => {
     expect(normalizeExternalId("imo", "9074729")).toBe("9074729")
   })
 
-  it("upper-cases and trims for every scheme, and is idempotent", () => {
+  it("upper-cases structured schemes, trims every scheme, and is idempotent", () => {
     const sample = "  aB-12 cD.34  "
     expect(ALL_SCHEMES).toHaveLength(9)
+    expect(STRUCTURED_SCHEMES).toHaveLength(4)
     for (const scheme of ALL_SCHEMES) {
       const once = normalizeExternalId(scheme, sample)
-      expect(once).toBe(once.toUpperCase())
       expect(once).toBe(once.trim())
       expect(normalizeExternalId(scheme, once)).toBe(once)
+    }
+    for (const scheme of STRUCTURED_SCHEMES) {
+      expect(normalizeExternalId(scheme, sample)).toBe(normalizeExternalId(scheme, sample).toUpperCase())
+    }
+  })
+
+  it("preserves case for free-form schemes, so two case-distinct ids keep distinct keys", () => {
+    // Owner ruling on Q31, 2026-07-29. An OpenSanctions entity id is a case-sensitive
+    // token, and so is a registry id whose case is meaningful; folding case here would
+    // silently merge two register rows into one entity the moment a consumer dedups.
+    expect(FREE_FORM_SCHEMES).toHaveLength(5)
+    for (const scheme of FREE_FORM_SCHEMES) {
+      expect(normalizeExternalId(scheme, "NK-a7bC")).toBe("NK-a7bC")
+      expect(externalIdKey({ scheme, value: "NK-a7bC" })).not.toBe(
+        externalIdKey({ scheme, value: "nk-a7bc" }),
+      )
     }
   })
 

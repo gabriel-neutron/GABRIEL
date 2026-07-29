@@ -97,22 +97,26 @@ function hasValidImoCheckDigit(digits: string): boolean {
  * 20-character LEI may itself begin with the letters LEI, and stripping them
  * would turn a valid id invalid. It also keeps the function idempotent.
  *
- * A free-form value has its whitespace collapsed and nothing else touched: a
- * hyphen or a dot carries meaning inside an opaque registry string
- * ("EU.1234.56"), so stripping those could merge two distinct ids onto one dedup
- * key, and such an id may legitimately start with its own registry's name.
+ * A free-form value has its whitespace collapsed and nothing else touched —
+ * including its case. A hyphen or a dot carries meaning inside an opaque
+ * registry string ("EU.1234.56"), so stripping those could merge two distinct
+ * ids onto one dedup key, and such an id may legitimately start with its own
+ * registry's name. Case is the same argument: an OpenSanctions entity id is a
+ * case-sensitive token, so upper-casing "NK-a7bC" and "nk-a7bc" onto one key
+ * would silently merge two register rows into one entity (owner ruling on Q31,
+ * 2026-07-29 — this branch previously upper-cased too, which contradicted the
+ * separator rule directly above it).
  *
  * A value that is not a string at runtime (persisted JSON is not type-checked)
  * normalises to the empty string, which every validity rule rejects.
  */
 export function normalizeExternalId(scheme: ExternalIdScheme, value: string): string {
   if (typeof value !== "string") return ""
-  const upper = value.toUpperCase()
 
   const lengths = EXPECTED_LENGTHS[scheme]
-  if (lengths === undefined) return upper.trim().replace(WHITESPACE_RUN, " ")
+  if (lengths === undefined) return value.trim().replace(WHITESPACE_RUN, " ")
 
-  const compact = upper.replace(STRUCTURED_SEPARATORS, "")
+  const compact = value.toUpperCase().replace(STRUCTURED_SEPARATORS, "")
   const prefix = SCHEME_PREFIXES[scheme]
   if (prefix !== undefined && compact.startsWith(prefix)) {
     const stripped = compact.slice(prefix.length)

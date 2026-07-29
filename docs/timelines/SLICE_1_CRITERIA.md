@@ -270,12 +270,33 @@ preserved as entered" (spec:385-386), so a check against the raw string would re
 
     and both equal `"9074729"` (the scheme prefix and the separator are stripped, spec:389-390).
 
-26. **[MACHINE]** `PASSES(src/core/entity/externalId.test.ts, "upper-cases and trims for every
-    scheme, and is idempotent")`. For all nine schemes and a mixed-case, space-padded sample
-    value: the result equals its own `toUpperCase()`, equals its own `trim()`, and
-    `normalizeExternalId(s, normalizeExternalId(s, v)) === normalizeExternalId(s, v)`. These are
-    the pinned minimum guarantees; which further separators a scheme strips is implementation
-    freedom (recorded in `SLICE_0_1_OPEN_QUESTIONS.md`, Q25), subject to criterion 27.
+26. **[MACHINE]** `PASSES(src/core/entity/externalId.test.ts, "upper-cases structured schemes,
+    trims every scheme, and is idempotent")`. For all nine schemes and a mixed-case,
+    space-padded sample value: the result equals its own `trim()`, and
+    `normalizeExternalId(s, normalizeExternalId(s, v)) === normalizeExternalId(s, v)`. For the
+    four **structured** schemes (`imo`, `inn`, `ogrn`, `lei`) the result additionally equals its
+    own `toUpperCase()`. These are the pinned minimum guarantees; which further separators a
+    scheme strips is implementation freedom (recorded in `SLICE_0_1_OPEN_QUESTIONS.md`, Q25),
+    subject to criterion 27.
+
+    > **Amendment, 2026-07-29 — owner-authorised. The second amendment to this frozen file.**
+    > The criterion previously required the result to equal its own `toUpperCase()` for **all
+    > nine** schemes, and the test was named ~~`"upper-cases and trims for every scheme, and is
+    > idempotent"`~~. The clause is narrowed to the four structured schemes by the owner ruling
+    > on **Q31**: upper-casing a free-form value contradicted the rule immediately above it in
+    > `normalizeExternalId`, which preserves hyphens and dots in an opaque registry string
+    > precisely because stripping them "could merge two distinct ids onto one dedup key". Case
+    > is the same argument — an OpenSanctions entity id is a case-sensitive token — so the
+    > original clause pinned a silent entity merge as a guarantee. Unlike the Slice 0 semicolon
+    > amendment, this one was satisfiable as written; it was ruled wrong, not defective.
+    > Amended before any consumer shipped, so no persisted data is affected: the normalised
+    > form is recomputed at every comparison and never stored.
+
+26b. **[MACHINE]** `PASSES(src/core/entity/externalId.test.ts, "preserves case for free-form
+    schemes, so two case-distinct ids keep distinct keys")`. Added by the same Q31 ruling. For
+    each of the five free-form schemes (`ofac`, `eu_fsf`, `uk_hmt`, `opensanctions`,
+    `registry`): `normalizeExternalId(s, "NK-a7bC") === "NK-a7bC"`, and
+    `externalIdKey({ scheme: s, value: "NK-a7bC" }) !== externalIdKey({ scheme: s, value: "nk-a7bc" })`.
 
 27. **[MACHINE]** `PASSES(src/core/entity/externalId.test.ts, "never throws for any scheme on
     any input")`. `normalizeExternalId` is called for all nine schemes with `""`, `"   "`, a
