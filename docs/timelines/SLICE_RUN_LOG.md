@@ -235,9 +235,33 @@ not a regex, decides how these thirteen sentences read.
 
 ### Slice 0 — commit
 
-- **SHA: pending — appended by the orchestrator at commit**
+- **SHA: `507f425`** — `feat(relationship): add the edge vocabulary and Relationship type (Slice 0)`,
+  committed on branch `telegram-osint-sidecar`, not pushed.
 - Iterations: **3**
-- `npm run verify`: green on the tree being committed.
+- `npm run verify`: green on the tree being committed — 61 test files, 472 tests, `lint` clean,
+  `tsc -b && vite build` clean. Node byte scan: 299 files, **0 NUL bytes**. `public/` and every
+  test fixture untouched.
+- **A second `/code-review` ran on the settled tree**, after the two rulings landed — the first
+  one had graded a tree that no longer existed. Spec axis: clean on all three questions (nothing
+  missing, no scope creep, nothing implemented wrongly), with the thirteen definitions verified
+  byte-identical to the spec block. Standards axis: three documentation breaches and four
+  judgement-call smells, disposed of below.
+- Applied from that review: the spec's own Tests bullet at
+  `GABRIEL_V2_SLICE_0_1_BUILD.md:333` still stated the struck no-semicolon rule, so the spec
+  contradicted itself at the exact point of Ruling 1 — now amended in place with a dated note
+  (this closes **Q15**); `CONTEXT.md`'s **Hierarchy**, **Entity** and **Profile** entries still
+  said hierarchy was the core relation and that the Unit Profile was the only one that exists,
+  both false after this slice; `docs/CONSTRAINTS.md`'s target-layout block did not list the new
+  `core/relationship/` module; and the two-person export rule was stated twice, in
+  `relationship.ts` and again in `validate.ts` — the predicate now lives once, beside the decoder
+  that owns it, as `isSelfConfirmedOverride`.
+- Declined from that review, with reasons: the two ISO-date regexes stay separate — the
+  anchoring difference (`ISO_DATE` full-match vs `CONFIRMED_AT_DATE_PREFIX` prefix-match) is
+  deliberate and sharing them would couple two modules for one line each; and
+  `decode: (raw) => decodeEntityKind(raw)` keeps its wrapper rather than collapsing to
+  `decode: decodeEntityKind`, because every sibling descriptor in that same list
+  (`decodeAliases`, `decodePositionMode`, `decodeOrganisationType`) uses the wrapper form and
+  changing only the new one would make it the odd entry out.
 - Files: three new modules and their tests under `src/core/relationship/`, `entity.ts` +
   `entity.test.ts`, the Trap T2 edit to `units.table.ts` + its tests — ten paths under `src/`,
   matching criterion 57 exactly — plus ADR 0010, the ADR 0004 supersession line, the `CONTEXT.md`
