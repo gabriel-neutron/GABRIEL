@@ -1,7 +1,12 @@
 # Slice Build Loop — unattended agent workflow
 
-**Invoke with:** `Follow docs/SLICE_BUILD_LOOP.md. Target: Slice 0.`
-(Or `Slice 0 and Slice 1`, or any slice named in a build spec.)
+**Invoke with:** `Follow docs/SLICE_BUILD_LOOP.md. Target: Slice 2A.`
+(Or any slice that has a frozen criteria file or a build spec.)
+
+> **Current target: Slice 2A, then Slice 2B.** 2A is four mechanical refactors against
+> `docs/timelines/SLICE_2A_CRITERIA.md`, which is **already frozen** — so **skip Phase 1** for it
+> and go straight to Phase 2. 2B is a migration and needs its own Phase 1 criteria file, frozen
+> from `docs/timelines/GABRIEL_V2_SLICE_2B_BUILD.md`. **Do not start 2B until 2A is committed.**
 
 This file is the prompt. Read it fully before acting. It defines a six-phase loop with a
 hard iteration cap and a set of prohibitions that exist because each one describes a real
@@ -11,9 +16,12 @@ way an unattended agent has silently produced a green build over broken work.
 
 ## Phase 0 — Orient (no subagents)
 
-1. Identify the authoritative build spec for the target slice. For Slices 0–1 that is
-   `docs/timelines/GABRIEL_V2_SLICE_0_1_BUILD.md`. It supersedes
-   `GABRIEL_V2_FOUNDATION_SPEC.md`, which still describes a revised-away plan.
+1. Identify the authoritative contract for the target slice. **Slice 2A:**
+   `docs/timelines/SLICE_2A_CRITERIA.md`, already frozen. **Slice 2B:**
+   `docs/timelines/GABRIEL_V2_SLICE_2B_BUILD.md`, plus the binding
+   "Decisions carried into Slice 2 and beyond" section of
+   `docs/timelines/GABRIEL_V2_SLICE_0_1_BUILD.md`. There is no third document — read
+   `docs/README.md`'s reading list and stop there.
 2. Confirm the working tree is clean and `npm run verify` is green at HEAD. If it is red
    before you start, **stop** — write the failure to `docs/timelines/SLICE_RUN_LOG.md` and
    end the run. Do not build on a red baseline.
@@ -117,9 +125,18 @@ each — a command output, a file:line, a test name. "Looks done" is not evidenc
 
 **If every `[MACHINE]` criterion passes:**
 
-1. Byte-scan the new and modified files for NUL: `rg -c $'\x00' src/`. Any hit is a hard stop
-   — this repo has a recorded history of template literals writing NUL bytes and corrupting
-   diffs.
+1. Byte-scan for NUL: **`npm run scan:nul`**. Any hit is a hard stop — this repo has a
+   recorded history of template literals writing NUL bytes and corrupting diffs. The same
+   scan now runs first inside `npm run verify`, so step 2 covers it too; run it alone here to
+   get the finding before the slower gates.
+   *Amended 2026-07-29 by owner ruling (Q36).* This step printed `rg -c $'\x00' src/` until
+   that date. **That command is vacuous under Git Bash and so is its `rg --text` variant** —
+   the shell collapses the escape to an empty-string argument, `rg` then matches the empty
+   pattern on every line of every file, and the check exits 0 whether or not a NUL byte is
+   present. Measured against a control file: a two-line NUL-free file and a file containing a
+   NUL report the identical count and the identical exit code. Every NUL scan reported in the
+   Slice 0 and Slice 1 runs was therefore vacuously green. **Never report an `rg`-based NUL
+   check as evidence for this step.**
 2. Confirm `npm run verify` is green one final time on the exact tree being committed.
 3. Commit. Imperative present tense, per `CLAUDE.md`. Reference the slice.
 4. Append to `docs/timelines/SLICE_RUN_LOG.md`: the slice, the iteration count, the commit

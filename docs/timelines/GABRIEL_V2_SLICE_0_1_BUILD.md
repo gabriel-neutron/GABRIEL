@@ -1,10 +1,10 @@
 # Build Spec — Gabriel v2, Slices 0 and 1
 
-**Authority.** For Slices 0 and 1 this document supersedes `GABRIEL_V2_FOUNDATION_SPEC.md`
-wherever the two disagree. The Foundation Spec still describes the pre-review plan
-(`parentId` deletion, `query.ts`, seven violation codes, an eight-slice Stage 1); that plan
-was revised. Do not read the Foundation Spec for Slices 0–1 except where this document
-cites it explicitly.
+**Authority.** For Slices 0 and 1 this document is the authority. `GABRIEL_V2_FOUNDATION_SPEC.md`
+was deleted on 2026-07-29: it described the revised-away plan (`parentId` deletion, `query.ts`,
+seven violation codes, an eight-slice Stage 1) and was wrong in six further places; git history
+has it. **This file's line numbers drifted +9 above line 488 on 2026-07-29 — read the appendix at
+the end of this file before trusting any citation into it.**
 
 **Audience.** An autonomous coding agent working unattended. Every open question that
 blocked a dry run has been closed below. If you find yourself about to guess, stop and
@@ -484,8 +484,17 @@ so `"externalIds" in entity` is `true` on every loaded row even when the value i
 
 **T7 — NUL bytes in template literals.** This repo has a recorded history of spaces inside
 TS template literals becoming NUL bytes and corrupting git diffs. Slice 0 is almost entirely
-string authoring. Use plain quoted strings, not template literals, and byte-scan the new
-files before committing: `rg -c $'\x00' src/`.
+string authoring. Use plain quoted strings, not template literals, and byte-scan before
+committing: **`npm run scan:nul`** (`scripts/scan-nul.mjs`, also the first gate inside
+`npm run verify`).
+*Amended 2026-07-29 by owner ruling (Q36).* This trap printed `rg -c $'\x00' src/` until that
+date, and the handoff brief suggested `rg --text -c $'\x00'` as a workaround. **Both forms are
+vacuous under Git Bash** — the shell collapses the escape to an empty-string argument, so `rg`
+matches the empty pattern on every line and the check can neither fail nor distinguish a clean
+file from a dirty one. Measured against a control file. The guard for a *recorded historical
+failure* was therefore off for the whole of Slices 0 and 1; the shipped code is nonetheless
+clean, because the pre-commit scans in both runs used a Node byte scan (`readFileSync`) rather
+than the documented command. Never report an `rg`-based NUL check as evidence.
 
 ---
 
@@ -498,8 +507,8 @@ files before committing: `rg -c $'\x00' src/`.
   import plugin. It is a human review item.
 - `useProjectStore.ts` is 343 lines against the 300-line cap (`CONSTRAINTS.md:112`), and
   `EntityInspector.tsx` is 611. Neither slice here touches either file. Do not "fix" them.
-- `GABRIEL_V2_FOUNDATION_SPEC.md` still describes `parentId` deletion, `query.ts`, seven
-  violation codes and an eight-slice Stage 1. All four are superseded.
+- `GABRIEL_V2_FOUNDATION_SPEC.md` described `parentId` deletion, `query.ts`, seven violation
+  codes and an eight-slice Stage 1. All four superseded; the file was deleted 2026-07-29.
 
 ---
 
@@ -639,3 +648,38 @@ mint it automatically.
 - **Whoever migrates first says so in the handoff.** If both collaborators open the same
   pre-migration copy independently they each migrate and produce two divergent binaries, with
   no merge tool. The second person takes the migrated file, not their own copy.
+
+---
+
+## Appendix — why this file survives, and the line-number drift
+
+**Why it was not deleted with the rest of the Slice 0/1 paperwork.** Two of its parts are still
+load-bearing, and neither is reproducible from the code:
+
+1. **It is the authored source of the thirteen `publicDefinition` strings** that ship verbatim in
+   the CC-BY dataset. `src/core/relationship/vocabulary.test.ts:24` and `:85` transcribe the
+   vocabulary table and those definitions *from here*, by line number, deliberately not from the
+   implementation — so the test asserts a contract rather than restating the code. Drift between
+   this file and `vocabulary.ts` is a publication defect, not a refactor.
+2. **The "Decisions carried into Slice 2 and beyond" section is binding** on Slice 2B and is
+   cited by `GABRIEL_V2_SLICE_2B_BUILD.md` and by `src/core/relationship/validate.ts:64`.
+
+Everything else here is history, and git holds it.
+
+**Line-number drift, 2026-07-29.** The Trap T7 amendment inserted 9 lines at `:485`. **Any
+citation into this file authored before that date and pointing above line 488 is short by 9.**
+Measured after the fix:
+
+| section | cited as | actually at |
+|---|---|---|
+| Decisions carried into Slice 2 | 506 | **515** |
+| The 13 legacy corporate links | 528 | **537** |
+| Ordering and safety in Slice 2 | 587 | **596** |
+| the quote in `validate.ts:64` | 575-576 | **584-585** |
+
+Citations **below** 488 are unaffected and were re-verified line by line:
+`vocabulary.test.ts`'s `:175-189` (the vocabulary table) and `:198-247` (the definitions block),
+`externalId.test.ts`'s `:379-381` (the scheme union) and `:407-408` (the UI labels).
+
+**Prefer the section headings to the line numbers.** This is the second time in this project that
+a cross-file line citation has gone stale, and it will not be the last.

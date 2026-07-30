@@ -461,3 +461,145 @@ only — the ADR's safety net did not exist. Pushing is what creates it.
    frozen criteria defeated by exactly that shape. Scope such checks to the diff, not the tree.
 4. ~~Read the 5 `[HUMAN]` criteria from Slice 0 (44–48) and the open questions Q1–Q31.~~ **Done —
    see the table above.**
+
+---
+
+## Owner ruling session — 2026-07-29, second sitting: Q32–Q41 and the Slice 2B spec
+
+No code was written. Ten questions ruled, three reconnaissance passes run against the real code
+and the real file, and `docs/timelines/GABRIEL_V2_SLICE_2B_BUILD.md` authored. Every ruling is a
+dated **RESOLVED** block in `SLICE_0_1_OPEN_QUESTIONS.md`; this is the index.
+
+| id | subject | ruling |
+|---|---|---|
+| **Q36** | the NUL byte-scan printed in the docs cannot fail | **Fixed, and the guard is now automatic.** `scripts/scan-nul.mjs` + `npm run scan:nul`, wired as the **first** gate of `npm run verify`. Both documents corrected with dated notes. Frozen criterion 48 untouched. |
+| **Q35** | the 300-line cap versus Prohibition 5 | Split `project-gpkg-fixture.test.ts`; `geopackage.service.test.ts` converts one line per site and ends at **exactly 321**. No new violation, no repair of an old one. No criterion amended. |
+| **Q32** | all eight `SaveGeoPackageOptions` fields required | **Yes.** It is the only mechanism by which Slice 2B's two new members break every un-updated call site at compile time. A test helper that would soften the verbosity is explicitly forbidden — it reopens the hole. |
+| **Q33** | the save guard's signal, false positive and wording | **The frozen condition was replaced, not tuned.** See below — this is the one that mattered. |
+| **Q34** | where `projectStateFromLoadResult` lives | Stays in `useProjectIO.ts`, signature fixed as an intersection type so "no sixth field" is a compile-time property. Move to `core/` scheduled for 2B. |
+| **Q37** | `BASE` no longer matches HEAD | Re-pinned to the run's starting SHA. Safe because `git diff --name-only c8483b5 HEAD -- src/` is **empty**. |
+| **Q38** | a **third** duplicated project-state literal | `ViewPage.tsx:46-52` was missed by every document. Slice 2A converts it; criterion 46 amended additively. |
+| **Q39** | `activeParentMap` vs the dual-subordination check | `validate.ts` **may be reopened**, for one export only: a single `isHierarchyBearing` consumed by both the derivation and the control. |
+| **Q40** | contested children | `activeParentMap` emits no entry; derived parent is `null`. Display cascade stated explicitly: own position, else orbit the parent, else do not show. |
+| **Q41** | `mergeEntities` after 2B | Ported to edges. Left alone it produces a `.gpkg` that **cannot be reopened**. |
+
+### Q33 — the guard as frozen did not protect what it named
+
+The measured finding, and the reason five frozen criteria were amended: `save.ts:66` runs
+`DELETE FROM units` and `:75` then runs `writeEntities`. A save **replaces**. So after a failed
+restore the analyst types one entity — the ordinary reflex on opening an empty tool — the
+four-way emptiness collapses, **the guard goes silent, and Save writes 1 unit over 1010.** In the
+other direction `handleNew` never routes through `performProjectSave`, so an ordinary
+New → Save → Save on a fresh project **was refused**. The condition obstructed the ordinary
+gesture and missed the only destructive sequence.
+
+No refinement could have rescued it: after `resetProject()` and after a failed restore the store
+is at `initialState()` in both cases. The needed fact is about the session, not the state.
+Replaced by a `snapshotIsAuthoritative` ref, required on `ProjectSaveInput`. Criteria 24, 26, 27,
+28, 29 amended; 24b and 26b added; `[HUMAN]` criteria 55, 56, 57 closed.
+
+**Known weakness, recorded rather than hidden:** the repo has no jsdom, no
+`@testing-library/react` and zero `.test.tsx` files, so no hook can be mounted. The flag's three
+assignment sites are verifiable only by grep (criterion 24b). The guard logic itself is fully
+tested, because `performProjectSave` is a dependency-injected module function.
+
+### Measured facts that contradict the documents
+
+- **741 units, not 142**, draw their map position from the parent chain (599 `position_mode` =
+  `none` + 142 `parent`). And `geometry.ts:80` + `:126-128` mean a null derived parent **removes
+  an entity from the map** rather than moving it. That retires the count assertion as the primary
+  safeguard: the failure mode is topological, the assertion is cardinal.
+- **Three** duplicated `setProject` literals, not two. 22 call sites in all (Q38).
+- **15** production read sites for `parentId` across 13 files, not "nine consumers"; two files the
+  inventory names do not read it at all, and `core/entity/hierarchy.ts` — the central reader — was
+  missing from the list.
+- The two shareholding percentages are **not in a column**: they are English prose in
+  `organisations.notes`, and the Kalashnikov note contains `95%` (a *market* share) before
+  `25%+1`. Any regex publishes "Rostec holds 95% of Kalashnikov". The migration is forbidden from
+  reading `notes` at all, and a test proves it by rewriting that note to
+  `"Rostec holds 100% and 3% and c.7%"` and asserting `percent: 25` still.
+- The parent's real name is `Rostec State Corporation`, not the `Rostec` the docs abbreviate.
+- `units` has **no `kind` column** — all 1010 rows decode to `"unit"`, and every corporate entity
+  comes from the legacy `organisations` table, which still holds all 17 rows. This file has never
+  been re-saved by post-E1 code.
+- Ground truth otherwise **confirmed exactly**: 1010 / 999 / 17 / 13 / 1027 / 1012, plus 15 roots,
+  166 distinct parents, max sibling group 31, depth 5, zero dangling parents, zero self-loops,
+  zero cycles.
+
+### Tooling changed in this session
+
+`scripts/scan-nul.mjs` and `npm run scan:nul`, now the first gate of `npm run verify`. It proves
+its own detector on every run, treats "could not run" and "zero files enumerated" as failures
+distinct from clean, and enumerates through `git ls-files --cached --others --exclude-standard`.
+Evidence: clean tree → `clean, 306 files scanned`, exit 0; a planted NUL under `src/` → exit 1
+with the path named; a bad root → exit 2.
+
+`public/project.gpkg` was read from temp copies only and is byte-identical throughout
+(`7d0b0e592a1128a0d83e7575110bf2dc`).
+
+### Documentation cut back to what Slice 2 actually needs — same session, owner-directed
+
+`docs/timelines/` went from **7,811 lines to 4,025**; `docs/` from 8,808 to 5,035. The trigger was
+the owner's question: *if the code is built, aren't the code and the ADRs enough?* Largely yes —
+and the measurement that settled it is that the largest document in the repo was
+`SLICE_0_1_OPEN_QUESTIONS.md` at 1,420 lines, bigger than any spec, growing every session and
+never once drained.
+
+**Deleted — four files, 2,526 lines. Git history has all of them.**
+
+| file | lines | why |
+|---|---|---|
+| `GABRIEL_V2_FOUNDATION_SPEC.md` | 952 | Superseded, and **wrong in six measured places**: a 7-column `relationships` DDL, 7 violation codes against the shipped 9, a `decodeAliases` decode precedent that inverts on a required field, a `GeoPackageLoadResult.warnings` that does not exist, a stale `units.table.ts:31`, and a `saveGeoPackage` signature contradicting Slice 2A. The single highest-value deletion — this is the file an agent following the index would have built against. |
+| `SLICE_2_HANDOFF.md` | 293 | Written for a session that has now happened. Three of its figures were wrong: two duplicated literals (three), 16 call sites (19), 142 position-derived units (741). |
+| `SLICE_0_CRITERIA.md` | 489 | Frozen contract for shipped, reviewed work. |
+| `SLICE_1_CRITERIA.md` | 792 | Same. |
+
+**Compressed.** `SLICE_0_1_OPEN_QUESTIONS.md`, 1,420 → **101 lines**. It keeps only the four
+entries that record *unratified* behaviour — where the code shows a behaviour nobody has blessed,
+which is the one thing a source comment cannot carry — plus an index resolving every `Q<n>`
+citation to the document that now owns the ruling. Q32–Q41 were already copied in full into the 2A
+criteria amendments and the 2B spec, so the questions file was redundant for them the day it was
+written.
+
+**The rule that replaces "append-only".** At each slice commit, every entry goes exactly one of
+three ways: into the code as a comment stating the whole reasoning (the model is
+`src/core/entity/externalId.ts:100-108`, which carries its argument in full and cites Q31 only as
+a date stamp); into an ADR if it has consequences beyond the line it touches; or deleted with one
+line here. Append-only was right for a single run and wrong for a file outliving five slices.
+
+**Kept, and why `GABRIEL_V2_SLICE_0_1_BUILD.md` was not deleted with the other Slice 0/1
+paperwork.** It has two live functions that are not reproducible from the code: it is the
+**authored source of the thirteen `publicDefinition` strings** that ship verbatim in the CC-BY
+dataset — `vocabulary.test.ts:24,85` transcribes them from it *by line number*, deliberately not
+from the implementation — and it holds the binding "Decisions carried into Slice 2 and beyond"
+section. Deleting it would have orphaned the provenance of published prose.
+
+**A defect this session caused and then fixed.** The Trap T7 amendment inserted 9 lines at `:485`
+of that file, so **every citation into it above line 488 became short by 9** — including the
+frozen Slice 2A criteria's authority pointer and `validate.ts:64`. Corrected with a drift table in
+that file's new appendix and a dated note in the 2A criteria header; all five affected anchors
+re-verified line by line, and the four citations below 488 confirmed unaffected. A first attempt at
+the fix made it worse by inserting the note at the top of the file, which shifted everything again;
+it was redone at iso-line count. **Prefer section headings to line numbers** — this is the second
+cross-file line citation to go stale in this project.
+
+**Also corrected, because it was an active falsehood rather than clutter.**
+`GABRIEL_V2_TIMELINE.md`'s Stage 1 gate stated the stage ends "with `parentId` gone from the type
+and from the file". That is the pre-review plan the expert panel revised away: `parentId` is
+**kept** as a derived field and the `relationships` table is the source of truth. A stage gate that
+contradicts the shipped decision is exactly what an agent builds against.
+
+**One dangling reference left on purpose.** `vocabulary.test.ts:220` cites
+`SLICE_0_CRITERIA.md criterion 23`. The comment carries the entire reasoning inline and the
+citation is provenance only, so it resolves through git like Q31 does. No source file was touched
+in this session.
+
+### What Slice 2A must do before it starts (updated)
+
+1. ~~Split `project-gpkg-fixture.test.ts`.~~ Still required — criterion 20, and Q35 confirms it.
+2. Convert `ViewPage.tsx` as part of Task 3 (Q38).
+3. Read the amendments in `SLICE_2A_CRITERIA.md` before grading anything: criteria 24, 24b, 25, 26,
+   26b, 27, 28, 29, 46, 47 and the `BASE` definition all carry dated owner-authorised changes, and
+   the header note corrects every line citation into `GABRIEL_V2_SLICE_0_1_BUILD.md` by +9.
+4. Expect Task A to leave the suite red until Task B lands. Do not grade in between.
+5. **Skip Phase 1.** The criteria are already frozen. Phase 1 is only needed for 2B.

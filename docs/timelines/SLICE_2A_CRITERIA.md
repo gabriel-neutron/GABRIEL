@@ -15,6 +15,40 @@ record it and STOP. That judgement is the owner's.
 All commands are run from the repo root in Git Bash unless stated otherwise.
 `BASE` below means the commit `c8483b5`.
 
+> **Amendment, 2026-07-29 — owner-authorised. `BASE` is re-pinned to the commit at which the
+> Slice 2A run starts**, not `c8483b5`. Documentation commits landed after this file was frozen
+> (the handoff, and the preparation session that produced the amendments below), so `c8483b5` is
+> no longer HEAD and criterion 47's "HEAD is still `c8483b5`" was already false before a line of
+> Slice 2A code existed.
+>
+> **This is safe, and the reason is measurable:** `git diff --name-only c8483b5 HEAD -- src/`
+> is **empty**. Every commit since the freeze touched `docs/` and `package.json` only. So every
+> §0 measurement — the 16 call sites and their line numbers, the `useProjectIO.ts` line map, the
+> file sizes, the `public/project.gpkg` md5 `7d0b0e592a1128a0d83e7575110bf2dc` — holds unchanged
+> at the new `BASE`, and every `git diff BASE -- src/...` command in this file returns exactly
+> what it would have returned against `c8483b5`. The re-pin changes which commits criterion 47
+> counts, and nothing else.
+>
+> The Phase 0 agent records the actual SHA in `docs/timelines/SLICE_RUN_LOG.md` before starting,
+> and re-verifies the emptiness of `git diff --name-only c8483b5 <that SHA> -- src/`. If that
+> diff is **not** empty, this amendment does not apply and the run stops: it would mean source
+> changed after the criteria were frozen against it.
+>
+> **Two further corrections to this file's own citations, same date, same authority.** Nothing in
+> any criterion changes; only where its references point.
+>
+> 1. **Every citation of `GABRIEL_V2_SLICE_0_1_BUILD.md` in this file is short by 9 lines.** That
+>    file gained 9 lines at `:485` when Trap T7 was corrected. So the authority section cited above
+>    as `506-641` is at **515-650**, "Ordering and safety in Slice 2" cited as `587-604` is at
+>    **596-613**, and ordering items 1/3 and the tests list cited as `589-591`, `596-599`,
+>    `615-616` are at **598-600**, **605-608**, **624-625**. Cite the section headings instead; that
+>    file's appendix carries the drift table.
+> 2. **`GABRIEL_V2_FOUNDATION_SPEC.md` was deleted on 2026-07-29.** The sentence above calling it
+>    superseded and not a fallback stands and is now simply unarguable. `SLICE_0_CRITERIA.md`,
+>    `SLICE_1_CRITERIA.md` and `SLICE_2_HANDOFF.md` were deleted in the same pass. Nothing in this
+>    file depends on any of the four; the reconnaissance in §0 is self-contained, which is why it
+>    was written out here in the first place. Git history has all four.
+
 ---
 
 ## 0. Reconnaissance — the real numbers this contract is built on
@@ -420,11 +454,85 @@ Spec ordering item 3 (`GABRIEL_V2_SLICE_0_1_BUILD.md:596-599`): "Guard inside
     Command: `sed -n '/export async function performProjectSave/,/^}/p' src/hooks/useProjectIO.ts`
     Expected: read output; the condition matches the above.
 
+    > **Amendment, 2026-07-29 — owner-authorised. The first amendment to this frozen file.**
+    > **The condition above is struck and replaced.** It is not merely imprecise: it fails to
+    > fire on the destructive case it exists to prevent, and it fires on an ordinary one.
+    >
+    > *Measured against the code.* `save.ts:66` runs `DELETE FROM units` and `save.ts:75` then
+    > runs `writeEntities(geoPackage, entities)` — a save **replaces**, it does not merge. So
+    > after a failed restore the analyst types one entity, the ordinary reflex on opening an
+    > empty tool, `input.entities.length` becomes `1`, the four-way emptiness collapses,
+    > **the guard goes silent, and Save writes 1 unit over 1010.** In the other direction,
+    > `handleNew` never routes through `performProjectSave` and never calls `saveProject`
+    > (`useProjectIO.ts:147-185`), so its first Save fills IndexedDB and the **second Save on a
+    > fresh empty project is refused**. The justification above ("`handleNew` calls
+    > `clearProject()`, so `loadProject()` returns `null`") holds only for the first save. The
+    > frozen condition therefore obstructs the ordinary gesture and misses the only destructive
+    > sequence — the worst available arrangement of the two errors.
+    >
+    > *Why no refinement of the predicate could have rescued it.* After `resetProject()` and
+    > after a failed restore, the store sits at `initialState()` in both cases; the two states
+    > are identical. The criterion tried to infer a fact about the session from a photograph of
+    > the state, and that fact is not in the photograph.
+    >
+    > **The replacement condition.** `performProjectSave` refuses when *both* hold:
+    > - `input.snapshotIsAuthoritative === false` — nothing in this session has established that
+    >   the in-memory snapshot stands for the persisted project; **and**
+    > - `deps.loadProject()` resolved a project whose `buffer.byteLength > 0` — there is
+    >   something real on disk to destroy.
+    >
+    > Under it: New -> Save -> Save saves; deliberately emptying a real project and saving is
+    > allowed, which is the analyst's call and git is the backup; a failed restore refuses
+    > **every** save, with or without typed work. Both error directions fall together, which is
+    > why this is a replacement and not a narrowing.
+    > Command: `sed -n '/export async function performProjectSave/,/^}/p' src/hooks/useProjectIO.ts`
+    > Expected: read output; the condition matches the two clauses above and no longer inspects
+    > the lengths of `entities`, `geometries`, `claims` or `sources`.
+
+24b. **[MACHINE]** **The flag's wiring. Added by the same ruling.** `snapshotIsAuthoritative` is
+    a **required** `boolean` member of `ProjectSaveInput` (`useProjectIO.ts:51-59`), so a call
+    site that forgets it is a compile error — the Q32 doctrine applied to the same data path.
+    Its value is held in a `useRef<boolean>` inside `useProjectIO()`, initialised `false`, set
+    to `true` at exactly three sites and nowhere else:
+    - the `restoreSession` success path, after `setProject` (`useProjectIO.ts:114-120`);
+    - the `handleOpen` success path, after `setProject` (`:194-200`);
+    - `handleNew`, which deliberately creates an empty project (`:147-185`).
+
+    It is **not** a store field, is never written to `useProjectStore`, and does not survive a
+    reload. A `useRef` and not a module-level `let`: `performProjectSave` is a pure,
+    dependency-injected module function (`:82-98`) and a guard reading module-global mutable
+    state would destroy exactly the property that makes it testable. The name is
+    `snapshotIsAuthoritative` and not `loadSucceeded` because `handleNew` sets it `true` with
+    no load having occurred; a name that misstates its one invariant is a defect waiting six
+    months.
+    Command: `rg -n "snapshotIsAuthoritative" src/hooks/useProjectIO.ts`
+    Expected: the `ProjectSaveInput` member, the `useRef` declaration, the three assignments
+    above, the read inside `performProjectSave`'s condition, and the value passed by
+    `handleSave` — and no other site.
+    Command: `git diff --stat BASE -- src/store/`
+    Expected: empty output. The flag adds no store field, so criterion 23 stands unamended.
+
 25. **[MACHINE]** The refusal **throws** (so `handleSave`'s existing catch surfaces it via
     `setError`, `useProjectIO.ts:232-235`) with a message matching `/refusing to overwrite/i`.
     The wording is a planner choice, recorded as Q33.
     Command: `rg -ni "refusing to overwrite" src/hooks/useProjectIO.ts`
     Expected: exactly one match, inside `performProjectSave`.
+
+    > **Addition, 2026-07-29 — owner-authorised. Nothing above is struck; the wording Q33 left
+    > open is now fixed.** The thrown message is exactly, on one line, ASCII only, assembled
+    > with plain quoted strings and **not** a template literal (Trap T7):
+    >
+    > `Refusing to overwrite your saved project: this session never loaded it, so saving now would replace it with what is on screen. Nothing has been written. Reload the page to load your project again, or use Open to pick the .gpkg file yourself. Anything you typed into this session is not carried across by either route, so copy it out first.`
+    >
+    > It names the cause rather than the symptom, which the replaced condition could not have
+    > done honestly — under the struck four-dimension rule the same banner also greeted an
+    > ordinary New -> Save -> Save, so the copy would have had to hedge. It states that nothing
+    > was written, because at that moment the analyst cannot tell. It offers the two exits in
+    > order of cost, reload before Open. It deliberately **does not mention New Project**: that
+    > is the one command which writes an empty project over the real one, and a hurried reader
+    > skimming for a way out is exactly who must not be pointed at it. The last sentence is
+    > owed to the case the guard now covers and the old one did not — an analyst who typed work
+    > into a session that never loaded, for whom both exits are lossy.
 
 26. **[MACHINE]** **The refusal is observable.** `src/hooks/useProjectIO.save-ordering.test.ts`
     contains a test named exactly
@@ -438,6 +546,29 @@ Spec ordering item 3 (`GABRIEL_V2_SLICE_0_1_BUILD.md:596-599`): "Guard inside
     Command: `npx vitest run src/hooks/useProjectIO.save-ordering.test.ts -t "refuses to save an empty snapshot"`
     Expected: exit 0, 1 test passed.
 
+    > **Amendment, 2026-07-29 — owner-authorised, same ruling as criterion 24.** The test name
+    > is struck: ~~`refuses to save an empty snapshot over an existing non-empty session
+    > buffer`~~. Emptiness is no longer the trigger, so a name built on it would describe a
+    > rule that does not exist. **The new name, exactly:**
+    > `refuses to save over an existing session buffer when this session never loaded the project`.
+    > The five assertions above are unchanged and remain required in full. The fixture sets
+    > `snapshotIsAuthoritative: false` and a non-empty `loadProject` buffer.
+    > Command: `npx vitest run src/hooks/useProjectIO.save-ordering.test.ts -t "refuses to save over an existing session buffer"`
+    > Expected: exit 0, 1 test passed.
+
+26b. **[MACHINE]** **The regression test for the hole the original criterion 24 left open.**
+    Added by the same ruling, and it is the load-bearing one: under the struck condition this
+    test could not have existed, because the guard did not fire in this case. A test named
+    exactly
+    `refuses even when the snapshot carries entities, if this session never loaded the project`
+    supplies `snapshotIsAuthoritative: false`, a `loadProject` buffer with `byteLength > 0`, and
+    an `input` carrying **one entity** — the state an analyst reaches by typing a single unit
+    into an app that failed to restore. It asserts the same five things as criterion 26.
+    Command: `npx vitest run src/hooks/useProjectIO.save-ordering.test.ts -t "refuses even when the snapshot carries entities"`
+    Expected: exit 0, 1 test passed.
+    This is the sequence that would have written 1 unit over 1010 (`save.ts:66` `DELETE FROM
+    units`, then `:75` `writeEntities`).
+
 27. **[MACHINE]** The guard does **not** fire when there is nothing to destroy. Two tests,
     named exactly:
     - `saves an empty snapshot when there is no persisted session buffer` — `loadProject`
@@ -448,12 +579,32 @@ Spec ordering item 3 (`GABRIEL_V2_SLICE_0_1_BUILD.md:596-599`): "Guard inside
     Command: `npx vitest run src/hooks/useProjectIO.save-ordering.test.ts -t "saves an empty snapshot"`
     Expected: exit 0, 2 tests passed.
 
+    > **Amendment, 2026-07-29 — owner-authorised, same ruling as criterion 24.** Both test names
+    > and both sets of assertions stand unchanged. One requirement is **added**: each fixture
+    > must pass `snapshotIsAuthoritative: false`. Without it the tests are vacuous under the new
+    > condition — an authoritative snapshot never reaches the buffer clause, so both would pass
+    > against a guard that had been deleted outright. They exist to pin the *second* clause, and
+    > only a `false` flag lets them reach it.
+
 28. **[MACHINE]** The guard does not fire when any one of the four dimensions is non-empty.
     A test named exactly
     `does not refuse when the snapshot carries claims or sources but no entities`
     asserts `deps.saveGeoPackage` was called once.
     Command: `npx vitest run src/hooks/useProjectIO.save-ordering.test.ts -t "does not refuse when the snapshot carries"`
     Expected: exit 0, 1 test passed.
+
+    > **Amendment, 2026-07-29 — owner-authorised, same ruling as criterion 24. This criterion is
+    > struck in full and replaced.** It pinned the four-dimension rule, which no longer exists;
+    > worse, under the new condition its test would assert the *opposite* of the intended
+    > behaviour, since a snapshot carrying claims and sources must still be refused when the
+    > session never loaded. **The replacement**, a test named exactly
+    > `does not refuse when this session loaded the project, even though the snapshot is empty`:
+    > `snapshotIsAuthoritative: true`, a `loadProject` buffer with `byteLength > 0`, and an
+    > `input` empty in all four dimensions. It asserts `deps.saveGeoPackage` **was** called once
+    > and the promise resolves. This is the analyst who deliberately emptied a real project and
+    > saved — allowed by ruling, and previously refused.
+    > Command: `npx vitest run src/hooks/useProjectIO.save-ordering.test.ts -t "does not refuse when this session loaded the project"`
+    > Expected: exit 0, 1 test passed.
 
 29. **[MACHINE]** The four **pre-existing** tests in
     `src/hooks/useProjectIO.save-ordering.test.ts` still exist and pass, with their
@@ -469,6 +620,18 @@ Spec ordering item 3 (`GABRIEL_V2_SLICE_0_1_BUILD.md:596-599`): "Guard inside
     plus the renamed/replaced baseBuffer test (criterion 33) and the new guard tests.
     Command: `rg -n "entities:" src/hooks/useProjectIO.save-ordering.test.ts`
     Expected: `makeInput()`'s `entities` is a non-empty array literal.
+
+    > **Amendment, 2026-07-29 — owner-authorised, same ruling as criterion 24.** The three named
+    > tests and the requirement that all four pre-existing tests keep passing with unchanged
+    > assertions **stand**. What is struck is the *reason* and the last command: ~~`makeInput()`
+    > must gain at least one entity, or the guard fires on all four~~. Under the replaced
+    > condition emptiness is irrelevant; what the four pre-existing tests need is
+    > **`snapshotIsAuthoritative: true`** in `makeInput()`, since they exercise the ordinary
+    > save path and must not be refused. Criterion 37's `makeInput()` requirement is unaffected
+    > and still applies to the seven forwarded fields.
+    > Command: `rg -n "snapshotIsAuthoritative" src/hooks/useProjectIO.save-ordering.test.ts`
+    > Expected: `makeInput()` sets it `true`, and the guard tests (26, 26b, 27) override it to
+    > `false` per-test.
 
 30. **[MACHINE]** The guard preserves the load-bearing save ordering documented at
     `useProjectIO.ts:77-81`: disk write still precedes the IndexedDB overwrite.
@@ -558,6 +721,12 @@ catch and goes red on a harmless refactor."
     Command: `npx vitest run src/hooks/useProjectIO.save-ordering.test.ts -t "forwards every ProjectSaveInput field"`
     Expected: exit 0, 1 test passed, 8 assertions.
 
+    > **Note, 2026-07-29 — not an amendment. Nothing here is struck.** Criterion 24b adds an
+    > eighth member to `ProjectSaveInput`, `snapshotIsAuthoritative`. It is **deliberately not
+    > forwarded** to `saveGeoPackage` — it is an input to the guard, not an option of the save —
+    > so the eight assertions enumerated above remain exactly right and exhaustive, and the test
+    > name stays as written. Read "all seven input fields" as "the seven forwarded fields".
+
 38. **[MACHINE]** No other assertion in that file was deleted.
     Command: `git diff BASE -- src/hooks/useProjectIO.save-ordering.test.ts | rg "^-" | rg -v "^---" | rg "expect\("`
     Expected: exactly one removed `expect(` line — `expect(saveGeoPackageMock.mock.calls[0]?.[4]).toBe(existingBuffer)`
@@ -620,9 +789,39 @@ that exact shape has been defeated by ordinary JSDoc prose in each of the last t
     `src/hooks/useProjectIO.loadState.test.ts` (criterion 34) and a split sibling of
     `project-gpkg-fixture.test.ts` (criterion 20). Nothing else.
 
+    > **Amendment, 2026-07-29 — owner-authorised. Additive: one file is ADDED to the expected
+    > set. Nothing is removed.** `src/pages/ViewPage.tsx` joins the modified list.
+    >
+    > *Why.* §0.3 and the handoff both record **two** duplicated project-state literals
+    > (`useProjectIO.ts:114-120` and `:194-200`). There are **three**. `ViewPage.tsx:46-52` is
+    > byte-identical to both, preceded by the same `const next = applyGeoPackageResult(result, null)`
+    > at `:45` and followed by the same `setSourceCache` / `applyDeterministicRatingPipeline` /
+    > `setSources` / `setRatingEvents` sequence. The 2A reconnaissance enumerated
+    > `saveGeoPackage` call sites, and `ViewPage.tsx` only calls `loadGeoPackage` — that is the
+    > blind spot. Measured: production `setProject` call sites are `useProjectIO.ts:114`,
+    > `useProjectIO.ts:194` and `ViewPage.tsx:46`, plus 6 in stories and 13 in
+    > `useProjectStore.test.ts`.
+    >
+    > **Task 3 therefore converts `ViewPage.tsx:45-52` as well**, replacing the literal and its
+    > preceding `applyGeoPackageResult` call with `projectStateFromLoadResult(result)`. The task
+    > was scoped from a count that was wrong; leaving the third copy would ship an extraction
+    > that fails at the thing it exists for — "turns 'forgot a call site' into a compile error".
+    > This is not Prohibition 5 scope-widening: it is the same task, on a site the survey missed.
+    >
+    > Criteria 31, 32 and 33 are **unchanged** — their greps are scoped to
+    > `src/hooks/useProjectIO.ts` and stay true as written. One addition for the grader:
+    > Command: `rg -n "projectStateFromLoadResult|drawnGeometries: next.drawnGeometries" src/pages/ViewPage.tsx`
+    > Expected: one match on `projectStateFromLoadResult(`, zero on the literal.
+
 47. **[MACHINE]** No commit, no push, no `--no-verify`. Work is left in the working tree.
     Command: `git log --oneline BASE..HEAD`
     Expected: empty output (HEAD is still `c8483b5`).
+
+    > **Amendment, 2026-07-29 — owner-authorised, same ruling as the header.** ~~(HEAD is still
+    > `c8483b5`)~~ is struck. `BASE` is the SHA the Phase 0 agent recorded at the start of the
+    > Slice 2A run. The requirement is unchanged and is the one that matters: **the run adds no
+    > commit of its own.** `git log --oneline BASE..HEAD` is empty, where `BASE` is that recorded
+    > SHA.
 
 ---
 
@@ -692,14 +891,46 @@ the morning-review list.
     in a different context (integrity-event gating), which is why the guard shipped. Filed
     as Q33. A reader rules whether an override is needed.
 
+    > **Closed, 2026-07-29 — owner ruling. Its premise is gone.** Criterion 24 was amended: the
+    > guard no longer reads emptiness, so an analyst who deliberately empties a real project and
+    > saves is **allowed** through, and criterion 28's replacement test pins that. The refusal
+    > now fires only when the session never loaded, where there is nothing to override. No
+    > reader action remains.
+
 56. **[HUMAN]** **The refusal message wording (criterion 25).** `refusing to overwrite ...`
     is surfaced verbatim to the analyst through `handleSave`'s error banner. Nobody has read
     it for tone or actionability — it should tell the user what to do next (reload the
     project), not just that the save was refused.
 
+    > **Closed, 2026-07-29 — owner ruling.** The exact sentence is now fixed at criterion 25's
+    > Addition and is no longer a reader's call. **Three findings about the surrounding surface
+    > were raised while ruling it and are deliberately NOT in this slice** — they are recorded
+    > here as debt rather than acted on, because criterion 46 fixes the changed-file set and
+    > Prohibition 5 forbids widening scope:
+    > - `handleSave` announces success with a blocking `window.alert("Saved successfully")`
+    >   (`useProjectIO.ts:231`) but announces a refusal only as grey body text. The refusal is
+    >   also raised *before* `writeGeoPackageToFile`, so no file picker opens and the click
+    >   appears to do nothing at all.
+    > - The error is rendered by `<Alert>` with `variant="default"` (`src/shell/AppShell.tsx:325`),
+    >   so a refused destructive save looks identical to "Project restored from last session".
+    > - `handleSave` calls `setError(null)` at `useProjectIO.ts:225` before saving, which wipes
+    >   the startup restore failure at the exact moment the analyst starts looking for why the
+    >   project is missing.
+    >
+    > The deeper defect none of these fixes: after a failed restore the app looks like an
+    > ordinary empty project, and nothing says "this is not your data" until the analyst presses
+    > Save. The honest end state is a session mode that says so up front. **That belongs in a
+    > later slice, and must be written down somewhere it will not die inside Q33.**
+
 57. **[HUMAN]** **`geopackage.service.test.ts` crosses further over the 300-line cap
     (criterion 21).** It was 321 at BASE and this conversion grows it. Prohibition 5 forbids
     fixing it here. A reader decides whether it gets its own splitting task. Filed as Q35.
+
+    > **Closed, 2026-07-29 — owner ruling on Q35.** It does **not** cross further: the file's
+    > four call sites convert one line each and it ends the run at **exactly 321 lines**. Not
+    > split, not restructured, not grown. No new violation and no repair of an old one. This
+    > criterion cannot fail on size and now has a stated expected value; `wc -l` reads `321` and
+    > `git diff --numstat BASE` on that file shows four insertions and four deletions.
 
 ---
 

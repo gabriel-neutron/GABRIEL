@@ -17,7 +17,7 @@ everything else.
 | # | Stage | Covers (PRD §) | Spec | Status |
 |---|---|---|---|---|
 | 0 | Wall-clock & continuous | Further Notes, §13 | — | **Running** |
-| 1 | Foundation — model + Proposal spine | §1–5 | [`GABRIEL_V2_FOUNDATION_SPEC.md`](GABRIEL_V2_FOUNDATION_SPEC.md) | Specified, not started |
+| 1 | Foundation — model + Proposal spine | §1–5 | per-slice: [`GABRIEL_V2_SLICE_0_1_BUILD.md`](GABRIEL_V2_SLICE_0_1_BUILD.md), [`SLICE_2A_CRITERIA.md`](SLICE_2A_CRITERIA.md), [`GABRIEL_V2_SLICE_2B_BUILD.md`](GABRIEL_V2_SLICE_2B_BUILD.md) | **Slices 0–1 shipped; 2A next** |
 | 2 | Search & table | §8, §10 (table) | not written | Not started |
 | 3 | Connectors & sync | §6, §7 | not written | Not started |
 | 4 | Documents & weak signals | §9 | not written | Not started |
@@ -57,12 +57,21 @@ every other stage.
 
 ## Stage 1 — Foundation
 
-**Spec:** [`GABRIEL_V2_FOUNDATION_SPEC.md`](GABRIEL_V2_FOUNDATION_SPEC.md) — eight slices, full
-detail there.
+**Specs, per slice.** The single eight-slice Foundation Spec was deleted on 2026-07-29 (superseded,
+and wrong in six measured places). Slices 0–1: [`GABRIEL_V2_SLICE_0_1_BUILD.md`](GABRIEL_V2_SLICE_0_1_BUILD.md)
+— **shipped** (`507f425`, `cfaf80b`). Slice 2A: [`SLICE_2A_CRITERIA.md`](SLICE_2A_CRITERIA.md),
+frozen, **next to build**. Slice 2B: [`GABRIEL_V2_SLICE_2B_BUILD.md`](GABRIEL_V2_SLICE_2B_BUILD.md).
 
-**Gate for the whole stage:** the real 1,010-unit demo project opens, its parent-child links
-become `subordinate_to` Relationships, it saves, and it reopens with an identical hierarchy —
-with `parentId` gone from the type and from the file. Every existing view behaves as before.
+**Gate for the whole stage:** the real demo project opens, its parent-child links become
+`subordinate_to` and `corporate_parent` Relationships, it saves, and it reopens with an identical
+hierarchy — **1,012 edges, not 2,024** — and an identical *rendered position map*. Every existing
+view behaves as before.
+
+**`parentId` is kept**, as a derived, non-authoritative field, and is never deleted; the
+`relationships` table is the source of truth on disk. This paragraph previously stated the
+opposite — "with `parentId` gone from the type and from the file" — which was the pre-review plan
+the expert panel revised away on 2026-07-29. Corrected here because a stage gate that contradicts
+the shipped decision is the kind of line an agent builds against.
 
 | Slice | Status |
 |---|---|
