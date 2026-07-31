@@ -2,10 +2,9 @@ import { readFileSync, readdirSync, rmSync } from "node:fs"
 import { resolve } from "node:path"
 import { GeoPackageAPI } from "@ngageoint/geopackage"
 import { afterEach, describe, expect, it } from "vitest"
-import { projectStateFromLoadResult } from "@/hooks/useProjectIO"
 import { selectPersistableSnapshot, useProjectStore } from "@/store/useProjectStore"
 import { tableExists } from "./columnDescriptor"
-import { loadGeoPackage, saveGeoPackage } from "./index"
+import { loadGeoPackage, projectStateFromLoadResult, saveGeoPackage } from "./index"
 import { ORGANISATIONS_TABLE } from "./organisations.table"
 
 /**
@@ -51,7 +50,7 @@ describe("real project through the store path (public/project.gpkg)", () => {
       const loaded = await loadGeoPackage(buffer)
       expect(loaded.entities.length).toBeGreaterThan(0)
 
-      // The one shared state literal every load path hands to setProject (useProjectIO.ts).
+      // The one shared state literal every load path hands to setProject (applyResult.ts).
       useProjectStore.getState().setProject(projectStateFromLoadResult(loaded))
       const state = useProjectStore.getState()
 

@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest"
-import { getDefaultEchelonLayers, type GeoPackageLoadResult } from "@/core/persistence/geopackage"
+import {
+  getDefaultEchelonLayers,
+  projectStateFromLoadResult,
+  type GeoPackageLoadResult,
+} from "@/core/persistence/geopackage"
 import { INDUSTRY_LAYER_ID } from "@/types/organisation.types"
-import { projectStateFromLoadResult } from "./useProjectIO"
 
 function makeLoadResult(): GeoPackageLoadResult {
   return {

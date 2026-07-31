@@ -7,7 +7,8 @@ setSqljsWasmLocateFile(
 export { loadGeoPackage } from "./load"
 export { saveGeoPackage } from "./save"
 export type { SaveGeoPackageOptions } from "./save"
-export { getDefaultEchelonLayers, applyGeoPackageResult } from "./applyResult"
+export { getDefaultEchelonLayers, applyGeoPackageResult, projectStateFromLoadResult } from "./applyResult"
+export type { ProjectStateFromLoadResult } from "./applyResult"
 export type {
   GpkgLayer,
   GpkgEntity,

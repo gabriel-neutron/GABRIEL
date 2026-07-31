@@ -3,7 +3,7 @@ import {
   loadGeoPackage,
   saveGeoPackage,
   getDefaultEchelonLayers,
-  applyGeoPackageResult,
+  projectStateFromLoadResult,
   type GpkgLayer,
   type GpkgEntity,
   type GpkgGeometry,
@@ -11,8 +11,6 @@ import {
   type GpkgClaim,
   type GpkgRatingEvent,
   type SaveGeoPackageOptions,
-  type GeoPackageLoadResult,
-  type ApplyGeoPackageResultState,
 } from "@/core/persistence/geopackage"
 import { applyDeterministicRatingPipeline } from "@/core/provenance/ratingPipeline"
 import { INDUSTRY_LAYER_ID } from "@/types/organisation.types"
@@ -48,27 +46,6 @@ async function loadSeedGeoPackageBuffer(): Promise<ArrayBuffer | null> {
     return buffer.byteLength > 0 ? buffer : null
   } catch {
     return null
-  }
-}
-
-/**
- * The one project state every load path hands to setProject. Named rather than inferred so that
- * "no sixth field" is a compile-time property: the literal below is excess-property-checked.
- */
-export type ProjectStateFromLoadResult = ApplyGeoPackageResultState & { claims: GpkgClaim[] }
-
-/**
- * claims comes from the load result, not from applyGeoPackageResult, which does not carry
- * provenance claims: taking them from there would silently drop every claim on load.
- */
-export function projectStateFromLoadResult(result: GeoPackageLoadResult): ProjectStateFromLoadResult {
-  const applied = applyGeoPackageResult(result, null)
-  return {
-    layers: applied.layers,
-    entities: applied.entities,
-    drawnGeometries: applied.drawnGeometries,
-    claims: result.claims,
-    selectedEntityId: applied.selectedEntityId,
   }
 }
 

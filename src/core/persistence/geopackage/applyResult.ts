@@ -1,7 +1,7 @@
 import { ECHELON_OPTIONS } from "@/types/symbol.types"
 import type { Layer, MapEntity, DrawnGeometry } from "@/types/domain.types"
 import { INDUSTRY_LAYER_ID } from "@/types/organisation.types"
-import type { ApplyGeoPackageResultState, GeoPackageLoadResult } from "./types"
+import type { ApplyGeoPackageResultState, GeoPackageLoadResult, GpkgClaim } from "./types"
 
 export function getDefaultEchelonLayers(): Layer[] {
   return ECHELON_OPTIONS.map((opt) => ({
@@ -49,5 +49,26 @@ export function applyGeoPackageResult(
     entities: result.entities as MapEntity[],
     drawnGeometries: result.geometries as DrawnGeometry[],
     selectedEntityId,
+  }
+}
+
+/**
+ * The one project state every load path hands to setProject. Named rather than inferred so that
+ * "no sixth field" is a compile-time property: the literal below is excess-property-checked.
+ */
+export type ProjectStateFromLoadResult = ApplyGeoPackageResultState & { claims: GpkgClaim[] }
+
+/**
+ * claims comes from the load result, not from applyGeoPackageResult, which does not carry
+ * provenance claims: taking them from there would silently drop every claim on load.
+ */
+export function projectStateFromLoadResult(result: GeoPackageLoadResult): ProjectStateFromLoadResult {
+  const applied = applyGeoPackageResult(result, null)
+  return {
+    layers: applied.layers,
+    entities: applied.entities,
+    drawnGeometries: applied.drawnGeometries,
+    claims: result.claims,
+    selectedEntityId: applied.selectedEntityId,
   }
 }
