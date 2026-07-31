@@ -22,23 +22,32 @@ import { ensureOptionalColumns } from "./columnDescriptor"
 import type { GpkgLayer, GpkgEntity, GpkgGeometry, GpkgSource, GpkgClaim, GpkgRatingEvent } from "./types"
 
 /**
+ * Every member is required, including the five that accept `undefined`: a save replaces
+ * each table it owns, so a call site that *forgets* a key silently wipes that table. The
+ * `T | undefined` union keeps "deliberately nothing here" expressible and visible in a
+ * diff while making omission a compile error.
+ */
+export type SaveGeoPackageOptions = {
+  layers: GpkgLayer[]
+  entities: GpkgEntity[]
+  geometries: GpkgGeometry[]
+  researchSources: Map<string, string> | undefined
+  baseBuffer: ArrayBuffer | undefined
+  // ADR 0006, E2 Slice A: additive fields, not yet threaded through from the
+  // store/useProjectIO (E2.4).
+  sources: GpkgSource[] | undefined
+  claims: GpkgClaim[] | undefined
+  // Phase 4 (v1.5): same additive pattern as sources/claims above.
+  ratingEvents: GpkgRatingEvent[] | undefined
+}
+
+/**
  * A legacy `organisations` table (pre-E1, ADR 0004) is folded into `units` (via its
  * `kind` column) on every save, then emptied with `clearLegacyOrganisationsTable` so a
  * later `loadGeoPackage` doesn't re-migrate its now-duplicated rows.
  */
-export async function saveGeoPackage(
-  layers: GpkgLayer[],
-  entities: GpkgEntity[],
-  geometries: GpkgGeometry[],
-  researchSources?: Map<string, string>,
-  baseBuffer?: ArrayBuffer,
-  // ADR 0006, E2 Slice A: additive trailing params, not yet threaded through from the
-  // store/useProjectIO (E2.4) — every existing call site keeps working unchanged.
-  sources?: GpkgSource[],
-  claims?: GpkgClaim[],
-  // Phase 4 (v1.5): same additive-trailing-param pattern as sources/claims above.
-  ratingEvents?: GpkgRatingEvent[],
-): Promise<Uint8Array> {
+export async function saveGeoPackage(options: SaveGeoPackageOptions): Promise<Uint8Array> {
+  const { layers, entities, geometries, researchSources, baseBuffer, sources, claims, ratingEvents } = options
   let geoPackage: GeoPackage | null = null
   try {
     if (baseBuffer != null && baseBuffer.byteLength > 0) {

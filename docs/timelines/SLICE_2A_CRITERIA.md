@@ -363,6 +363,54 @@ drops a field. These criteria prove each of the eight still reaches disk.
     Command: `npx vitest run src/core/persistence/geopackage/save.options.roundtrip.test.ts`
     Expected: exit 0, the named test passes, 8 groups of assertions all green.
 
+15b. **[MACHINE]** **The store-path integration test. Added 2026-07-30 by owner ruling.**
+
+    > *Why this is an addition rather than a correction.* The authority's "Tests required before
+    > Slice 2 touches the real file" section asks for **"a new real-WASM integration test exercising
+    > the actual store path: load -> `projectStateFromLoadResult` -> `setProject` ->
+    > `selectPersistableSnapshot` -> save -> reload"**, and states the reason plainly: *"All three
+    > existing persistence tests bypass this path — which is why the hard gate can pass green while
+    > the running app destroys data."* This file's §8 mapped that entire tests-required list to a
+    > **single** row (the `mock.calls[0][4]` bullet), so the store-path bullet was neither mapped to a
+    > criterion nor declared out of scope, and criterion 15 silently stood in for it while proving
+    > strictly less — criterion 15's own test also feeds `loadGeoPackage`'s output straight back into
+    > `saveGeoPackage`, making it a **fourth** test bypassing the condemned path. Five graders passed
+    > this slice without noticing, because they all graded the proxy rather than the authority.
+    > The `relationships`, full `parentId` deep-equal and "1,012 edges not 2,024" parts of that spec
+    > bullet remain **Slice 2B**; the store *chain* is what this criterion pins.
+
+    A **new** file `src/core/persistence/geopackage/store-path.integration.test.ts` contains a test
+    named exactly
+    `carries a real project through the store path: load -> setProject -> selectPersistableSnapshot -> save -> reload`,
+    with a 60000 ms timeout, using **real WASM and the real `public/project.gpkg`** (read-only,
+    `readFileSync` only; no mocking of the GeoPackage layer, and no `vi.mock`/`vi.fn` in the file per
+    criterion 50). It drives the whole chain — `loadGeoPackage` ->
+    `projectStateFromLoadResult` -> `useProjectStore.getState().setProject` ->
+    `selectPersistableSnapshot` -> `saveGeoPackage` (all eight options, `sourceCache` mapped to
+    `researchSources` and the original buffer as `baseBuffer`, exactly as `performProjectSave` maps
+    them) -> `loadGeoPackage` — and asserts:
+    - entity count preserved end to end, **and** the `entityId -> parentId` map deep-equal on both
+      sides, with an anti-vacuity check that non-null parents exist (an all-null map deep-equals
+      itself, and the failure mode on this path is topological, not cardinal);
+    - every layer id present in the file is still present after the round-trip, and every reloaded
+      entity's `layerId` resolves to a layer that exists;
+    - claim count asserted against what **the snapshot** carried, not the raw load, since
+      `selectPersistableSnapshot` filters orphaned claims;
+    - geometry count preserved;
+    - **the saved bytes descend from the opened file** — reopened with `GeoPackageAPI`, they still
+      carry the legacy `organisations` table. This assertion is **required, not optional**: it was
+      added after the test was measured to stay **green** with `baseBuffer` dropped entirely, because
+      every count assertion is satisfiable by a save into a brand-new GeoPackage when the snapshot
+      supplies all the rows. Counts alone cannot prove the reopen path ran.
+
+    It resets the global store in an `afterEach` and sweeps stray `gabriel-*.gpkg` from cwd.
+    Command: `npx vitest run src/core/persistence/geopackage/store-path.integration.test.ts`
+    Expected: exit 0, the named test passes.
+
+    **The test was proven able to fail, both ways**, and that evidence is part of this criterion:
+    skipping `setProject` reddens it (`expected [] to have a length of 1027`) and dropping
+    `baseBuffer` reddens the `organisations` assertion (`expected false to be true`).
+
 16. **[MACHINE]** The pre-existing round-trip coverage still passes unchanged in substance
     after conversion — these are the tests that would go red if a field were dropped:
     Command: `npx vitest run src/core/persistence/geopackage/project-gpkg-fixture.test.ts src/core/persistence/geopackage/geopackage.service.test.ts src/core/persistence/geopackage/project-open-save-restore.integration.test.ts`
@@ -436,6 +484,34 @@ Spec ordering item 3 (`GABRIEL_V2_SLICE_0_1_BUILD.md:596-599`): "Guard inside
     Command: `git diff BASE -- src/hooks/useProjectIO.ts | rg "^\+" | rg -v "^\+\s*(\*|//)" | rg "useProjectStore\.getState\(\)\.set|loaded:|hasLoaded|loadFailed"`
     Expected: no output. (The guard derives its answer from data `performProjectSave`
     already receives — see §0.4.)
+
+    > **Ruling, 2026-07-30 — owner-authorised. The criterion PASSES on substance; its second command
+    > is recorded as an over-broad proxy.** Nothing is struck.
+    >
+    > That second command returns **two** lines, both
+    > `useProjectStore.getState().setProject(projectStateFromLoadResult(result))`, in `restoreSession`
+    > and `handleOpen`. Neither writes a flag: the `loaded:` / `hasLoaded` / `loadFailed` alternatives
+    > match **zero** times, and the guard itself lives in `performProjectSave`, a module-level function
+    > with no store access at all.
+    >
+    > **The two criteria are jointly unsatisfiable as written.** At `BASE` those lines read
+    > `useProjectStore.getState().setProject({` followed by the five-field literal; criterion 32
+    > *requires* that literal gone and replaced by `projectStateFromLoadResult`, so the line must
+    > change, and any changed line containing `setProject` necessarily matches criterion 23's pattern.
+    > The single formatting that satisfies both keeps `setProject({` as unchanged diff context and
+    > spreads inside it — which defeats the excess-property check that is the entire stated reason
+    > Q34 required a *named* return type ("so that 'no sixth field' is a compile-time property").
+    > The contract's only joint solution would cost the ruling it exists to protect.
+    >
+    > **The headline requirement is proven twice over and independently of the grep:**
+    > `git diff --stat BASE -- src/store/` is empty, and criterion 42 shows `useProjectStore.ts`
+    > byte-identical to `BASE`. Filed as Q2A-9.
+    >
+    > **This is the third slice running that a negative grep has cost a criterion**, and the lesson
+    > recorded after the first two ("scope it to the diff, not the tree") was already followed here —
+    > criterion 23 *is* diff-scoped and still failed. The sharpened rule, for whoever freezes 2B's
+    > criteria: **a negative grep must also exclude the strings the positive criteria oblige you to
+    > write.**
 
 24. **[MACHINE]** **The guard condition, pinned.** `performProjectSave` refuses when *both*
     hold:
@@ -511,6 +587,90 @@ Spec ordering item 3 (`GABRIEL_V2_SLICE_0_1_BUILD.md:596-599`): "Guard inside
     `handleSave` — and no other site.
     Command: `git diff --stat BASE -- src/store/`
     Expected: empty output. The flag adds no store field, so criterion 23 stands unamended.
+
+    > **Amendment, 2026-07-30 — owner-authorised. The site list is extended to four and, for the
+    > first time, the *ordering within each site* is pinned.** Everything else in 24b stands: the
+    > required `boolean` member, the `useRef<boolean>` and not a module-level `let`, no store field,
+    > and the name `snapshotIsAuthoritative` rather than `loadSucceeded`.
+    >
+    > *Why.* 24b as frozen pinned **which** sites write the flag and never **when within each site**,
+    > and that single omission produced three separately-reported defects, two of them destructive.
+    > Measured against the code at the time:
+    > - `restoreSession` and `handleOpen` both set the flag immediately after `setProject`, i.e.
+    >   **before** `setSourceCache`, `applyDeterministicRatingPipeline`, `setSources` and
+    >   `setRatingEvents`. A throw in any of those left the flag `true` over an empty
+    >   `useProvenanceStore`, and because `writeProvenanceSources` / `writeProvenanceClaims` /
+    >   `writeRatingEvents` each self-clear before inserting (`save.ts`, the documented "wipe on
+    >   omit"), the next save **wiped `provenance_sources`, `provenance_claims` and
+    >   `rating_events`.**
+    > - `handleNew` set the flag right after `resetProject()`, while `clearProject()` runs later
+    >   inside a `try` whose `catch` **swallows the failure**. A failed clear followed by a cancelled
+    >   file picker left an empty store, a `true` flag and the real project still in IndexedDB — so
+    >   the next save was **permitted** and overwrote 1010 units with zero. This also falsified
+    >   criterion 24's own justification, which reasoned that "`handleNew` calls `clearProject()`, so
+    >   `loadProject()` returns `null`" — sound only if the clear succeeds.
+    > - **Nothing set the flag on a successful save**, so a session that never pressed New or Open
+    >   had Save 1 succeed (filling IndexedDB via `saveProject`) and **Save 2 refused**, over data
+    >   the session itself had just written.
+    >
+    > None of the three was a deviation from 24b; all three were faithful implementations of it.
+    > That is what makes this an amendment rather than a defect list.
+    >
+    > **The rule, replacing "exactly three sites and nowhere else". It has TWO halves, and an
+    > independent check proved that stating only the first one is not enough.**
+    >
+    > *How that was learned, recorded because it is the whole lesson of this amendment.* A first fix
+    > pass implemented only the raise half — "set `true` only once the operation completed", including
+    > gating `handleNew` on `clearProject()` succeeding — and an independent checker then found the
+    > flag **is never assigned `false` anywhere**. So the gate held only for the *first* authoritative
+    > operation of a session: restore succeeds and raises the flag; the analyst clicks New; every store
+    > is emptied **before** `clearProject()` runs; the clear fails and its rejection is swallowed; the
+    > flag is still `true` from the restore; and the next save overwrites 1010 units with zero. Bug B
+    > was closed for a fresh session and left open for every session after the first. A raise-only
+    > rule cannot express "authority has been unmade".
+    >
+    > **Half 1 — LOWERED to `false` at exactly two sites**, at the instant the snapshot stops standing
+    > for the persisted project:
+    > - `handleNew`, **immediately before `resetProject()`**, i.e. before any store is emptied;
+    > - `handleOpen`, **immediately before the first `setProject`**, i.e. after `file.arrayBuffer()`
+    >   and `loadGeoPackage` have both resolved. Deliberately **not** at the top of the function: a
+    >   throw in either await leaves the store holding whatever it already held, which may legitimately
+    >   still be authoritative, and lowering there would refuse a save that should be allowed.
+    >
+    > **Half 2 — RAISED to `true` at exactly four sites**, each only once the operation that
+    > establishes authority has actually completed:
+    > - `restoreSession`, **after the last store write of the block** (`setRatingEvents`);
+    > - `handleOpen`, **after the last store write of the block** (`setRatingEvents`). Deliberately
+    >   **not** gated on the later `await saveProject(buffer)`: the analyst chose this file, so the
+    >   snapshot stands for what they want saved even if the IndexedDB cache write fails, and
+    >   refusing there would be the wrong direction;
+    > - `handleNew`, **inside the `try`, after `await clearProject()` succeeds.** If the clear fails
+    >   the flag stays `false`, so a save over the still-present real project is refused;
+    > - `handleSave`, **after `await performProjectSave(...)` resolves**, before the success alert.
+    >   A save the analyst authorised and which landed is exactly what makes the snapshot stand for
+    >   the persisted project.
+    >
+    > Command: `rg -n "snapshotIsAuthoritative" src/hooks/useProjectIO.ts`
+    > Expected: **10 lines** — the `ProjectSaveInput` member, the `useRef` declaration, the **two**
+    > lowerings, the **four** raisings, the read inside `performProjectSave`'s condition, and the value
+    > passed by `handleSave` — and no other site.
+    > Command: `rg -c "snapshotIsAuthoritativeRef.current = true" src/hooks/useProjectIO.ts`
+    > Expected: `4`.
+    > Command: `rg -c "snapshotIsAuthoritativeRef.current = false" src/hooks/useProjectIO.ts`
+    > Expected: `2`. **A `0` here is the defect described above and is a hard stop.**
+    >
+    > **Known and accepted: this wiring is grep-verified only.** The repo has no jsdom, no
+    > `@testing-library/react` and zero `.test.tsx` files, so no hook can be mounted and no
+    > behavioural test can reach these four lines. The guard *logic* remains fully tested, because
+    > `performProjectSave` is a dependency-injected module function. A source-level test asserting
+    > the four statement offsets was considered and declined as brittle against innocuous refactors.
+    > **Adding a hook-testing capability is the standing recommendation for a later slice**, and
+    > until it exists this criterion's grep is the only control on the ordering rule above.
+    >
+    > *One accepted consequence of the correct choice:* a throw between `setProject` and the flag
+    > now leaves the project store populated while the flag is `false` — a visibly loaded map the
+    > analyst cannot save. That is the safe direction (refuse, never overwrite) and it is preferred
+    > deliberately; restoring atomicity across five separate store writes is out of scope.
 
 25. **[MACHINE]** The refusal **throws** (so `handleSave`'s existing catch surfaces it via
     `setError`, `useProjectIO.ts:232-235`) with a message matching `/refusing to overwrite/i`.
@@ -687,6 +847,14 @@ explicitly out of scope** (criterion 41).
     Command: `npx vitest run src/hooks/ -t "builds one project state from a load result"`
     Expected: exit 0, 1 test passed.
 
+    > **Amendment, 2026-07-30 — owner-authorised. Filename only; the test, its name and its
+    > assertions are untouched.** The permitted sibling is
+    > ~~`src/hooks/useProjectIO.loadState.test.ts`~~ -> **`src/hooks/useProjectIO.load-state.test.ts`**.
+    > The camelCase middle segment breached `CONSTRAINTS.md:37` (kebab-case) and was inconsistent with
+    > its own sibling `useProjectIO.save-ordering.test.ts`; this file naming it was what made the
+    > breach contract-forced rather than a choice. The criterion's **command is unaffected** — it
+    > filters `src/hooks/` by test name, not by filename — so this amendment moves prose only.
+
 ---
 
 ## 4. Task 4 — kill the positional assertion, replace it with a named one
@@ -813,6 +981,23 @@ that exact shape has been defeated by ordinary JSDoc prose in each of the last t
     > Command: `rg -n "projectStateFromLoadResult|drawnGeometries: next.drawnGeometries" src/pages/ViewPage.tsx`
     > Expected: one match on `projectStateFromLoadResult(`, zero on the literal.
 
+    > **Second amendment, 2026-07-30 — owner-authorised. Additive again: one file is ADDED to the
+    > expected new set and one expected filename is corrected. Nothing is removed.**
+    >
+    > 1. **`src/core/persistence/geopackage/store-path.integration.test.ts` joins the new-file list**,
+    >    required by the criterion **15b** added the same day. It is a new file rather than an addition
+    >    to `project-open-save-restore.integration.test.ts` for a specific reason: criterion 13 forbids
+    >    adding, removing or altering **any** `expect(...)` line in that file, so the store-path test
+    >    could not live there without also amending 13. A new file leaves 13 untouched and intact.
+    > 2. **`src/hooks/useProjectIO.loadState.test.ts` is renamed** to
+    >    **`src/hooks/useProjectIO.load-state.test.ts`**, per criterion 34's amendment of the same date
+    >    (kebab-case, `CONSTRAINTS.md:37`).
+    >
+    > So the expected set becomes: modified — the seven original paths plus `src/pages/ViewPage.tsx`;
+    > new — `save.options.test.ts`, `save.options.roundtrip.test.ts`,
+    > `store-path.integration.test.ts`, and `useProjectIO.load-state.test.ts`. Nothing else. The
+    > optional split sibling of `project-gpkg-fixture.test.ts` was **not** created (Q2A-1).
+
 47. **[MACHINE]** No commit, no push, no `--no-verify`. Work is left in the working tree.
     Command: `git log --oneline BASE..HEAD`
     Expected: empty output (HEAD is still `c8483b5`).
@@ -822,6 +1007,32 @@ that exact shape has been defeated by ordinary JSDoc prose in each of the last t
     > Slice 2A run. The requirement is unchanged and is the one that matters: **the run adds no
     > commit of its own.** `git log --oneline BASE..HEAD` is empty, where `BASE` is that recorded
     > SHA.
+
+    > **Amendment, 2026-07-30 — owner-authorised. The prohibition is DISCHARGED, not struck.**
+    > Owner ruling, verbatim: *"Si le slice est terminé il doit être commité."*
+    >
+    > *What this criterion was actually protecting.* It bound the **unattended** run: an agent working
+    > overnight, with nobody having read the diff, must not put its own work into history — that is
+    > Prohibition 8's "the morning review decides what leaves the machine". It was never a claim that
+    > Slice 2A should live forever in a working tree.
+    >
+    > *That condition is now met.* The review happened: two `/code-review` passes on two axes, an
+    > independent Phase 4 runner, a Phase 6 grader over all 57 criteria, an independent check of the
+    > data-safety fix, and an owner reading which produced four rulings. Nine findings were raised
+    > after the build went green and every one is dispositioned — fixed, or recorded with the criterion
+    > that blocks it. `npm run verify` is green on the exact tree being committed.
+    >
+    > **So the criterion is satisfied in substance and then discharged by ruling.** It held for the
+    > whole duration it was written for: `git log --oneline BASE..HEAD` was empty at the end of the
+    > automated run, which the Phase 6 grader verified and recorded. The commit that follows is the
+    > owner's act on a reviewed slice, not the run's act on an unreviewed one. It is **not** an
+    > exception to Prohibition 4 — verify is green — nor to Prohibition 8, since nothing is pushed.
+    >
+    > Command, for a grader re-running this file after the fact:
+    > `git log --oneline BASE..HEAD`
+    > Expected: **exactly one commit**, the Slice 2A commit, carrying the twelve `src/` paths of
+    > criterion 46 as amended plus this file, `SLICE_RUN_LOG.md` and `SLICE_2A_OPEN_QUESTIONS.md`.
+    > More than one commit, or any commit touching a path outside that set, fails this criterion.
 
 ---
 
@@ -882,6 +1093,29 @@ the morning-review list.
     is filed as Q32. A reader must confirm this is the trade the owner wants before Slice 2B
     adds `relationships` and `integrityEvents` on top of it, because 2B's compile-error
     behaviour depends on it.
+
+    > **Closed, 2026-07-30 — owner ruling. RATIFIED, and Slice 2B may build on it.** The trade is
+    > accepted as the owner wants it.
+    >
+    > *The cost, now measured rather than predicted:* four call sites in `geopackage.service.test.ts`
+    > write five explicit `undefined`s each, on lines of roughly 180 characters, and that file ends
+    > the slice at exactly 321 lines with a 4-insertion/4-deletion diff. Across all sixteen sites the
+    > conversion was net-negative in lines — `project-gpkg-fixture.test.ts` **shrank** from 299 to 279.
+    > So the feared verbosity did not materialise at the file level.
+    >
+    > *What is bought:* the only mechanism that turns "a call site forgot a field" into a compile
+    > error. Before this slice, omitting a positional argument silently wiped a database table for six
+    > of the eight parameters. When 2B adds `relationships` and `integrityEvents` as two more required
+    > members in the one declaration site, every un-updated call site breaks at compile time rather
+    > than at the analyst's next save.
+    >
+    > *Two conditions carried into 2B, both already recorded:* the ban on a shared default-options
+    > factory stands, in tests and in source alike — it reopens exactly the hole this closes; and
+    > **Q2A-6** applies the same doctrine one layer up, to `ProjectSaveInput.ratingEvents`, which is
+    > still optional while its `SaveGeoPackageOptions` twin is required and therefore still lets a
+    > `performProjectSave` caller silently wipe `rating_events`.
+    >
+    > **All four `[HUMAN]` criteria (54-57) are now closed.** None blocks anything.
 
 55. **[HUMAN]** **The guard's false-positive surface (criterion 24).** A user who
     deliberately deletes every entity, geometry, claim and source from a real project and

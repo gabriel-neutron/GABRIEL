@@ -65,7 +65,7 @@ describe("public/project.gpkg round-trip (real pre-E1 fixture)", () => {
       // Pass `buffer` as baseBuffer, mirroring performProjectSave's real reopen-and-save
       // path (useProjectIO.ts) — this is the exact path that silently went untested
       // pre-migration and let the crash-on-save regression ship.
-      const bytes = await saveGeoPackage(first.layers, first.entities, first.geometries, first.sourceCache, buffer)
+      const bytes = await saveGeoPackage({ layers: first.layers, entities: first.entities, geometries: first.geometries, researchSources: first.sourceCache, baseBuffer: buffer, sources: undefined, claims: undefined, ratingEvents: undefined })
       const second = await loadGeoPackage(Uint8Array.from(bytes).buffer)
 
       expect(second.entities).toHaveLength(first.entities.length)
@@ -99,7 +99,7 @@ describe("public/project.gpkg round-trip (real pre-E1 fixture)", () => {
         e.id === target.id ? { ...e, aliases: ["Вагнер", "PMC Wagner"] } : e,
       )
 
-      const bytes = await saveGeoPackage(first.layers, aliased, first.geometries, first.sourceCache, buffer)
+      const bytes = await saveGeoPackage({ layers: first.layers, entities: aliased, geometries: first.geometries, researchSources: first.sourceCache, baseBuffer: buffer, sources: undefined, claims: undefined, ratingEvents: undefined })
       const second = await loadGeoPackage(Uint8Array.from(bytes).buffer)
 
       expect(second.entities.find((e) => e.id === target.id)!.aliases).toEqual(["Вагнер", "PMC Wagner"])
@@ -125,7 +125,7 @@ describe("public/project.gpkg round-trip (real pre-E1 fixture)", () => {
         e.id === target.id ? { ...e, externalIds: [{ scheme: "imo" as const, value: "9074729" }] } : e,
       )
 
-      const bytes = await saveGeoPackage(first.layers, withIds, first.geometries, first.sourceCache, buffer)
+      const bytes = await saveGeoPackage({ layers: first.layers, entities: withIds, geometries: first.geometries, researchSources: first.sourceCache, baseBuffer: buffer, sources: undefined, claims: undefined, ratingEvents: undefined })
       const second = await loadGeoPackage(Uint8Array.from(bytes).buffer)
 
       expect(second.entities.find((e) => e.id === target.id)!.externalIds).toEqual([
@@ -148,28 +148,20 @@ describe("public/project.gpkg round-trip (real pre-E1 fixture)", () => {
       expect(first.sources.length).toBeGreaterThan(0)
       expect(first.claims.length).toBeGreaterThan(0)
 
-      const firstBytes = await saveGeoPackage(
-        first.layers,
-        first.entities,
-        first.geometries,
-        first.sourceCache,
-        buffer,
-        first.sources,
-        first.claims,
-      )
+      const firstBytes = await saveGeoPackage({
+        layers: first.layers, entities: first.entities, geometries: first.geometries,
+        researchSources: first.sourceCache, baseBuffer: buffer,
+        sources: first.sources, claims: first.claims, ratingEvents: undefined,
+      })
       const second = await loadGeoPackage(Uint8Array.from(firstBytes).buffer)
       expect(second.sources).toHaveLength(first.sources.length)
       expect(second.claims).toHaveLength(first.claims.length)
 
-      const secondBytes = await saveGeoPackage(
-        second.layers,
-        second.entities,
-        second.geometries,
-        second.sourceCache,
-        Uint8Array.from(firstBytes).buffer,
-        second.sources,
-        second.claims,
-      )
+      const secondBytes = await saveGeoPackage({
+        layers: second.layers, entities: second.entities, geometries: second.geometries,
+        researchSources: second.sourceCache, baseBuffer: Uint8Array.from(firstBytes).buffer,
+        sources: second.sources, claims: second.claims, ratingEvents: undefined,
+      })
       const third = await loadGeoPackage(Uint8Array.from(secondBytes).buffer)
       expect(third.sources).toHaveLength(first.sources.length)
       expect(third.claims).toHaveLength(first.claims.length)
@@ -202,7 +194,7 @@ describe("public/project.gpkg round-trip (real pre-E1 fixture)", () => {
           : s,
       )
 
-      const bytes = await saveGeoPackage(first.layers, first.entities, first.geometries, first.sourceCache, buffer, rated, first.claims)
+      const bytes = await saveGeoPackage({ layers: first.layers, entities: first.entities, geometries: first.geometries, researchSources: first.sourceCache, baseBuffer: buffer, sources: rated, claims: first.claims, ratingEvents: undefined })
       const second = await loadGeoPackage(Uint8Array.from(bytes).buffer)
 
       expect(second.sources.find((s) => s.id === target.id)?.reliabilityMeta).toEqual(rated.find((s) => s.id === target.id)!.reliabilityMeta)
@@ -228,16 +220,11 @@ describe("public/project.gpkg round-trip (real pre-E1 fixture)", () => {
         assessor: { kind: "analyst" as const },
         timestamp: "2026-07-14T00:00:00.000Z",
       }
-      const bytes = await saveGeoPackage(
-        first.layers,
-        first.entities,
-        first.geometries,
-        first.sourceCache,
-        buffer,
-        first.sources,
-        first.claims,
-        [event],
-      )
+      const bytes = await saveGeoPackage({
+        layers: first.layers, entities: first.entities, geometries: first.geometries,
+        researchSources: first.sourceCache, baseBuffer: buffer,
+        sources: first.sources, claims: first.claims, ratingEvents: [event],
+      })
       const second = await loadGeoPackage(Uint8Array.from(bytes).buffer)
       expect(second.ratingEvents).toEqual([event])
     },
@@ -261,16 +248,11 @@ describe("public/project.gpkg round-trip (real pre-E1 fixture)", () => {
         timestamp: "2026-07-14T00:00:00.000Z",
       }
       // First save populates sources/claims/ratingEvents into a fresh buffer.
-      const firstBytes = await saveGeoPackage(
-        first.layers,
-        first.entities,
-        first.geometries,
-        first.sourceCache,
-        buffer,
-        first.sources,
-        first.claims,
-        [event],
-      )
+      const firstBytes = await saveGeoPackage({
+        layers: first.layers, entities: first.entities, geometries: first.geometries,
+        researchSources: first.sourceCache, baseBuffer: buffer,
+        sources: first.sources, claims: first.claims, ratingEvents: [event],
+      })
 
       // Second save reuses that buffer but omits sources/claims/ratingEvents entirely
       // (the "New Project" shape). Read the raw tables directly (bypassing
@@ -278,13 +260,11 @@ describe("public/project.gpkg round-trip (real pre-E1 fixture)", () => {
       // sources from the entities' legacy `sources` strings and mask a broken wipe) to
       // assert the persisted tables themselves end up empty, not carrying over the
       // first save's rows.
-      const secondBytes = await saveGeoPackage(
-        first.layers,
-        first.entities,
-        first.geometries,
-        first.sourceCache,
-        Uint8Array.from(firstBytes).buffer,
-      )
+      const secondBytes = await saveGeoPackage({
+        layers: first.layers, entities: first.entities, geometries: first.geometries,
+        researchSources: first.sourceCache, baseBuffer: Uint8Array.from(firstBytes).buffer,
+        sources: undefined, claims: undefined, ratingEvents: undefined,
+      })
       const geoPackage = await GeoPackageAPI.open(new Uint8Array(secondBytes))
       try {
         expect(readProvenanceSources(geoPackage)).toEqual([])

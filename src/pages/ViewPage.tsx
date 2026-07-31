@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react"
 import { Loader2 } from "lucide-react"
 import { MainLayout } from "@/shell/MainLayout"
-import { loadGeoPackage, applyGeoPackageResult } from "@/core/persistence/geopackage"
+import { loadGeoPackage } from "@/core/persistence/geopackage"
 import { applyDeterministicRatingPipeline } from "@/core/provenance/ratingPipeline"
+import { projectStateFromLoadResult } from "@/hooks/useProjectIO"
 import { useProjectStore } from "@/store/useProjectStore"
 import { useSourceCacheStore } from "@/store/useSourceCacheStore"
 import { useProvenanceStore } from "@/store/useProvenanceStore"
@@ -42,14 +43,7 @@ export function ViewPage({ onEditMode, onOpenAbout }: ViewPageProps): React.Reac
       .then((buffer) => loadGeoPackage(buffer))
       .then((result) => {
         if (!mounted) return
-        const next = applyGeoPackageResult(result, null)
-        useProjectStore.getState().setProject({
-          layers: next.layers,
-          entities: next.entities,
-          drawnGeometries: next.drawnGeometries,
-          claims: result.claims,
-          selectedEntityId: next.selectedEntityId,
-        })
+        useProjectStore.getState().setProject(projectStateFromLoadResult(result))
         useSourceCacheStore.getState().setSourceCache(result.sourceCache)
         const rated = applyDeterministicRatingPipeline(result.sources, result.claims, result.ratingEvents)
         useProvenanceStore.getState().setSources(rated.sources)

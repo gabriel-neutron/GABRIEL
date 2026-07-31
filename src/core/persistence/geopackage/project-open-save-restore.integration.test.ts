@@ -42,7 +42,11 @@ describe("project open/save/session-restore flow", () => {
     ]
     const sourceCache = new Map<string, string>([["https://example.org/source", "snippet"]])
 
-    const exported = await saveGeoPackage(layers, entities, geometries, sourceCache)
+    const exported = await saveGeoPackage({
+      layers, entities, geometries,
+      researchSources: sourceCache, baseBuffer: undefined,
+      sources: undefined, claims: undefined, ratingEvents: undefined,
+    })
     const bufferToPersist = Uint8Array.from(exported).buffer
     await saveProject(bufferToPersist)
 

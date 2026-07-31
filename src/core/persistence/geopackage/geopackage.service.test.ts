@@ -59,7 +59,7 @@ describe("coordinate round-trip", () => {
         ["https://example.org/source-b", "cached snippet B"],
       ])
 
-      const bytes = await saveGeoPackage(layers, entities, geometries, sourceCache)
+      const bytes = await saveGeoPackage({ layers, entities, geometries, researchSources: sourceCache, baseBuffer: undefined, sources: undefined, claims: undefined, ratingEvents: undefined })
       const persistedBuffer = Uint8Array.from(bytes).buffer
       const loaded = await loadGeoPackage(persistedBuffer)
 
@@ -127,7 +127,7 @@ describe("coordinate round-trip", () => {
         },
       ]
 
-      const bytes = await saveGeoPackage(layers, entities, [], undefined)
+      const bytes = await saveGeoPackage({ layers, entities, geometries: [], researchSources: undefined, baseBuffer: undefined, sources: undefined, claims: undefined, ratingEvents: undefined })
       const persistedBuffer = Uint8Array.from(bytes).buffer
       const loaded = await loadGeoPackage(persistedBuffer)
 
@@ -181,7 +181,7 @@ describe("coordinate round-trip", () => {
           notes: "predates the analyzed_at/position_mode/is_exact_position columns",
         },
       ]
-      const bytes = await saveGeoPackage(layers, entities, [])
+      const bytes = await saveGeoPackage({ layers, entities, geometries: [], researchSources: undefined, baseBuffer: undefined, sources: undefined, claims: undefined, ratingEvents: undefined })
       const geoPackage = await GeoPackageAPI.open(new Uint8Array(bytes))
       try {
         geoPackage.connection.run("ALTER TABLE units DROP COLUMN analyzed_at")
@@ -286,7 +286,7 @@ describe("coordinate round-trip", () => {
         },
       ]
 
-      const bytes = await saveGeoPackage(layers, entities, [])
+      const bytes = await saveGeoPackage({ layers, entities, geometries: [], researchSources: undefined, baseBuffer: undefined, sources: undefined, claims: undefined, ratingEvents: undefined })
       await expect(loadGeoPackage(Uint8Array.from(bytes).buffer)).rejects.toThrow(
         /Unsupported schema.*missing parent/,
       )

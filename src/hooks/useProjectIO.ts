@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import {
   loadGeoPackage,
   saveGeoPackage,
@@ -10,6 +10,9 @@ import {
   type GpkgSource,
   type GpkgClaim,
   type GpkgRatingEvent,
+  type SaveGeoPackageOptions,
+  type GeoPackageLoadResult,
+  type ApplyGeoPackageResultState,
 } from "@/core/persistence/geopackage"
 import { applyDeterministicRatingPipeline } from "@/core/provenance/ratingPipeline"
 import { INDUSTRY_LAYER_ID } from "@/types/organisation.types"
@@ -48,6 +51,27 @@ async function loadSeedGeoPackageBuffer(): Promise<ArrayBuffer | null> {
   }
 }
 
+/**
+ * The one project state every load path hands to setProject. Named rather than inferred so that
+ * "no sixth field" is a compile-time property: the literal below is excess-property-checked.
+ */
+export type ProjectStateFromLoadResult = ApplyGeoPackageResultState & { claims: GpkgClaim[] }
+
+/**
+ * claims comes from the load result, not from applyGeoPackageResult, which does not carry
+ * provenance claims: taking them from there would silently drop every claim on load.
+ */
+export function projectStateFromLoadResult(result: GeoPackageLoadResult): ProjectStateFromLoadResult {
+  const applied = applyGeoPackageResult(result, null)
+  return {
+    layers: applied.layers,
+    entities: applied.entities,
+    drawnGeometries: applied.drawnGeometries,
+    claims: result.claims,
+    selectedEntityId: applied.selectedEntityId,
+  }
+}
+
 export interface ProjectSaveInput {
   layers: GpkgLayer[]
   entities: GpkgEntity[]
@@ -56,20 +80,16 @@ export interface ProjectSaveInput {
   sources: GpkgSource[]
   claims: GpkgClaim[]
   ratingEvents?: GpkgRatingEvent[]
+  /**
+   * Whether this session established that the in-memory snapshot stands for the persisted
+   * project. Required, not optional, so a call site that forgets it is a compile error.
+   */
+  snapshotIsAuthoritative: boolean
 }
 
 export interface ProjectSaveDeps {
   loadProject: () => Promise<LoadedProject | null>
-  saveGeoPackage: (
-    layers: GpkgLayer[],
-    entities: GpkgEntity[],
-    geometries: GpkgGeometry[],
-    researchSources: Map<string, string> | undefined,
-    baseBuffer: ArrayBuffer | undefined,
-    sources: GpkgSource[] | undefined,
-    claims: GpkgClaim[] | undefined,
-    ratingEvents?: GpkgRatingEvent[],
-  ) => Promise<Uint8Array>
+  saveGeoPackage: (options: SaveGeoPackageOptions) => Promise<Uint8Array>
   writeGeoPackageToFile: (bytes: Uint8Array) => Promise<void>
   saveProject: (buffer: ArrayBuffer) => Promise<void>
 }
@@ -81,16 +101,30 @@ export interface ProjectSaveDeps {
  */
 export async function performProjectSave(input: ProjectSaveInput, deps: ProjectSaveDeps): Promise<void> {
   const existing = await deps.loadProject()
-  const bytes = await deps.saveGeoPackage(
-    input.layers,
-    input.entities,
-    input.geometries,
-    input.sourceCache,
-    existing?.buffer,
-    input.sources,
-    input.claims,
-    input.ratingEvents,
-  )
+  // A save replaces rather than merges (save.ts deletes each table's rows, then rewrites them),
+  // so saving a snapshot this session never tied to the persisted project destroys that project.
+  // Emptiness cannot be the test instead: after a failed restore the store sits at initialState(),
+  // indistinguishable from a deliberate New Project, and one typed entity would defeat it anyway.
+  if (input.snapshotIsAuthoritative === false && existing != null && existing.buffer.byteLength > 0) {
+    // Plain concatenated string literals, never a template literal (Trap T7: template literals
+    // have twice written NUL bytes into this repo).
+    throw new Error(
+      "Refusing to overwrite your saved project: this session never loaded it, so saving now would replace it with what is on screen. " +
+        "Nothing has been written. " +
+        "Reload the page to load your project again, or use Open to pick the .gpkg file yourself. " +
+        "Anything you typed into this session is not carried across by either route, so copy it out first.",
+    )
+  }
+  const bytes = await deps.saveGeoPackage({
+    layers: input.layers,
+    entities: input.entities,
+    geometries: input.geometries,
+    researchSources: input.sourceCache,
+    baseBuffer: existing?.buffer,
+    sources: input.sources,
+    claims: input.claims,
+    ratingEvents: input.ratingEvents,
+  })
   await deps.writeGeoPackageToFile(bytes)
   const buffer = new ArrayBuffer(bytes.length)
   new Uint8Array(buffer).set(bytes)
@@ -102,6 +136,14 @@ export function useProjectIO() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [restoredFromSession, setRestoredFromSession] = useState(false)
+  // Does the in-memory snapshot stand for the persisted project? The save guard refuses when it
+  // does not. Two halves, and both are load-bearing: LOWERED the instant the snapshot stops
+  // standing for the persisted project, and RAISED only once an operation has fully landed. Raising
+  // early leaves a half-filled store armed, and the next save wipes the tables it never filled;
+  // failing to lower leaves a stale true from an earlier operation, and an emptied store overwrites
+  // the real project. A ref, not a module-level let, so the dependency-injected performProjectSave
+  // stays testable; not a store field, so it cannot survive a reload that re-established nothing.
+  const snapshotIsAuthoritativeRef = useRef<boolean>(false)
 
   useEffect(function restoreSession() {
     let mounted = true
@@ -110,18 +152,12 @@ export function useProjectIO() {
         if (!stored || !mounted) return
         return loadGeoPackage(stored.buffer).then((result) => {
           if (!mounted) return
-          const next = applyGeoPackageResult(result, null)
-          useProjectStore.getState().setProject({
-            layers: next.layers,
-            entities: next.entities,
-            drawnGeometries: next.drawnGeometries,
-            claims: result.claims,
-            selectedEntityId: next.selectedEntityId,
-          })
+          useProjectStore.getState().setProject(projectStateFromLoadResult(result))
           useSourceCacheStore.getState().setSourceCache(result.sourceCache)
           const rated = applyDeterministicRatingPipeline(result.sources, result.claims, result.ratingEvents)
           useProvenanceStore.getState().setSources(rated.sources)
           useProvenanceStore.getState().setRatingEvents(rated.events)
+          snapshotIsAuthoritativeRef.current = true
           setRestoredFromSession(true)
         })
       })
@@ -150,6 +186,9 @@ export function useProjectIO() {
       previousProject?.buffer != null && previousProject.buffer.byteLength > 0
         ? previousProject.buffer
         : await loadSeedGeoPackageBuffer()
+    // Lowered before the stores are emptied, not after: an earlier restore or save may have left it
+    // true, and an empty screen does not stand for the project still sitting in IndexedDB.
+    snapshotIsAuthoritativeRef.current = false
     resetProject()
     useSourceCacheStore.getState().resetSourceCache()
     useProvenanceStore.getState().resetSources()
@@ -160,6 +199,10 @@ export function useProjectIO() {
     setRestoredFromSession(false)
     try {
       await clearProject()
+      // Raised only once the clear succeeded, and with no load having happened at all: New Project
+      // deliberately makes an empty project the thing on screen, which is why this flag is not
+      // called loadSucceeded. A failed clear leaves it false, so the real project survives.
+      snapshotIsAuthoritativeRef.current = true
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to clear persisted session")
       console.error("clearProject failed", e)
@@ -172,7 +215,16 @@ export function useProjectIO() {
         ...defaultLayers.map((l) => ({ id: l.id, name: l.name, visible: l.visible, kind: l.kind })),
         industryLayer,
       ]
-      const bytes = await saveGeoPackage(gpkgLayers, [], [], undefined, seedBuffer ?? undefined)
+      const bytes = await saveGeoPackage({
+        layers: gpkgLayers,
+        entities: [],
+        geometries: [],
+        researchSources: undefined,
+        baseBuffer: seedBuffer ?? undefined,
+        sources: undefined,
+        claims: undefined,
+        ratingEvents: undefined,
+      })
       await writeGeoPackageToFile(bytes)
       window.alert("New project created.")
     } catch (e) {
@@ -190,18 +242,17 @@ export function useProjectIO() {
     try {
       const buffer = await file.arrayBuffer()
       const result = await loadGeoPackage(buffer)
-      const next = applyGeoPackageResult(result, null)
-      useProjectStore.getState().setProject({
-        layers: next.layers,
-        entities: next.entities,
-        drawnGeometries: next.drawnGeometries,
-        claims: result.claims,
-        selectedEntityId: next.selectedEntityId,
-      })
+      // Lowered here and not at the top: a throw in the two awaits above leaves the store holding
+      // whatever it already held, which may legitimately still be authoritative.
+      snapshotIsAuthoritativeRef.current = false
+      useProjectStore.getState().setProject(projectStateFromLoadResult(result))
       useSourceCacheStore.getState().setSourceCache(result.sourceCache)
       const rated = applyDeterministicRatingPipeline(result.sources, result.claims, result.ratingEvents)
       useProvenanceStore.getState().setSources(rated.sources)
       useProvenanceStore.getState().setRatingEvents(rated.events)
+      // Not gated on the saveProject below: the analyst chose this file, so the snapshot stands for
+      // what they want saved even if the cache write fails.
+      snapshotIsAuthoritativeRef.current = true
       useOsmViewStore.getState().resetOsmView()
       useSelectionStore.getState().setSelectedRef(null)
       useEntityVisibilityStore.getState().reset()
@@ -225,9 +276,12 @@ export function useProjectIO() {
     setError(null)
     try {
       await performProjectSave(
-        { layers, entities, geometries, sourceCache, sources, claims, ratingEvents },
+        { layers, entities, geometries, sourceCache, sources, claims, ratingEvents, snapshotIsAuthoritative: snapshotIsAuthoritativeRef.current },
         { loadProject, saveGeoPackage, writeGeoPackageToFile, saveProject },
       )
+      // A save the analyst authorised and which landed is what makes the snapshot stand for the
+      // persisted project; without this, Save 2 is refused over what Save 1 itself wrote.
+      snapshotIsAuthoritativeRef.current = true
       window.alert("Saved successfully")
     } catch (e) {
       if (e instanceof Error && e.name === "AbortError") return

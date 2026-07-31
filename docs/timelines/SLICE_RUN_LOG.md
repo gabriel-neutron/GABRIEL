@@ -603,3 +603,301 @@ in this session.
    the header note corrects every line citation into `GABRIEL_V2_SLICE_0_1_BUILD.md` by +9.
 4. Expect Task A to leave the suite red until Task B lands. Do not grade in between.
 5. **Skip Phase 1.** The criteria are already frozen. Phase 1 is only needed for 2B.
+
+---
+
+## Run 2026-07-30 — Slice 2A
+
+### Phase 0 — Orient
+
+- **Authoritative contract:** `docs/timelines/SLICE_2A_CRITERIA.md`, already frozen. **Phase 1
+  was skipped** on the owner's instruction, per that file and `SLICE_BUILD_LOOP.md`'s current-target
+  note. The binding spec section is "Ordering and safety in Slice 2" in
+  `GABRIEL_V2_SLICE_0_1_BUILD.md` (**heading at `:596`**, not the `:587` the criteria file cites —
+  every citation into that file is short by 9 lines, per the criteria header amendment).
+- **Starting commit SHA — the revert point and `BASE`:**
+  `9525c3fda395abf8d3bb47834dac2ba0104bccb0` (`docs: rule Q32-Q41, spec Slice 2B, and cut the
+  planning docs to what Slice 2 needs`).
+- **The `BASE` re-pin amendment applies, re-verified as its own precondition requires:**
+  `git diff --name-only c8483b5 9525c3f -- src/` is **empty**. Every commit since the criteria were
+  frozen touched `docs/` and `package.json` only, so every §0 reconnaissance number holds at the new
+  `BASE`. The §0.3 line map was independently re-checked against the file and matches exactly
+  (`ProjectSaveInput` 51-59, `ProjectSaveDeps` 61-75, `performProjectSave` 82-98, literal A 114-120,
+  literal B 194-200, `handleNew`'s save 175).
+- **Working tree at start:** clean (`git status --porcelain` empty).
+- **`public/project.gpkg` at start:** md5 `7d0b0e592a1128a0d83e7575110bf2dc` — matches criterion 44.
+
+### Phase 0 — the baseline was red for an environmental reason, and what it took to get it green
+
+**This is the finding a morning reader most needs, because it will recur on this machine.**
+
+`npm run verify` at `BASE` aborted **3 times out of 3** with
+
+```
+Assertion failed: new_time >= loop->time, file src\win\core.c, line 327
+```
+
+exit **127**. That is a libuv assertion in Windows' monotonic-clock update (`uv__update_time`),
+fired when `uv_hrtime()` returns a value below the loop's last recorded time. It is a
+**machine-level timer regression, not a repository defect**, and it is the classic consequence of a
+multi-core QPC skew after sleep/resume cycles — this machine last booted **2026-07-25**, five days
+before the run.
+
+It was **not** vitest-specific and **not** coverage-specific. Measured at `BASE`, on an
+unmodified tree:
+
+| command | attempts | result |
+|---|---|---|
+| `npm run scan:nul` | 1 | clean, 302 files, exit 0 |
+| `npx eslint .` | 1 | clean, exit 0 |
+| `npx vitest run` (no coverage) | 1 | **exit 0 — 63 files / 502 tests**, 13.9s |
+| `npm run verify` | 3 | exit 127 every time |
+| `npx vitest run --coverage` | 3 | exit 127 ×2; exit 1 ×1 with **3 worker processes killed** by the same assertion (475/491 tests reported) |
+| `--coverage --coverage.reporter=text` | 3 | exit 0 ×1, exit 127 ×1, exit 1 ×1 |
+| `--coverage --maxWorkers=2` | 2 | exit 1 ×1, exit 127 ×1 |
+| `npm run build` (`tsc -b` passes, `vite build` aborts) | 3 | exit 127 every time |
+
+So neither the reporter nor the worker count was the trigger, and roughly **85% of long-running
+Node processes died**. Two dead ends worth not re-walking: clearing the 8.5 MB `coverage/`
+directory changed the failure mode once and then stopped helping, and the one green
+text-reporter run was luck, not a fix.
+
+**The mitigation that works — pin the process to a single core:**
+
+```
+cmd /c 'start /affinity 1 /wait /min cmd /c "npm run verify > <logfile> 2>&1"'
+```
+
+With that wrapper `npm run verify` is **GREEN at `BASE`: exit 0**, `scan:nul` clean, `eslint`
+clean, coverage **37.29% lines / 33.69% branches / 33.74% functions / 36.76% statements** against
+the 12/9/9/12 thresholds, `tsc -b && vite build` clean in 18.0s. `npm run build` alone is likewise
+exit 0 under the wrapper after failing 3/3 without it.
+
+This is an **environment mitigation, not a weakened gate**: it is the same `npm run verify`
+command running the same three gates over the same test suite, merely denied the second core on
+which the timer skew appears. Nothing was excluded, skipped or thresholded down. Every verify
+result later in this entry was obtained this way, and plain unwrapped `npm run verify` remains the
+criterion-18 command — it simply cannot be relied on to *complete* on this machine today.
+
+**What the owner should do:** reboot. That clears a QPC regression in the overwhelming majority of
+cases. If it recurs after a reboot, the next suspects are a power/HAL timer setting and the
+`useplatformclock`/`tscsyncpolicy` boot flags, not anything in this repository.
+
+### Phases 2-6 — one iteration, no red build except the planned handoff
+
+**Iterations used: 1 of 3.** Phase 1 was skipped (criteria already frozen). Six agents ran, each with
+the separation the loop requires: two coding agents, a test author, a runner, two review axes, a
+simplifier, and an independent grader. No agent graded its own work.
+
+| phase | agent | outcome |
+|---|---|---|
+| 2 / Task A | coding | `saveGeoPackage` to an options object + all 16 call sites + the `ProjectSaveDeps` type. Left the suite at **501/502 by design** |
+| 2 / Task B | coding | the save guard, `snapshotIsAuthoritative`, `projectStateFromLoadResult` at all **three** literal sites, the positional-assertion replacement. Back to **502/502** |
+| 3 | test author | 9 new tests across 3 new files + 6 added to `save-ordering`. **511/511** |
+| 4 | runner (no edits) | **VERDICT: PASS** |
+| 5 | 2 review axes + simplifier | 1 real defect, 7 declined findings, **0 edits** |
+| 6 | grader (no edits) | **GRADE: ALL MACHINE CRITERIA PASS**, plus one new defect the reviews missed |
+
+**Task A's planned red state worked exactly as the criteria predicted.** `calls[0]?.[4]` read
+`undefined` the moment the deps type became an options object, and because it is `any`-typed `tsc`
+did not catch it — so no verdict was taken between A and B, per §9. Task B's B3 replaced it, which
+is also the one `expect(` line criterion 38 permits removing.
+
+**Final state:** `npm run verify` **exit 0** (single-core wrapper), **66 test files / 511 tests
+passed / 0 skipped** (BASE 502; +9), coverage **37.35% lines / 33.78% branches / 33.78% functions /
+36.82% statements** against thresholds 12 / 9 / 9 / 12, `tsc -b && vite build` clean. NUL: **Node
+byte scan**, `clean, 306 files` — no `rg`-based check was accepted as evidence anywhere in this run
+(Q36). `public/project.gpkg` byte-identical, md5 `7d0b0e592a1128a0d83e7575110bf2dc`, and no stray
+`gabriel-*.gpkg` left behind.
+
+**Changed file set — exactly criterion 46 as amended.** Modified: `save.ts`, `index.ts`,
+`geopackage.service.test.ts`, `project-gpkg-fixture.test.ts`,
+`project-open-save-restore.integration.test.ts`, `useProjectIO.ts`,
+`useProjectIO.save-ordering.test.ts`, and `ViewPage.tsx` (the amendment's addition). New:
+`save.options.test.ts`, `save.options.roundtrip.test.ts`, `useProjectIO.loadState.test.ts`. Nothing
+else. `useProjectStore.ts` and `EntityInspector.tsx` byte-identical; `project-gpkg-fixture.test.ts`
+**shrank** 299 → 279; `geopackage.service.test.ts` ends at exactly **321** with a 4/4 numstat, as
+Q35 ruled.
+
+### Owner sitting, 2026-07-30 — four rulings, and the slice ships
+
+Read this before the two sections below, which were written while the work was still uncommitted and
+are left in place as the record of that state.
+
+| # | ruling |
+|---|---|
+| **Criterion 47** | *"Si le slice est terminé il doit être commité."* The prohibition is **discharged, not struck**: it bound the **unattended** run — nobody having read the diff — and that condition no longer holds after two `/code-review` passes, an independent runner, a 57-criterion grader, an independent check of the data-safety fix, and this sitting. It held for the whole duration it was written for, which the Phase 6 grader verified. **The slice is committed.** |
+| **Q2A-9 / criterion 23** | **PASS on substance, confirmed.** Its second command is recorded as an over-broad proxy: it matches the two `setProject` lines that criterion 32 *requires* to change, while the flag alternatives match zero times and the headline requirement is proven twice over independently. |
+| **Commit shape** | **One commit**, all fifteen paths — the twelve under `src/` plus the three docs. |
+| **`[HUMAN]` criterion 54** | **RATIFIED.** The eight required options typed `T \| undefined` are the trade the owner wants, and 2B may build its compile-error mechanism on them. **All four `[HUMAN]` criteria (54-57) are now closed.** |
+
+**The commit.** Single commit, imperative present per `CLAUDE.md`, `npm run verify` green on the exact
+tree, no `--no-verify`, **not pushed** — Prohibition 8 stands and what leaves the machine is a separate
+decision. It carries the twelve `src/` paths of criterion 46 as amended, plus this file,
+`SLICE_2A_CRITERIA.md` and `SLICE_2A_OPEN_QUESTIONS.md`.
+
+*On the SHA the loop's Phase 6 step 4 asks for here:* it cannot be written into the commit that
+contains it — recording it would change it. With one commit ruled, the honest form is
+self-reference: **the SHA is that of the single commit carrying this entry**, resolvable with
+`git log -1 --format=%H -- docs/timelines/SLICE_RUN_LOG.md`. The revert point remains the Phase 0 SHA
+`9525c3f`, which is the parent of that commit.
+
+### Written while still uncommitted — criterion 47 as it stood before the ruling above
+
+`SLICE_BUILD_LOOP.md` Phase 6 step 3 says "Commit." **Frozen criterion 47 says the work is left in
+the working tree, and the owner restated that on 2026-07-29** while amending the criterion. The
+specific frozen contract governs the generic procedure, committing would turn a passing criterion
+into a failing one, and Prohibition 2 forbids weakening a criterion to make an action legal. Full
+reasoning and the one-command way to land it are in **Q2A-10**.
+
+So the loop's Phase 6 step 4 asks for a commit SHA here and there is none. **Commit SHA: _(none —
+work left uncommitted per criterion 47; fill in when the review lands it)_.** Revert point remains
+the Phase 0 SHA `9525c3f`; nothing was pushed.
+
+### Three defects found after the build went green — the reason the phases are separated
+
+Ordered by how much they matter. **None is a criterion failure**; all three are holes in the frozen
+contract itself, which is why they are recorded for a ruling rather than patched (the criteria
+header: *"If a criterion turns out to be unsatisfiable or to contradict the spec: record it and
+STOP. That judgement is the owner's."*).
+
+1. **Q2A-8 — data-loss direction, found by the Phase 6 grader alone.** `snapshotIsAuthoritative` is
+   set `true` *before* the provenance stores are filled, at both `restoreSession:153` and
+   `handleOpen:239`. A throw in the four statements after it (realistically
+   `applyDeterministicRatingPipeline`) leaves an authoritative-flagged session with empty provenance,
+   and because the three provenance writers self-clear before inserting, the next save **wipes
+   `provenance_sources`, `provenance_claims` and `rating_events`.** Criterion 24b says "after
+   `setProject`", which is exactly where it sits, so the code is faithful and the contract is what
+   missed it. Strictly narrower than BASE, where *every* failed restore armed a destructive save.
+2. **Q2A-5 — obstruction, found by the Phase 5 spec review.** Nothing sets the flag on a successful
+   save, so a session that never pressed New or Open has Save 1 succeed (filling IndexedDB) and
+   **Save 2 refused**, over data it wrote itself. This is the same failure the criterion 24 amendment
+   levelled against the condition it struck, surviving on the one route `handleNew` does not cover.
+   Safe direction, and the refusal message's own first instruction ("Reload the page") is a genuinely
+   correct remedy. The one-line fix is a *fourth* flag-assignment site and so contradicts criterion
+   24b's "exactly three sites and nowhere else".
+3. **Q2A-9 — criterion 23's negative grep versus criterion 32.** Graded PASS on substance and
+   flagged, not concealed: criterion 23's headline is proven twice over (empty store diff, plus
+   criterion 42's byte-identical store), but its second command matches the two `setProject` lines
+   that criterion 32 *requires* to change. The only formatting satisfying both uses a spread, which
+   defeats the excess-property check Q34 exists to create. **Third slice running that a negative
+   grep has cost a criterion** — the lesson needs sharpening from "scope it to the diff" (already
+   done here) to **"exclude the strings the positive criteria force you to write."**
+
+### Recorded judgement calls — `SLICE_2A_OPEN_QUESTIONS.md`, Q2A-1 to Q2A-10
+
+| id | one line |
+|---|---|
+| **Q2A-1** | `project-gpkg-fixture.test.ts` **not split**, declining the preference recorded three times in this log. Criteria 16 and 20 are only jointly satisfiable in one file: criterion 16 filters vitest by three *filenames* and demands nine named tests pass, so a moved test stops being run. Both the spec reviewer and the grader independently agreed. The file also **shrank** to 279, weakening Q35's premise. |
+| **Q2A-2** | The two comments carried onto `SaveGeoPackageOptions` were **reworded, not copied** — verbatim they asserted "additive *trailing params*" and "every existing call site keeps working unchanged", both made false by the conversion. No provenance reference lost. |
+| **Q2A-3** | `saveGeoPackage(options: SaveGeoPackageOptions)` plus a one-line body destructure, over destructuring in place — matches criterion 1's printed form and keeps criterion 6's removed-line set exact. |
+| **Q2A-4** | Call-site formatting: preserve each call's existing shape. This is what buys the headroom in Q2A-1. |
+| **Q2A-5** | **Escalation** — the guard refuses Save 2 of a from-scratch session. See above. |
+| **Q2A-6** | `ProjectSaveInput.ratingEvents` is still `ratingEvents?:` while its save option is required, so a `performProjectSave` caller that omits it still silently wipes `rating_events` — the Q32 hole one layer up. Inert today. **Apply the Q32 doctrine to `ProjectSaveInput` in 2B.** |
+| **Q2A-7** | Seven Phase 5 findings declined, each with the frozen criterion that blocks it — including the real standards breach at `ViewPage.tsx:6` (see below). |
+| **Q2A-8** | **Escalation, rule first** — the flag-ordering data-loss hole. See above. |
+| **Q2A-9** | Criterion 23's grep versus criterion 32. See above. |
+| **Q2A-10** | **Stop-and-report** — criterion 47 forbids the commit Phase 6 orders. Work left uncommitted. |
+
+**One breach this slice creates by contract, worth confirming the fix ordering for.**
+`ViewPage.tsx:6` now imports `projectStateFromLoadResult` from `@/hooks/useProjectIO`. That import did
+not exist at BASE, and `CONSTRAINTS.md:64-71` calls the hook "EditPage's **private I/O seam, not
+shared infrastructure**". It is contract-forced: criterion 46's amendment mandates the ViewPage
+conversion while criteria 31-32 pin the function's home in `src/hooks/`. Q34 already scheduled the
+move to `core/` for 2B, and Q2A-7 names the right target —
+`core/persistence/geopackage/applyResult.ts`, beside `applyGeoPackageResult`, re-exported from the
+barrel, which **deletes** the breach rather than relocating it. **Make it 2B's first move.**
+
+### `[HUMAN]` criteria awaiting review
+
+Only **criterion 54** genuinely remains; the grader re-verified that 55, 56 and 57's dated closures
+all still hold against the built tree.
+
+> **54.** The required-vs-optional ruling (criterion 4 / Q32). Every one of the eight options is a
+> required property typed `T | undefined`, so a test that only cares about layers must now write five
+> explicit `undefined`s. **A reader must confirm this is the trade the owner wants before Slice 2B
+> adds `relationships` and `integrityEvents` on top of it, because 2B's compile-error behaviour
+> depends on it.** The cost is now measurable rather than hypothetical: four sites in
+> `geopackage.service.test.ts` write five explicit `undefined`s each, at ~180-character lines.
+
+**Criterion 56's three recorded debt items were re-verified as still true**, at line numbers that
+have drifted from the closure text: the blocking `window.alert("Saved successfully")` for success
+versus grey body text for a refusal (`useProjectIO.ts:279`), the refusal rendered by a
+default-variant `<Alert>` indistinguishable from "Project restored from last session"
+(`AppShell.tsx:325`), and `setError(null)` (`:264`) wiping the startup restore failure at the moment
+the analyst starts looking for it. **The closure's own deeper point — that the honest end state is a
+session mode saying "this is not your data" up front, and that it "must be written down somewhere it
+will not die inside Q33" — still has no home.** Q2A-5 and Q2A-8 are now two more reasons it needs
+one.
+
+### What Slice 2B must do before it starts
+
+1. **Rule Q2A-8, then Q2A-5** — the two halves of "what establishes authority". Q2A-8 first: it is
+   the one with a data-loss direction.
+2. **Rule Q2A-10** and land or discard this work. 2B must not start on an uncommitted 2A.
+3. **Move `projectStateFromLoadResult` to `core/persistence/geopackage/applyResult.ts`** as 2B's
+   first move, deleting the `ViewPage.tsx` page-boundary breach 2A was forced to create.
+4. **Answer `[HUMAN]` criterion 54** before adding `relationships`/`integrityEvents` to
+   `SaveGeoPackageOptions` — 2B's whole compile-error mechanism rests on it.
+5. **Apply the Q32 doctrine to `ProjectSaveInput`** (Q2A-6) while that type is open.
+6. **When writing 2B's criteria: a negative grep must exclude the strings the positive criteria force
+   you to write** (Q2A-9). Three slices, three criteria lost to this one shape.
+
+### Fix pass — same day, owner-directed after a second review
+
+The owner ruled three things and directed that all findings be fixed: **amend the frozen criteria as
+needed**; the flag means **"the whole operation landed"**; and the refusal message **stays exactly as
+ruled** (no `projectStorage:` prefix — `CONSTRAINTS.md:81-83` loses to analyst-facing copy, recorded as
+accepted debt).
+
+**A second two-axis review ran first**, deliberately told what the first pass had already found so it
+would look elsewhere. It paid: **9 new findings**, including two the first review and four graders had
+all missed. Three agents then fixed them in parallel across disjoint files, and an independent checker
+found that one of those fixes was itself incomplete.
+
+**Four dated owner-authorised amendments to `SLICE_2A_CRITERIA.md`:** **24b** (four raise sites plus —
+after the independent check — two lowering sites, and *ordering within each site* pinned for the first
+time), **15b** (new criterion: the store-path integration test), **34** and **46** (the kebab-case
+rename and the new file). All additive or stated replacements; nothing weakened.
+
+**What was fixed**
+
+| was | fix |
+|---|---|
+| **Q2A-5 / Q2A-8 / Q2A-11** — one bug at three sites: the flag was set before the work that made it true | Lowered before the stores are touched, raised only on completion; `handleNew`'s gated on `clearProject()` succeeding; a fourth raise site added after a successful save. `useProjectIO.ts` **296** lines |
+| **Q2A-12** — the build spec's store-path test never existed, and the criteria never mapped it | New `store-path.integration.test.ts`, real WASM, real fixture, driving load -> `projectStateFromLoadResult` -> `setProject` -> `selectPersistableSnapshot` -> save -> reload, with the `entityId -> parentId` map deep-equalled |
+| **Q2A-13** — an over-claiming docstring, a missing `afterEach`, dishonest fixtures, broken `calls` tracking, a camelCase filename | Docstring **made true** (8 `@ts-expect-error` directives, one per member, two proven live); cleanup added; the "empty snapshot" fixtures made genuinely empty; `calls` survives a `loadProject` override; renamed to `useProjectIO.load-state.test.ts` |
+
+**Two things worth knowing about how the fixes were validated.**
+
+- **The store-path test initially stayed GREEN with `baseBuffer` dropped entirely.** Its author treated
+  that as a gap rather than a pass: every count assertion is satisfiable by a save into a brand-new
+  GeoPackage, because the snapshot supplies all the rows. An assertion that the saved bytes still carry
+  the legacy `organisations` table — which only survives via the reopen path — was added, and the
+  breakage then reddened it. **Counts alone cannot prove the reopen path ran**; criterion 15b now
+  records that.
+- **The flag fix was incomplete on its first attempt, and the separation caught it** (now **Q2A-15**).
+  The brief said "raise only on completion" and the implementation obeyed — but nothing ever assigned
+  `false`, so the gate held only for a session's *first* authoritative operation. Restore raises the
+  flag, New empties every store before `clearProject()`, the clear fails and is swallowed, and the next
+  save still overwrites 1010 units with zero. **The brief was the defect**: a raise-only rule cannot
+  express "authority has been unmade". Criterion 24b now carries both halves and a
+  `rg -c "... = false"` -> `2` check with a stated hard stop.
+
+**Final state after the fix pass:** `npm run verify` **exit 0** (single-core wrapper), **67 test files
+/ 512 tests passed / 0 skipped**, coverage 37.37% lines / 33.89% branches / 33.9% functions / 36.85%
+statements against 12/9/9/12, `tsc -b && vite build` clean, `scan-nul` clean over 307 files. Still
+**uncommitted**, per criterion 47 and Q2A-10. `public/project.gpkg` md5 unchanged.
+
+**New for 2B, from the fix pass — read Q2A-14 first.** Writing the store-path test exposed that
+**`applyGeoPackageResult` silently reverts a renamed echelon layer**: it rebuilds layers by id from
+`getDefaultEchelonLayers()`, taking only `visible` from the file, so an analyst's rename is lost on
+every load and the next save writes the reverted name back. Invisible to every count assertion — the
+real fixture happens to use the built-in names — which is exactly the "hard gate passes green while the
+running app destroys data" shape the build spec warned about. Two neighbouring silent-loss branches
+(layers of unknown `kind`, `osm` layers with null `osmData`) and the fact that
+**`selectPersistableSnapshot` is a total no-op on the real fixture** — its OSM filter, orphaned-claim
+drop and `"Untitled"` rename are exercised by nothing — are recorded there too. Q2A-15 adds two more:
+`clearProject()` resolves on `request.onsuccess` rather than `tx.oncomplete`, so a commit-time abort
+rolls back after the promise resolved; and `restoreSession` can race a user action.
+
