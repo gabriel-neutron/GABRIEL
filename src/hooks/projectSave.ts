@@ -19,10 +19,16 @@ export interface ProjectSaveInput {
   layers: GpkgLayer[]
   entities: GpkgEntity[]
   geometries: GpkgGeometry[]
-  sourceCache: Map<string, string>
+  /** The persistence-side name, on both sides since P3: this type is SaveGeoPackageOptions' pre-image. */
+  researchSources: Map<string, string>
   sources: GpkgSource[]
   claims: GpkgClaim[]
-  ratingEvents?: GpkgRatingEvent[]
+  /**
+   * Required, not optional. writeRatingEvents self-clears before inserting (save.ts), so an
+   * omitted field is not tidying — it wipes the table. A call site that forgets it is a compile
+   * error rather than a silent loss of the audit trail.
+   */
+  ratingEvents: GpkgRatingEvent[]
   /**
    * Whether this session established that the in-memory snapshot stands for the persisted
    * project. Required, not optional, so a call site that forgets it is a compile error.
@@ -62,7 +68,7 @@ export async function performProjectSave(input: ProjectSaveInput, deps: ProjectS
     layers: input.layers,
     entities: input.entities,
     geometries: input.geometries,
-    researchSources: input.sourceCache,
+    researchSources: input.researchSources,
     baseBuffer: existing?.buffer,
     sources: input.sources,
     claims: input.claims,

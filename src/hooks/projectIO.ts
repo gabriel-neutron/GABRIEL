@@ -214,7 +214,9 @@ export async function performSaveProject(
   deps: ProjectSaveDeps & Pick<ProjectIODeps, "notify">,
   ui: Pick<ProjectIOUi, "setBusy" | "setError">,
 ): Promise<void> {
-  const { layers, entities, geometries, sourceCache, sources, claims, ratingEvents } = selectPersistableSnapshot(
+  // The store calls it sourceCache, persistence calls it researchSources; renamed on the way in so
+  // performProjectSave forwards it under one name (P3).
+  const { layers, entities, geometries, sourceCache: researchSources, sources, claims, ratingEvents } = selectPersistableSnapshot(
     useProjectStore.getState(),
     useSourceCacheStore.getState().sourceCache,
     useProvenanceStore.getState().sources,
@@ -224,7 +226,7 @@ export async function performSaveProject(
   ui.setError(null)
   try {
     await performProjectSave(
-      { layers, entities, geometries, sourceCache, sources, claims, ratingEvents, snapshotIsAuthoritative: authority.current },
+      { layers, entities, geometries, researchSources, sources, claims, ratingEvents, snapshotIsAuthoritative: authority.current },
       deps,
     )
     // A save the analyst authorised and which landed is what makes the snapshot stand for the

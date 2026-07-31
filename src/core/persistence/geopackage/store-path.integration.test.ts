@@ -59,7 +59,7 @@ describe("real project through the store path (public/project.gpkg)", () => {
       // test is about the project-store chain, not the rating pipeline that fills them.
       const snapshot = selectPersistableSnapshot(state, loaded.sourceCache, loaded.sources, loaded.ratingEvents)
 
-      // Mapped exactly as performProjectSave maps it, including the sourceCache ->
+      // Mapped exactly as performSaveProject maps it, including the store's sourceCache ->
       // researchSources rename, and the baseBuffer that makes this the reopen-and-save path
       // the app really runs (a missing baseBuffer would save into a blank GeoPackage instead).
       const bytes = await saveGeoPackage({

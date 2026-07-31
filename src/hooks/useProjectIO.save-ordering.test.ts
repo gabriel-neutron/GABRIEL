@@ -14,7 +14,7 @@ function makeInput(overrides: Partial<ProjectSaveInput> = {}): ProjectSaveInput 
     geometries: [
       { id: "geometry-1", layerId: "division", entityId: "entity-1", type: "point", lat: 50.45, lng: 30.52 },
     ],
-    sourceCache: new Map([["https://example.org/report", "cached snippet"]]),
+    researchSources: new Map([["https://example.org/report", "cached snippet"]]),
     sources: [{ id: "source-1", url: "https://example.org/report", domainType: null, reliability: null }],
     claims: [
       {
@@ -45,7 +45,7 @@ function makeInput(overrides: Partial<ProjectSaveInput> = {}): ProjectSaveInput 
 
 /**
  * A snapshot that is empty in every data dimension, matching the three guard tests whose names
- * say "empty snapshot": an emptied `sourceCache` and `ratingEvents` count as much as the four
+ * say "empty snapshot": an emptied `researchSources` and `ratingEvents` count as much as the four
  * arrays, since a save replaces each of those tables too. Callers keep passing
  * `snapshotIsAuthoritative` explicitly — it is the axis those tests vary.
  */
@@ -55,7 +55,7 @@ function emptySnapshotInput(overrides: Partial<ProjectSaveInput> = {}): ProjectS
     geometries: [],
     claims: [],
     sources: [],
-    sourceCache: new Map(),
+    researchSources: new Map(),
     ratingEvents: [],
     ...overrides,
   })
@@ -195,8 +195,8 @@ describe("performProjectSave", () => {
     expect(options.sources).toBe(input.sources)
     expect(options.claims).toBe(input.claims)
     expect(options.ratingEvents).toBe(input.ratingEvents)
-    // The rename: ProjectSaveInput calls it sourceCache, SaveGeoPackageOptions researchSources.
-    expect(options.researchSources).toBe(input.sourceCache)
+    // One name on both sides since P3, so this is a forward and no longer a translation.
+    expect(options.researchSources).toBe(input.researchSources)
     expect(options.baseBuffer).toBe(existingBuffer)
   })
 })

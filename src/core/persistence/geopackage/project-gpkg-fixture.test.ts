@@ -63,7 +63,7 @@ describe("public/project.gpkg round-trip (real pre-E1 fixture)", () => {
       const first = await loadGeoPackage(buffer)
 
       // Pass `buffer` as baseBuffer, mirroring performProjectSave's real reopen-and-save
-      // path (useProjectIO.ts) — this is the exact path that silently went untested
+      // path (projectSave.ts) — this is the exact path that silently went untested
       // pre-migration and let the crash-on-save regression ship.
       const bytes = await saveGeoPackage({ layers: first.layers, entities: first.entities, geometries: first.geometries, researchSources: first.sourceCache, baseBuffer: buffer, sources: undefined, claims: undefined, ratingEvents: undefined })
       const second = await loadGeoPackage(Uint8Array.from(bytes).buffer)
