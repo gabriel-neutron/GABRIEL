@@ -12,19 +12,30 @@ export function getDefaultEchelonLayers(): Layer[] {
   }))
 }
 
+/**
+ * ADR 0012. `custom` is the residual kind: every layer a project file carries that this function
+ * does not otherwise place comes back as `custom`, keeping its id, name and visibility.
+ *
+ * The alternative was dropping it, and the loss was never confined to the layer.
+ * `selectPersistableSnapshot` filters entities by *membership* in the set of loaded layer ids
+ * (`useProjectStore.ts`), not by an OSM test, so a dropped layer took its entities with it, and
+ * with them their geometries and their claims — all deleted at the next save, silently, on a file
+ * that is not corrupt. `decodeLayerKind` returns `undefined` for any `kind` outside the four,
+ * NULL included, which is exactly what a GeoPackage authored by QGIS carries.
+ *
+ * No integrity event is minted, because there is no longer a loss to record.
+ */
 export function applyGeoPackageResult(
   result: GeoPackageLoadResult,
   currentSelectedEntityId: string | null,
 ): ApplyGeoPackageResultState {
   const loaded = result.layers
+  const defaultEchelonLayers = getDefaultEchelonLayers()
   const echelonById = new Map(loaded.filter((l) => l.kind === "echelon").map((l) => [l.id, l]))
-  const echelonLayers: Layer[] = getDefaultEchelonLayers().map((d) => {
+  const echelonLayers: Layer[] = defaultEchelonLayers.map((d) => {
     const fromFile = echelonById.get(d.id)
     return fromFile ? { ...d, visible: fromFile.visible } : d
   })
-  const customLayers: Layer[] = loaded
-    .filter((l) => l.kind === "custom")
-    .map((l) => ({ id: l.id, name: l.name, visible: l.visible, kind: "custom" as const }))
   const osmLayers: Layer[] = loaded
     .filter((l) => l.kind === "osm" && l.osmData != null)
     .map((l) => ({
@@ -35,6 +46,24 @@ export function applyGeoPackageResult(
       osmData: l.osmData,
       sourceQuery: l.sourceQuery,
     }))
+  // Every id this function places elsewhere. What is left over is rehabilitated below rather than
+  // dropped, so this set is what keeps rehabilitation from duplicating a layer.
+  const placedIds = new Set<string>([
+    ...defaultEchelonLayers.map((d) => d.id),
+    ...osmLayers.map((l) => l.id),
+    INDUSTRY_LAYER_ID,
+  ])
+  // Declared `custom` layers and rehabilitated ones in a single pass, so the file's own order
+  // survives among them. The four branches this replaces each dropped a layer: an unrecognised or
+  // NULL `kind`, an `osm` layer whose payload is gone, an `organisation` layer that is not
+  // Industry, and an `echelon` layer whose id is not one of the vocabulary values.
+  const customLayers: Layer[] = []
+  const takenIds = new Set<string>(placedIds)
+  for (const l of loaded) {
+    if (takenIds.has(l.id)) continue
+    takenIds.add(l.id)
+    customLayers.push({ id: l.id, name: l.name, visible: l.visible, kind: "custom" })
+  }
   const industryFromFile = loaded.find((l) => l.id === INDUSTRY_LAYER_ID && l.kind === "organisation")
   const industryLayer: Layer = industryFromFile
     ? { id: INDUSTRY_LAYER_ID, name: industryFromFile.name, visible: industryFromFile.visible, kind: "organisation" }

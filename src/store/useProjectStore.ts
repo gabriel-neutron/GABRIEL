@@ -171,6 +171,11 @@ export const useProjectStore = create<ProjectState & ProjectActions>()(
       renameLayer(layerId, name) {
         const trimmed = name.trim()
         if (!trimmed) return
+        // ADR 0012: the vocabulary is authoritative for echelon layers, so a rename here would
+        // persist in memory, survive one save and revert on the next load. Unlike removeLayer,
+        // `organisation` is deliberately not guarded — Industry's name does round-trip.
+        const layer = get().layers.find((l) => l.id === layerId)
+        if (layer?.kind === "echelon") return
         set(
           (s) => ({ layers: s.layers.map((l) => (l.id === layerId ? { ...l, name: trimmed } : l)) }),
           false,
