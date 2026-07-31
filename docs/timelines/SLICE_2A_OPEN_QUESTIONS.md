@@ -22,10 +22,23 @@ the most conservative available), and what a different owner ruling would cost t
 > build its compile-error mechanism on the eight required options. All four `[HUMAN]` criteria are now
 > closed.
 >
-> **Still open, all of it Slice 2B work:** [[Q2A-6]] (apply the Q32 doctrine to
-> `ProjectSaveInput.ratingEvents`), the deferrals in [[Q2A-7]], the message-prefix debt in
-> [[Q2A-13]], and **[[Q2A-14]]** — the renamed-echelon-layer data loss, which is the most
-> consequential thing on this page and was found only because [[Q2A-12]]'s test was written.
+> **CLOSED, 2026-07-31 — everything on this page is now ruled.** The rulings are not repeated here;
+> they live where the builder reads them, in `SLICE_RUN_LOG.md`, *"Owner ruling session —
+> 2026-07-31, before Slice 2B"*, and in **ADR [0012](../adr/0012-layer-identity-is-the-id.md)**.
+> In short: [[Q2A-14]] splits in two and the ruling on each is in ADR 0012 — the echelon layer's
+> name is **not** analyst data (the built-in vocabulary is authoritative), while the two
+> neighbouring branches are **rehabilitated as `custom`, not dropped**. [[Q2A-6]] and the
+> `ViewPage` breach in [[Q2A-7]] become prerequisite commits **P3** and **P1**, before any
+> migration code. [[Q2A-15]]'s `tx.oncomplete` fix is deferred to its own commit **after** 2B.
+> [[Q2A-13]]'s message-prefix debt is **confirmed** as accepted debt.
+>
+> **Two statements on this page are wrong and the run log carries the corrections.** [[Q2A-14]]'s
+> claim that a dropped layer leaves its entities behind is false — `selectPersistableSnapshot`
+> filters entities by membership in `state.layers` (`useProjectStore.ts:123,125`), so the layer's
+> entities, geometries and claims are deleted with it. And its claim that the selector's three
+> lossy branches are "exercised by nothing" is false at the unit level:
+> `useProjectStore.test.ts:39`, `:72` and `:97` cover all three. The no-op is on the **real
+> fixture** only.
 
 ---
 

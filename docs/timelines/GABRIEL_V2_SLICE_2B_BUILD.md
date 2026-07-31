@@ -16,11 +16,31 @@ than inventing (`SLICE_BUILD_LOOP.md`, Prohibition 7).
 **Stop-ship.** `npm run verify` (`scan:nul` → `lint` → `test:coverage` → `build`) must pass
 before this slice is claimed done.
 
-**Prerequisite.** Slice 2A must be committed first. This spec assumes `SaveGeoPackageOptions`
-exists as a named, exported, single-declaration-site type with all eight members required, that
-`projectStateFromLoadResult` exists and is used by all three former literal sites, and that
-`performProjectSave` carries the `snapshotIsAuthoritative` guard. **Do not begin 2B on a tree
-where 2A is uncommitted.**
+**Prerequisite.** Slice 2A must be committed first — it is, at **`65ddc11`**, which is `BASE` for
+2B. This spec assumes `SaveGeoPackageOptions` exists as a named, exported, single-declaration-site
+type with all eight members required, that `projectStateFromLoadResult` exists and is used by all
+three former literal sites, and that `performProjectSave` carries the `snapshotIsAuthoritative`
+guard. **Do not begin 2B on a tree where 2A is uncommitted.**
+
+**Four prerequisite commits, ruled 2026-07-31, all before any migration code.** None of them may
+land inside the migration commit: a commit that first writes to `public/project.gpkg` has to stay
+reviewable. Full reasoning in `SLICE_RUN_LOG.md`, *"Owner ruling session — 2026-07-31, before
+Slice 2B"*.
+
+- **P1** — move `projectStateFromLoadResult` into `core/persistence/geopackage/applyResult.ts`
+  (Q34's scheduled move, Q2A-7). Deletes the `ViewPage.tsx:6` page-boundary breach and frees
+  ~10 lines in a file at 296/300 that this slice must grow.
+- **P1b** — extract `useProjectIO`'s three handler bodies into React-free async functions taking
+  `authority: { current: boolean }` beside their deps. The 300-line cap forces the split anyway,
+  and the split line is exactly the six untested `snapshotIsAuthoritativeRef` assignments. **No
+  jsdom and no `@testing-library/react`** — that was ruled against.
+- **P2** — ADR [0012](../adr/0012-layer-identity-is-the-id.md), layer identity and the residual
+  bucket. Must be **green before** the first write to `public/project.gpkg`.
+- **P3** — `ProjectSaveInput`: rename `sourceCache` to `researchSources` and make `ratingEvents`
+  required (Q2A-6). One commit for both, because this slice adds two further required fields to
+  the same type and four required-ness changes in one commit make a compile break unattributable.
+  **This changes §4.7's call-site work**: `researchSources` is then the name on both sides and
+  `performProjectSave:122`'s translation disappears.
 
 **This is the first slice that ever writes to `public/project.gpkg`.** 1,010 units,
 17 organisations, 4,984,832 bytes, and one backup: git history at **`5b0d2ed`**, pushed to
@@ -92,6 +112,11 @@ on `setProject`; threading both through `selectPersistableSnapshot`, `saveGeoPac
 (explicitly forbidden — `GABRIEL_V2_SLICE_0_1_BUILD.md:617-618`). `Claim.relationshipId` (Slice
 6). The Phase 0 ORBAT Source (Slice 6). `core/relationship/hierarchyIndex.ts` and `Orbat.parentOf`
 (Slice 3 — see Trap T14). The export gate (Stage 1.5). Any new entity `kind`. Any `acts_for` edge.
+**Anything in ADR 0012** — the echelon-name rule, the `renameLayer` guard and the residual-`custom`
+rehabilitation all land in prerequisite commit P2, not here. In particular, an unrecognised layer
+kind mints **no** `integrity_events` row: P2 removes the loss rather than recording it, and adding
+an `integrityEvents` member to `ApplyGeoPackageResultState` for layer concerns is the seam change
+this sequencing exists to keep out of the migration commit.
 
 **Rulings this spec is built on**, all in `docs/timelines/SLICE_0_1_OPEN_QUESTIONS.md`:
 Q32 (all save options required), Q33 (the save guard reads a session flag), Q34
@@ -374,10 +399,38 @@ computed at `:127` for exactly this class of bug on `claim.entityId`. An edge po
 OSM-layer entity that the filter removed would otherwise be written to disk with a dangling
 endpoint and make the file unopenable on the next load.
 
-**Compile-forced call sites, all 22:** production `useProjectIO.ts:114`, `useProjectIO.ts:194`,
-`ViewPage.tsx:46`; 6 stories (`LayersPanel`, `TreeView`, `SymbolsLayer`, `HierarchyPanel`,
-`EntityInspector`, `OsmQueryMenu`); 13 in `useProjectStore.test.ts`. Also `makeState()` at
-`useProjectStore.test.ts:7-17`, or the six `selectPersistableSnapshot` tests fail to compile.
+**Compile-forced `setProject` call sites — 18, not the 22 this section claimed until 2026-07-31.**
+Re-measured at `65ddc11` by listing every occurrence verbatim rather than counting matches. The
+old figure was wrong in three independent ways and the composition mattered more than the total.
+
+| where | count | sites |
+|---|---|---|
+| production | 3 | `restoreSession` and `handleOpen` in `useProjectIO.ts`; the `loadDemoProject` effect in `ViewPage.tsx` |
+| **the gate test** | **1** | `store-path.integration.test.ts` — **missing from the old list entirely** |
+| stories | **5** | `LayersPanel`, `TreeView`, `SymbolsLayer`, `HierarchyPanel`, `EntityInspector` |
+| `useProjectStore.test.ts` | **9** | — |
+
+The three errors, recorded because each is a distinct failure mode a criteria-writer repeats:
+
+1. **`OsmQueryMenu.stories.tsx` calls `resetProject()`, not `setProject`.** It is not compile-forced
+   by a `setProject` signature change. Six stories became five.
+2. **Four of the "13" in `useProjectStore.test.ts` are `resetProject()` too.** Thirteen became nine.
+   Both errors come from counting `grep -c "setProject("`, which matches `resetProject(` as a
+   substring. **A criterion that counts occurrences of a name must exclude the names that contain
+   it** — this is the negative-grep lesson (§8b, lesson 1) wearing a different hat.
+3. **`store-path.integration.test.ts` did not exist when this section was written.** It was created
+   by Slice 2A's fix pass on 2026-07-30, one day after this spec froze, and it is *the* test that
+   exercises the real store path — the one §8 calls the load-bearing gate. A planner working from
+   the old enumeration would have omitted the single most important call site in the slice.
+
+**Line numbers are deliberately absent from the table above.** The old figures (`useProjectIO.ts:114`,
+`:194`) were pre-2A; the same two calls sit at `:155` and `:248` at `BASE`, and prerequisite commits
+P1 and P1b move them again. Cite the enclosing function, as §11 already requires for
+`GABRIEL_V2_SLICE_0_1_BUILD.md`, and re-measure before freezing a criterion on a count.
+
+`selectPersistableSnapshot` has **8** call sites, re-measured and unchanged in shape: `handleSave`
+in `useProjectIO.ts`, one in `store-path.integration.test.ts`, and **6** in `useProjectStore.test.ts`.
+`makeState()` at `useProjectStore.test.ts:7-17` must gain the new fields or those six fail to compile.
 
 ### 4.8 `src/core/identity/merge.ts` (Q41)
 
@@ -660,6 +713,51 @@ destroys data. 60000 ms timeout, real `public/project.gpkg`, read-only, no mocki
 (`computeAllEntityPositions`) before and after the round trip. The parent map can be perfect while
 741 units move or vanish; a count of edges stays green throughout. This is the only test that
 catches the failure mode that actually matters.
+
+---
+
+## 8b. Writing 2B's criteria — five lessons, each of which already cost a criterion
+
+**Read this before freezing `SLICE_2B_CRITERIA.md`.** These were scattered across Q2A-9, Q2A-12,
+Q2A-15 and the 2A fix pass, where a Phase 1 planner would never find them. They are collected here
+on 2026-07-31 because the planner reads this spec and does not read the 2A question file.
+
+1. **A negative grep must exclude the strings the positive criteria force you to write.** Slices 0,
+   1 and 2A each lost a criterion to this exact shape. 2A's criterion 23 asserted that
+   `useProjectIO.ts`'s added lines contain no `setProject`, while criterion 32 *required* rewriting
+   the two lines that contain it. The only formatting satisfying both defeated the excess-property
+   check that criterion 32 existed to create. Diff-scoping is not enough — 23 was already
+   diff-scoped. Write the exclusion.
+
+2. **A criterion that pins *sites* must also pin the *order within each site*.** This single
+   omission generated Q2A-8, Q2A-11 and Q2A-15, two of them with a data-loss direction. Criterion
+   24b named exactly which three sites assign `snapshotIsAuthoritative` and never said *when* within
+   each — so a faithful implementation set the flag before the work that made it true, and a second
+   faithful implementation never lowered it at all. If a criterion names a statement's location,
+   it must name what precedes and what follows it.
+
+3. **Counts do not prove a path was taken.** `save.options.roundtrip.test.ts` stayed green with
+   `baseBuffer` deleted outright, because the snapshot supplied every row it counted. It went red
+   only once an assertion looked for the legacy `organisations` table, which exists in the output
+   **only** if the reopen path ran. For every criterion phrased as a count, name the artefact that
+   exists only if the intended path executed, and assert that instead or as well.
+
+4. **The criteria are a proxy for the spec, so map every clause or disown it by name.** 2A's
+   criteria §8 claimed to cover every in-scope spec clause while giving the entire tests-required
+   list a single row. The store-path test was neither mapped nor declared out of scope; criterion 15
+   silently stood in for it and proved strictly less, and five reviewers graded the proxy. For 2B:
+   walk §7, §8, §9 and §10 clause by clause, and for each either cite the criterion number or write
+   the words "out of scope" beside it.
+
+5. **A criterion that counts occurrences of a name must exclude the names that contain it.** Added
+   2026-07-31, having just cost this document two of the three errors corrected in §4.7:
+   `grep -c "setProject("` matches `resetProject(`, which inflated one figure from 5 to 6 and
+   another from 9 to 13. List the occurrences verbatim and read them; do not report the count.
+
+**And one that is not a lesson but a standing hazard:** this spec was frozen on 2026-07-29 and the
+tree moved under it on 2026-07-30. Any enumeration, count or line number in it is a measurement with
+a date on it. Re-measure before freezing a criterion on one — §4.7 is the worked example of what
+happens otherwise.
 
 ---
 

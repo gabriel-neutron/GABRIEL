@@ -3,10 +3,27 @@
 **Invoke with:** `Follow docs/SLICE_BUILD_LOOP.md. Target: Slice 2A.`
 (Or any slice that has a frozen criteria file or a build spec.)
 
-> **Current target: Slice 2A, then Slice 2B.** 2A is four mechanical refactors against
-> `docs/timelines/SLICE_2A_CRITERIA.md`, which is **already frozen** — so **skip Phase 1** for it
-> and go straight to Phase 2. 2B is a migration and needs its own Phase 1 criteria file, frozen
-> from `docs/timelines/GABRIEL_V2_SLICE_2B_BUILD.md`. **Do not start 2B until 2A is committed.**
+> **Current target, updated 2026-07-31: the four prerequisite commits, then Slice 2B.**
+> **Slice 2A is committed at `65ddc11`**, which is `BASE` for everything below.
+>
+> **P1, P1b, P2, P3 come first** and are specified in the *Prerequisite* block of
+> `docs/timelines/GABRIEL_V2_SLICE_2B_BUILD.md`, with the reasoning in `SLICE_RUN_LOG.md`,
+> *"Owner ruling session — 2026-07-31, before Slice 2B"*. They are small, sequential, and each
+> gets its own commit; **none of them may land inside the migration commit.** P2 implements
+> ADR [0012](adr/0012-layer-identity-is-the-id.md) and must be green **before** anything writes to
+> `public/project.gpkg`. They have no frozen criteria file and do not need one — run them through
+> Phases 2-6 with the ADR and the Prerequisite block as the contract, skipping Phase 1.
+>
+> **Then Slice 2B**, which is a migration and does need its own Phase 1 criteria file, frozen from
+> `docs/timelines/GABRIEL_V2_SLICE_2B_BUILD.md`. **Read that spec's §8b before writing a single
+> criterion** — five lessons, each of which already cost a criterion, and one standing hazard: the
+> spec was frozen on 2026-07-29 and the tree moved under it on 2026-07-30, so every enumeration and
+> line number in it is a measurement with a date on it. §4.7 is the worked example of what happens
+> when one is trusted rather than re-measured.
+>
+> **Do not run §10, the rehearsal.** It writes to `public/project.gpkg` and it is the owner's, not
+> an agent's. Stop when 2B is committed and the file is still
+> md5 `7d0b0e592a1128a0d83e7575110bf2dc`.
 
 This file is the prompt. Read it fully before acting. It defines a six-phase loop with a
 hard iteration cap and a set of prohibitions that exist because each one describes a real
