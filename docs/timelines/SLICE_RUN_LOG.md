@@ -901,3 +901,248 @@ drop and `"Untitled"` rename are exercised by nothing — are recorded there too
 `clearProject()` resolves on `request.onsuccess` rather than `tx.oncomplete`, so a commit-time abort
 rolls back after the promise resolved; and `restoreSession` can race a user action.
 
+---
+
+## Owner ruling session — 2026-07-31, before Slice 2B
+
+`BASE` for 2B is **`65ddc11`**. Working tree clean, `npm run verify` green at 67 files / 512 tests /
+0 skipped, `public/project.gpkg` md5 `7d0b0e592a1128a0d83e7575110bf2dc`. A panel of three (dev /
+OSINT analyst / end user) answered the design questions; the owner ruled six. **No source file was
+touched in this session** — the rulings land in ADR 0012, in this log, and in 2B's prerequisite list.
+
+### Three measured claims that are wrong, all verified against the code and all corrected in place
+
+- **`SLICE_2A_OPEN_QUESTIONS.md` Q2A-14 says a dropped layer leaves its entities behind.** It does
+  not, and the truth is worse. `selectPersistableSnapshot` builds `nonOsmLayerIds` from
+  `state.layers` (`useProjectStore.ts:123`) and filters entities by **membership** in that set
+  (`:125`), not by an OSM test. A layer `applyGeoPackageResult` dropped is absent from
+  `state.layers`, so its entities are filtered out, and with them their geometries (`:131`) and
+  their claims (`:135`). An unknown-`kind` layer therefore deleted **layer, entities, geometry and
+  provenance** at the next save. This is what ADR 0012 rule 2 closes, and it is the reason that
+  rule outranks the layer-name question it was raised beside.
+- **Q2A-14 says `selectPersistableSnapshot`'s three lossy branches are "exercised by nothing".**
+  They have unit tests: `useProjectStore.test.ts:39` (OSM entity + geometry filter), `:72` (the
+  `"Untitled"` rename), `:97` (the orphaned-claim drop), all on `makeState()` at `:7-17`. What is
+  true is the **no-op on the real fixture**. Unit coverage exists; real-file coverage does not.
+  2B's new branch (dropping an edge whose endpoint the OSM filter removed) is a seventh case in
+  that same `describe`, on the same `makeState()` — four lines of test, no new fixture, and **no
+  synthetic `.gpkg` is to be committed** (§10 already refuses one as evidence).
+- **The 2B spec's own §4.7 says "all 22" compile-forced `setProject` call sites. There are 18**,
+  and the composition is wrong in three independent ways: `OsmQueryMenu.stories.tsx` calls
+  `resetProject()` and is not compile-forced at all (6 stories → 5); four of the "13" in
+  `useProjectStore.test.ts` are `resetProject()` too (13 → 9); and
+  **`store-path.integration.test.ts` is missing from the list entirely** — it was created by 2A's
+  fix pass on 2026-07-30, one day after the spec froze, and it is the load-bearing gate §8 names.
+  Two of the three come from `grep -c "setProject("` matching `resetProject(` as a substring. §4.7
+  now carries the corrected table, without line numbers, plus the three errors written out; the
+  spec's cited `useProjectIO.ts:114` and `:194` were pre-2A and are `:155` and `:248` at `BASE`.
+  **A planner working from the old enumeration would have omitted the single most important call
+  site in the slice.**
+
+### The four method lessons are now in one place the planner reads
+
+They were spread across Q2A-9, Q2A-12, Q2A-15 and the 2A fix pass — none of which a Phase 1
+planning agent opens. They are collected as **§8b of the 2B spec**, with a fifth added from the
+§4.7 correction above (a criterion counting occurrences of a name must exclude the names that
+contain it), and a standing hazard: the 2B spec was frozen on 2026-07-29 and the tree moved under
+it on 2026-07-30, so every enumeration and line number in it is a measurement with a date on it.
+`SLICE_BUILD_LOOP.md`'s target banner was retargeted at the same time — 2A is committed, P1/P1b/P2/P3
+run through Phases 2-6 with no criteria file, 2B gets its own Phase 1, and **§10's rehearsal is
+explicitly off-limits to the loop**: it writes to `public/project.gpkg` and it is the owner's.
+
+### The rulings
+
+| # | question | ruling |
+|---|---|---|
+| 1 | Push `65ddc11` before 2B? | **Stay on the current branch. Nothing pushed.** See the open item below — the net does not cover 2A. |
+| 2a | Is a renamed echelon layer analyst data? | **No — the built-in vocabulary is authoritative.** ADR 0012 rule 1. |
+| 2b | Layers of unknown `kind`, and `osm` layers with a null payload? | **Rehabilitate**, do not drop and do not record. ADR 0012 rule 2, one rule for both branches. |
+| 3 | Sequencing and the `sourceCache` / `researchSources` split | Delegated to the agent. Taken: **P1 → P2 → P3 → 2B**, unifying on **`researchSources`** (the persistence-side name; `ProjectSaveInput` is `SaveGeoPackageOptions`' pre-image and `performProjectSave:122` is the only translation site). |
+| 4 | Q2A-15, `projectStorage.service` on `tx.oncomplete` | **Deferred to after 2B**, its own commit. `restoreSession`'s race stays recorded and untreated. |
+| 5 | jsdom + `@testing-library/react` for the flag wiring? | **No — extract instead.** |
+| 6 | Q2A-13, the `projectStorage:` prefix on the refusal banner | **Confirmed as accepted debt.** The prose wins. |
+
+### Three prerequisite commits, before any migration code
+
+Nothing on this list belongs inside the migration commit; a migration commit has to stay reviewable.
+
+- **P1 — move `projectStateFromLoadResult` into `core/persistence/geopackage/applyResult.ts`**
+  (Q2A-7, scheduled by Q34). First, and pure. It deletes the live `CONSTRAINTS.md` breach at
+  `ViewPage.tsx:6` (importing from a hook the doc calls "EditPage's private I/O seam"), takes 2B's
+  load-bearing gate `store-path.integration.test.ts:5` off a React module, and frees ~10 lines in a
+  file at **296/300** that 2B must grow. Drop the `export` on `ProjectStateFromLoadResult` only if
+  nothing consumes it after the move.
+- **P1b — extract the three `useProjectIO` handler bodies into React-free async functions**, taking
+  `authority: { current: boolean }` beside their deps, exactly as `performProjectSave` already takes
+  `deps` (ruling 5). The genuinely uncovered surface is **only** the six assignments to
+  `snapshotIsAuthoritativeRef` (`:160, :191, :205, :247, :255, :284`) and its single read (`:279`);
+  everything else in the file is covered by `save-ordering.test.ts` and `load-state.test.ts`. Those
+  six lines are untested because they are welded to a `useRef` and three `useCallback`s, not because
+  they are rendering logic — every comment on them describes an ordering constraint. **The split is
+  forced anyway**: 2B adds ~12 lines to a file at 296/300, and the natural split line is precisely
+  the untested part. jsdom was refused on an independent ground — it means a second vitest
+  environment under the one suite that runs real GeoPackage WASM in Node, bought for seven lines
+  that can be made pure.
+- **P2 — ADR 0012.** Green *before* the first-ever write to `public/project.gpkg`, not alongside it.
+  Lands on `applyResult.ts` in its post-P1 home.
+- **P3 — `ProjectSaveInput`: rename `sourceCache` to `researchSources` and make `ratingEvents`
+  required** (Q2A-6). One commit, both changes. `writeRatingEvents` self-clears before inserting, so
+  the current optional field is a live table-wipe, not tidying. Both in one commit because 2B is
+  about to add two more required fields to the same type, and four required-ness changes in one
+  commit make a compile break unattributable.
+
+**ADR numbering.** 0012 is used, not 0011: the 2B spec pins `docs/adr/0011-relationships-are-the-hierarchy.md`
+by filename, and ADR 0012 lands first in time. The numbers are a sequence, not a chronology.
+
+### Still open, and deliberately not ruled
+
+- **The push.** `origin/telegram-osint-sidecar` is at `c8483b5`, **four commits behind `65ddc11`**.
+  `5b0d2ed` *is* pushed and `public/project.gpkg` is byte-identical between `5b0d2ed` and `HEAD`, so
+  the **file's** revert point genuinely exists off this machine and ADR 0010's requirement is met for
+  the data. What does not exist off this machine is 2A's save guard, the NUL scanner and 2B's own
+  spec. The ruling was "stay on the current branch", which settles the branch and not the push.
+  **Ask again before the rehearsal**, and note that §10 pre-flight step 4's out-of-repo dated copy is
+  a separate net that is also not yet made.
+- **"Copy it out first."** The refusal banner (`useProjectIO.ts:112-115`) instructs the analyst to
+  copy their work out before reloading. **No such mechanism exists** — no export, no save-as. The
+  instruction names a button that is not there, which is worse than saying nothing. The prefix debt
+  was confirmed (ruling 6); this is a different defect in the same string and is **not** ruled. The
+  real fix is to offer "save to a new file" from the refusal itself — writing to a fresh filename
+  cannot harm the persisted project, since the danger the guard exists for is the *overwrite* — but
+  that is a feature, and it is not 2B's.
+- **Integrity events have no UI, deliberately, and 2B is the last slice where that is safe.** 2B's
+  realistic output is one `hierarchy-migrated` row, and §10 step 25 has a human read it by hand. But
+  2B also ports `mergeEntities`, so `merge-dropped-edge` and `cross-kind-parent` can fire from
+  ordinary analyst work from that point on. A durable ledger nobody is told about is a developer
+  artefact. The end-user panel asked for one persistent, never-auto-clearing count in the left rail
+  beside Layers — the opposite of the four-second banner, since it cannot be dismissed without
+  writing `acknowledgedBy`. **Name the slice that ships it**, rather than "when the export path
+  exists".
+- **Two additions to §10 the rehearsal does not have.** (a) Step 23 proves the *file* and not the
+  *app*: 2B rewires setting a parent (`useEntityInspector`), creating an entity under a parent
+  (`MainLayout`) and merging. Add a ten-minute manual workout on the migrated file — reparent, clear
+  a parent and confirm `positionMode` goes to `"none"`, create under a parent, merge two entities,
+  save, reload. No code. (b) **Open the out-of-repo backup once before step 9.** A backup never
+  opened is a file with a familiar name, and step 17's picker defaults `suggestedName` to
+  `"project.gpkg"` — one tired Enter overwrites the original.
+
+---
+
+## Run 2026-07-31 — the four prerequisite commits P1, P1b, P2, P3
+
+`BASE` **`65ddc11`**, working tree clean of source changes, `npm run verify` green at the start
+(67 files / 512 tests / 0 skipped), `public/project.gpkg` md5 `7d0b0e592a1128a0d83e7575110bf2dc`.
+**All four landed, one iteration each, no red build and no loop-back.** The `.gpkg` is byte-identical
+at the end — nothing in this run writes to it.
+
+| # | commit | what | verify after |
+|---|---|---|---|
+| P1 | **`cea5a2f`** | `projectStateFromLoadResult` + its type move to `applyResult.ts`, re-exported from the barrel | 67 / 512 / 0 |
+| P1b | **`5fafa74`** | the four handler bodies become React-free functions taking `authority` | 69 / 529 / 0 |
+| P2 | **`ef2d633`** | ADR 0012 — `renameLayer` echelon guard + residual-`custom` rehabilitation. **ADR committed with it** | 72 / 548 / 0 |
+| P3 | **`f9f1046`** | `ProjectSaveInput`: `researchSources` rename, `ratingEvents` required | 72 / 548 / 0 |
+
+Phase 1 was skipped by owner instruction: these four have no frozen criteria file and do not need
+one. Their contract was 2B's *Prerequisite* block, ADR 0012, and the 2026-07-31 ruling session above.
+
+### What the run measured that the documents had wrong
+
+Per §8b's standing hazard, every enumeration was re-measured. Three were off:
+
+- **P1's importer set is four files, not three.** The three pre-existing consumers plus
+  `useProjectIO.ts` itself, which flips from declarer to importer. No file was missed, but a
+  criterion written on "three" would have graded an incomplete set.
+- **P1 freed 23 lines, not the "~10" the ruling estimated** — `useProjectIO.ts` 296 → 273.
+  Both figures are `@(Get-Content).Count`; **`Measure-Object -Line` undercounts because it skips
+  blank lines**, and using it produced a wrong count once during this run before being caught.
+  Add it to §8b's method lessons.
+- **P2's four drop branches are not the four the ADR enumerates.** The ADR names an unrecognised or
+  NULL `kind`, an `osm` layer with no payload, and an `organisation` layer that is not Industry,
+  then calls the third "the fourth branch". The code's fourth is an **`echelon` layer whose id is
+  not one of the 14 vocabulary values** — never emitted by the old `map` over the defaults, and not
+  named anywhere in the ADR. The implementation is a superset covered by rule 2's general clause, so
+  no requirement is unmet, but **the ADR should be reconciled before its count is cited as of record.**
+
+### Two things the run changed beyond the literal instruction, both recorded
+
+- **P1b produced two files, not "the extracted file" (singular).** `performProjectSave` and
+  `ProjectSaveInput` went to their own `src/hooks/projectSave.ts`. Without it `projectIO.ts` sat at
+  **297/300** and P1b would have *moved* the headroom rather than created it — the review caught
+  this and it defeats the split's stated motivation, since P3 and 2B both grow precisely the save
+  path. `projectSave.ts` is now 81/300 against 27 lines of headroom before. **Bless or reverse this
+  explicitly**; it is a scope judgement made inside a prerequisite commit.
+- **The 17 authority tests are split across two files plus a `.fixtures.ts`.** A single file reached
+  531 lines against the flat 300-line cap at `CONSTRAINTS.md:113`. Split by concern — no chosen file
+  (restore, New) vs chosen file (Open, Save) — following the existing `schema.fixtures.ts` precedent.
+
+### Open questions — recorded rather than guessed
+
+**P1.** `ProjectStateFromLoadResult` is exported and re-exported but **imported by nothing**. The
+ruling above says drop the export "only if nothing consumes it after the move"; the run instruction
+said to re-export it. Took the instruction. — `useProjectIO.load-state.test.ts` now tests a function
+in `core/` from `src/hooks/`, and imports nothing from `useProjectIO`; left in place deliberately
+because the ruling cites it by name as P1b's coverage evidence.
+
+**P1b.** `useProjectIO.ts` is now at **0% coverage**: the shell's dep wiring is pinned by the type
+checker alone, which is the accepted cost of ruling 5 refusing jsdom. — `projectIO.ts:191`
+(`authority.current = false` on Open) is observable only if a store write throws, which no test
+forces. — No test covers a failing `deps.saveProject` on the **Save** path; if the disk write lands
+and the cache write then throws, the next Save is refused against a cache holding the older project.
+Pre-existing, unchanged. — **Do not cite the v8 coverage table for `projectIO.ts`**: it reports lines
+130-140 uncovered while reporting hits on `:144`/`:146`/`:149` in the same straight-line block, which
+is impossible; a test that can only pass if `:130` ran does pass. — Two filenames are now misleading:
+`useProjectIO.save-ordering.test.ts` tests `projectSave.ts` exclusively. — **The 2B spec's §3 file
+table is stale**: it names `useProjectIO.ts` as gaining options, `ProjectSaveInput` and the three
+call paths; after P1b `useProjectIO.ts` gains none of them. Fix before 2B's Phase 1 freezes criteria
+on those names. — The five-line load-apply block is now duplicated in `performSessionRestore`,
+`performOpenProject` and `ViewPage.tsx`; an `applyLoadResultToStores` would finish what P1 started,
+but it touches `ViewPage` and was left alone as out of scope.
+
+**P2.** **Id collisions are now a silent *name* drop.** A file carrying `{id:"Division",
+kind:"custom"}`, or `INDUSTRY_LAYER_ID` under a non-`organisation` kind, is excluded by `placedIds`
+and reappears under the *vocabulary* name; the file's name is lost. No data loss — the id is in
+`state.layers`, so entities, geometries and claims survive — and it is strictly better than the old
+code, which emitted **duplicate ids** in that case. But it is the one way "no layer a project file
+carries is dropped" is not literally true, and **no test covers it.** — Duplicate `osm` ids are still
+not deduped, unlike the custom pass. Pre-existing. — `useProjectStore.ts` went **343 → 348**, still
+over the cap; Prohibition 5 forbids fixing it here, so it needs a scheduled split. — The store now
+permits renaming an `organisation` layer where `LayersPanel.tsx:127` does not. Deliberate per the
+ADR, and pinned by a test in both directions so a future reader cannot silently "fix" the asymmetry.
+
+**P3.** `SaveGeoPackageOptions.ratingEvents` is still `GpkgRatingEvent[] | undefined`, so the
+table-wipe remains reachable by any direct `saveGeoPackage` caller. Today there is exactly one, and
+it is intentional (New Project). The compile-time guarantee P3 buys **does not extend past
+`ProjectSaveInput`.** — The store→input rename at `projectIO.ts:219` has no runtime test; only the
+type checker pins the correspondence. Acceptable: a wrong rename there is a compile error, not a
+silent bug. — `SLICE_2A_CRITERIA.md`'s entries describing the assertion
+`expect(options.researchSources).toBe(input.sourceCache)` are now counterfactual. Another instance of
+the standing "every enumeration is a measurement with a date on it" hazard, in a frozen file.
+
+### `[HUMAN]` — awaiting the morning reader
+
+1. **ADR 0012's branch count vs the code's** (above). Prose fix, no behaviour.
+2. **Whether `projectSave.ts` should exist** as a separate file, or `performProjectSave` should go
+   back into `projectIO.ts` and the 300-line cap be handled another way in 2B.
+3. **Whether the `custom`-layer-with-an-echelon-id name drop is acceptable**, or wants a rule.
+4. **ADR 0012's prose** generally — it was written in the ruling session and committed unread by any
+   reviewer other than its author.
+
+### Process notes
+
+Phases 0, 2, 3, 4, 5 and 6 ran for each commit, in order. Test authoring, the verify verdict and the
+final grading each went to a **separate agent** that had not written the code under review; the
+Phase 5 `/code-review` ran both axes in parallel against `BASE`. The coding was done by the
+orchestrator rather than a fourth agent — a compression of Phase 2, disclosed here because the loop
+specifies an agent per task. The separations the loop actually names as safeguards — author does not
+grade, runner may not edit, verifier wrote none of it — were all kept.
+
+The Phase 5 review is what caught the 297/300 problem, a missing order-pin on `performNewProject`'s
+raise (a raise moved below the disk write would have passed every test while leaving the flag `false`
+after an aborted picker), and both stale comments. **None of the four commits was found defective by
+its own author.**
+
+Environment: the libuv `new_time >= loop->time` abort hit repeatedly, as documented. Every `verify`
+in this run used the `start /affinity 1 /wait /min` workaround and every reported exit code came from
+`$LASTEXITCODE`, never through a pipe. `npm run scan:nul` — the real scanner, never the vacuous `rg`
+form — was clean at every commit, 308 files rising to 316.
+
