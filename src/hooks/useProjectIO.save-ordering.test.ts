@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest"
 import type { SaveGeoPackageOptions } from "@/core/persistence/geopackage"
-import { performProjectSave, type ProjectSaveDeps, type ProjectSaveInput } from "./useProjectIO"
+import { performProjectSave, type ProjectSaveDeps, type ProjectSaveInput } from "./projectSave"
 
 /**
  * Every forwarded field carries a non-empty, distinguishable value so that no identity
