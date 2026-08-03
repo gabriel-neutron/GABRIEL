@@ -14,6 +14,74 @@
 >    seven keys.** The assertion's intent — no *undeclared* field reaches `setProject` — is
 >    preserved; only the declared count moved, and criterion 48 requires exactly that growth.
 
+> **OWNER RULINGS, 2026-08-03, taken after the slice was committed at `8527d44`.** Seven more, on the
+> questions the run left for the owner and on how the frozen artefacts are to be corrected. Each
+> names what it settles and what it costs to undo.
+>
+> 1. **[[Q2B-7]] — the six unrecordable violation codes get a durable row.** **Ruled: add a fifth
+>    `IntegrityEventKind`**, so `unknown-type`, `date-order`, `invalid-date`,
+>    `missing-required-date`, `invalid-metadata` and `invalid-export-override` become
+>    `integrity_events` rows carrying their code, as §7 step 4 always said they would. Rejected:
+>    keeping `console.warn` (a log is not a record — the information does not survive the session, and
+>    the hole is in a *publishable* audit trail); making them fatal (one malformed `endDate` string
+>    would make a legitimate file permanently unopenable, which §7's own reasoning against throwing on
+>    a cross-kind edge rejects with more force); and deferring to Slice 3 (the branch goes live the
+>    first time a foreign tool or a hand edit writes such a file, and nothing schedules the fix).
+>    **This supersedes criterion 8's "four" and its locking test** — superseded, not failed. A
+>    parallel agent is implementing it. **Cost to undo:** the union member, `INTEGRITY_EVENT_KINDS`,
+>    criterion 8's deep-equal, and the event-building body reverts to the warning. **No data
+>    migration**, because no file has ever been saved with the old behaviour: the old behaviour
+>    writes nothing.
+> 2. **[[Q2B-24]] — an unreadable `integrity_events` row is rehabilitated, not dropped.** **Ruled:**
+>    a row that fails `decodeIntegrityEvent` is kept as a **neutral event carrying its raw payload
+>    verbatim**, rather than dropped from the returned array and named in a `console.warn`. This is
+>    ADR 0012's doctrine for an unrecognised layer kind — rehabilitate, never discard — applied one
+>    storey down, to a row; and it is what §4.1's own prose says ("decodes to a neutral event rather
+>    than throwing"), against which its declared signature was the wrong half. It removes the narrow
+>    data loss Q2B-24 records: today the dropped row is not re-written on the next save, i.e. it is
+>    gone from the file. Ruled together with Q2B-7, as Q2B-24 asked. **Cost to undo:** revert to
+>    dropping, and accept that a row a foreign tool wrote is destroyed by the first save Gabriel
+>    makes.
+> 3. **[[Q2B-22]] — the merge acyclicity guarantee is accepted as traded away.** **Ruled: recorded
+>    as debt, not repaired, and no cycle-detection code is added.** A contested child derives `null`,
+>    so the *rendered* hierarchy cannot loop, and `buildOrbat` traverses cycle-safely; the three-edge
+>    cycle remains possible in the edge set and undetected. The trade is Q40's — an ancestor merged
+>    into its descendant leaves the survivor contested rather than having a winner elected for it —
+>    and it is now written down, which is what Q2B-22 asked for. **Cost to undo:** restoring the old
+>    guarantee means electing a winner inside `mergeEntities`, so the undo is a **Q40 reversal**, not
+>    a test edit or a bug fix.
+> 4. **The criteria file gets dated annotations, not edits.** **Ruled:** `SLICE_2B_CRITERIA.md` keeps
+>    every one of its 83 criteria byte-for-byte (Prohibition 2) and gains a §0 recording the four
+>    vacuously-green commands, 55d's stale count, the four criterion defects with their causes,
+>    criterion 8's supersession, and the six files no criterion grades. The value of that file is
+>    that it records what was actually frozen; a corrected criterion would erase the evidence that
+>    the run graded 73 of 83. **Cost to undo:** re-pointing the four commands and editing 55d in
+>    place is five minutes' work — and the record of what the run measured goes with them.
+> 5. **The spec gets §11 entries and a widened §8b lesson 1, not a rewritten body.** **Ruled:**
+>    `GABRIEL_V2_SLICE_2B_BUILD.md` §11 exists precisely so measured defects are recorded rather than
+>    silently patched, so the six found in this run (§3's self-contradiction, §4.4's impossible pair,
+>    §4.4's wrong trap number, §7 step 6's stale lines, §10 step 17's stale citation, §4.1's
+>    disagreeing halves) go there with their dates and how they were measured; §8b lesson 1 is
+>    widened to cover the spec's declared signatures and the code's own documentation, and a sixth
+>    lesson records the `-t`-filter hazard. **Cost to undo:** patching the body instead is cheap to
+>    do and costs the next slice the evidence of how these defects were found.
+> 6. **[[criterion 82]] — `merge-dropped-edge`'s summary loses the raw identifier.** **Ruled:** the
+>    sentence names the edge in readable words instead of carrying the vocabulary token
+>    `subordinate_to`. A summary is publishable prose read by someone who has never seen the schema —
+>    "if it reads like a stack trace it is a log, not a record" (§10 step 25) — and `detail` still
+>    carries the type verbatim, so nothing machine-readable depends on the wording. The other three
+>    summaries pass criteria 81/82 as written and are not touched. **Cost to undo:** one string.
+> 7. **[[Q2B-21]], [[criterion 83]] — the file-cap debt gets its own commit before Slice 3.**
+>    **Ruled:** the splits are scheduled now, not carried further. `useEntityInspector.ts` is at
+>    **305 of its 305 ceiling with zero headroom**, so the next line added to it fails criterion 6;
+>    `useProjectStore.ts` is 394 and `useProjectStore.test.ts` 384. It is scheduled ahead of Slice 3
+>    rather than inside it because Q2B-21 records that the React-free extraction of
+>    `handleParentChange`'s body — the same shape P1b applied to `useProjectIO` — is also **the only
+>    way to make that body testable** without jsdom, which was ruled against; so the cap debt and
+>    criterion 62c's untested hook body are one repair, not two. **Cost to undo:** none in code;
+>    deferring it again spends Slice 3's first line in `useEntityInspector.ts` on a criterion
+>    failure.
+
 Every entry is a question an agent had to answer without a ruling. Each records the question, the
 answer taken (always the most conservative available), and what a different owner ruling would cost
 to undo. Prohibition 7: a recorded guess is cheap, an unrecorded one is the bug someone finds in
@@ -922,3 +990,40 @@ be ruled on together.
 
 **Status:** recorded, not blocking. Nothing in the real file exercises it: `public/project.gpkg` has
 no `integrity_events` table today (criterion 30's test asserts exactly that).
+
+---
+
+## Q2B-25 — the fifth `IntegrityEventKind` is named `invalid-entry`, not `relationship-violation`
+
+**Raised by:** the agent implementing the 2026-08-03 owner rulings (Q2B-7 and Q2B-24, ruled together
+as the cost-to-undo note under Q2B-24 predicted).
+
+**What the two rulings jointly require.** Ruling 1: the six violation codes with no kind of their own
+get a durable, acknowledgeable row — exactly **one** new member of the union, suggested name
+`relationship-violation`. Ruling 2: an `integrity_events` row that cannot be decoded is
+**rehabilitated**, not dropped (ADR 0012 rule 2, applied to this table), under **one of the five**
+kinds, with no sixth added.
+
+**The tension.** Those two conditions cannot share a kind named after relationships: a row this table
+carries need not be about a relationship at all — it can be a `hierarchy-migrated` row whose
+timestamp column was blanked by a foreign tool. Filing it under `relationship-violation` would make
+the `kind` column state something the row does not support, which is the one thing a durable integrity
+record may not do. The other four kinds are worse: each names a specific finding the row is not.
+
+**Taken: the fifth kind is `invalid-entry`** — "something this project carries could not be validated,
+and is kept exactly as it stands rather than discarded". It covers both producers honestly, and
+**which** condition produced a row is in `detail` (`{ code, relationshipId, detail }` for a violation;
+the entire raw row for a rehabilitated one), never inferred from the kind. Ids stay
+`integrity:<kind>:<discriminator>`: `integrity:invalid-entry:<code>:<relationshipId>` for a violation,
+so two violations on one edge are two rows, and `integrity:invalid-entry:unreadable-row-<position>`
+for a row that has no salvageable id of its own.
+
+**What is arguable.** The name is broader than either producer, so a reader must open `detail` to know
+which kind of invalidity a row records — where `relationship-violation` would have been self-evident
+for the six codes and dishonest for the seventh case. The alternative the owner may still prefer is
+two kinds (`relationship-violation` + something like `unreadable-row`), which is the sixth member both
+rulings forbid. **Cost to undo:** the name is one string in four files
+(`integrityEvent.ts`, `mintOnLoad.ts`, `integrityEvents.table.ts` and their tests) and no persisted
+project carries it yet — `public/project.gpkg` still has no `integrity_events` table.
+
+**Status:** implemented, recorded, not blocking.

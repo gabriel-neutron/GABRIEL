@@ -32,6 +32,110 @@ a wrong count during the P1 run. Test commands are `npx vitest run <file>` or
 
 ---
 
+## 0. Corrections post-run, 2026-08-03 — annotations, not amendments (the criteria below are unchanged)
+
+> **Not one of the 83 criteria was edited, weakened, reworded or deleted** (Prohibition 2). The value
+> of this file is that it records what was actually frozen on 2026-07-31, and a corrected criterion
+> would erase the evidence that the run graded **73 of 83 with zero implementation failures**
+> (`SLICE_RUN_LOG.md`, "Run 2026-08-03 — Slice 2B, the hierarchy migration", which carries the
+> measurements this section summarises). Everything here is an annotation *around* the criteria,
+> dated, with the measurement it rests on. **Read it before running any command below, and before
+> reusing this file as a template for Slice 3.**
+
+### 0.1 Four criteria whose literal command exits 0 while running nothing
+
+**A `vitest -t` filter naming a file that does not contain the test exits 0 having proved nothing.**
+vitest reports the named file's other tests as skipped, matches the filter against none of them, and
+returns success. There is no failure to notice: the command is green, and the only evidence is a
+`skipped` count in a summary line nobody reads.
+
+Criteria **46, 47, 51 and 58** each name the file their test would naturally have lived in. The
+300/385-line caps that criteria 4, 5 and 6 impose then forced those tests into **siblings** of those
+files, so all four literal commands are vacuously green. Measured 2026-08-03:
+
+| criterion | `-t` filter | literal command | corrected command | corrected output |
+|---|---|---|---|---|
+| 46 | `dangling endpoint` | `1 skipped` / `8 skipped`, **exit 0** | `npx vitest run src/core/persistence/geopackage/ -t "dangling endpoint"` | `1 passed`, 24 skipped |
+| 47 | `cross-kind` | `1 skipped` / `8 skipped`, **exit 0** | same directory scope | `2 passed`, 23 skipped |
+| 51 | `round-trips relationships and integrity events` | `1 skipped` / `8 skipped`, **exit 0** | same directory scope | `1 passed`, 24 skipped |
+| 58 | `drops an edge whose endpoint` | `18 skipped (18)`, **exit 0** | `npx vitest run src/store/ -t "drops an edge whose endpoint"` | `1 passed`, 4 skipped |
+
+46, 47 and 51's tests live in `src/core/persistence/geopackage/migration.store-path.fixtures.test.ts`
+(the cap-forced sibling of `migration.store-path.test.ts`); 58's lives in
+`src/store/useProjectStore.snapshot.test.ts` (Q2B-20). **Criterion 49b escaped only because its
+command was already directory-scoped**, not because it was written more carefully.
+
+**Directory-scoping is the fix**: it finds the test wherever the cap put it, and it survives the next
+split. Re-point all four before this file is reused. Read the *pass count*, never the exit code —
+these four exit 0 either way. The general rule is now §8b lesson 6 of
+`GABRIEL_V2_SLICE_2B_BUILD.md`.
+
+### 0.2 Criterion 55d's count is stale, and its production half still holds
+
+55d expects `... | grep -c "getState().setProject("` -> **21**. The tree measures **24** at
+`8527d44`: Phase 3's three new test files (`migration.store-path.fixtures.test.ts`,
+`useProjectStore.snapshot.test.ts`, `useEntityInspector.parent.test.ts`) each carry one.
+**The production count is still exactly 3** — `src/hooks/projectIO.ts:104`,
+`src/hooks/projectIO.ts:197`, `src/pages/ViewPage.tsx:45` — which is what the criterion is actually
+for, and criterion 55c (`npm run build`) is what proves every site compiles.
+
+This is **§8b lesson 5 recurring one storey out**: a count frozen before the tests existed, then
+invalidated by writing the tests this same criteria file mandates. A criterion that counts
+occurrences across the whole tree cannot be frozen by a document that also requires new test files;
+it must count the *production* sites and name them, as §1.1 does.
+
+### 0.3 The four criterion defects, with their causes
+
+- **15a** expects exactly four paths from `git diff --name-only BASE -- src/core/relationship/`;
+  there are **five**. Criterion **6** *explicitly directs* the `isHierarchyBearing` truth table into a
+  sibling file when `validate.test.ts` would exceed 300 lines — and it does exceed it: the file is at
+  **292** with criterion 14b's test in it, and the truth table needs roughly 40 lines more.
+  **15a and 6 cannot both hold.** 15b and 15c pass, so the Q39 scope limit 15 exists for — no
+  `vocabulary.ts`, no `relationship.ts`, `EDGE_VOCABULARY_VERSION` still `1.0.0` — is intact. 15a
+  should have said "no other *source* path, and no vocabulary file", which is what its own prose
+  says. Recorded in full as Q2B-17.
+- **22** (`metadata NOT NULL`) **fails by owner ruling, not by defect.** §4.4 demanded both
+  `NOT NULL` and an encoder emitting `null` for the empty bag; SQLite cannot honour both, and 1010 of
+  the 1012 minted edges carry `{}`, so every save of a project with a hierarchy failed. **Ruled
+  2026-07-31 mid-run: drop `NOT NULL`, keep `encode({}) -> null`** — criterion 25's
+  `decode(null) -> {}` is what settles which half was wrong. Q2B-19.
+- **36** (`acts_for` unreachable under `src/core/persistence/`) matches **one line**:
+  `migration.store-path.test.ts:212`, which **criterion 69 requires** ("no third type, `acts_for`
+  **0**"). Criterion 36's own exclusion note asserts that nothing this slice's positive criteria
+  require puts that string there; **that assertion is false**, which is §8b lesson 1 failing on its
+  own terms. Corrected form: add `--glob '!*.test.ts'` to the command -> no output, exit 1.
+- **77** — two of its eight bullets match, both self-inflicted: the same `acts_for` line, and
+  `src/store/useProjectStore.renameLayer.test.ts` matching the `renameLayer` pattern, which **§2's own
+  file table lists as compile-forced**. Neither is out-of-scope work; the fence caught the slice's own
+  mandated changes.
+
+### 0.4 Criterion 8 is superseded by a later owner ruling, not failed
+
+Ruled 2026-08-03 (Q2B-7): **`IntegrityEventKind` gains a fifth member**, so the six otherwise
+unrecordable violation codes — `unknown-type`, `date-order`, `invalid-date`,
+`missing-required-date`, `invalid-metadata`, `invalid-export-override` — get a durable
+`integrity_events` row instead of a `console.warn`. Criterion 8's "exactly four" and its locking test
+(`locks the integrity event kinds at four`) are **superseded by that ruling**, not failed by the
+implementation: they were satisfied at `8527d44` and the ruling changes what they should assert. A
+parallel agent is implementing it; whoever lands it re-points the locking test at the five-member
+array and keeps its deep-equal shape, which is the part of criterion 8 worth preserving.
+
+### 0.5 Six files exist that no criterion grades
+
+None is out of scope; none is graded, because §2's file table was written before the caps forced the
+splits (`SLICE_RUN_LOG.md`, "Six files exist that §2's file table does not list"):
+
+| file | lines | why it exists |
+|---|---|---|
+| `src/store/projectSnapshot.ts` | 57 | the Phase 5 extraction that keeps `useProjectStore.ts` under criterion 5's 400 |
+| `src/core/integrity/contestedParentEvents.ts` | 69 | the pure minter `commitRelationships` calls (Q2B-23) |
+| `src/core/persistence/geopackage/migration.store-path.fixtures.test.ts` | 181 | cap-forced sibling; holds 46, 47 and 51's tests (§0.1) |
+| `src/core/relationship/isHierarchyBearing.test.ts` | 74 | cap-forced sibling directed by criterion 6; the fifth path 15a forbids (§0.3) |
+| `src/store/useProjectStore.snapshot.test.ts` | 71 | cap-forced sibling; holds 58's test (Q2B-20) |
+| `src/modules/orbat/hooks/useEntityInspector.parent.test.ts` | 121 | criterion 62c's test, written without jsdom (Q2B-21) |
+
+---
+
 ## 1. Measurement corrections
 
 Every enumeration this contract rests on was re-measured at `BASE` per §8b's standing hazard.

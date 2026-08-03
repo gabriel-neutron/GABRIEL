@@ -716,18 +716,36 @@ catches the failure mode that actually matters.
 
 ---
 
-## 8b. Writing 2B's criteria — five lessons, each of which already cost a criterion
+## 8b. Writing 2B's criteria — six lessons, each of which already cost a criterion
 
 **Read this before freezing `SLICE_2B_CRITERIA.md`.** These were scattered across Q2A-9, Q2A-12,
 Q2A-15 and the 2A fix pass, where a Phase 1 planner would never find them. They are collected here
 on 2026-07-31 because the planner reads this spec and does not read the 2A question file.
 
-1. **A negative grep must exclude the strings the positive criteria force you to write.** Slices 0,
-   1 and 2A each lost a criterion to this exact shape. 2A's criterion 23 asserted that
-   `useProjectIO.ts`'s added lines contain no `setProject`, while criterion 32 *required* rewriting
-   the two lines that contain it. The only formatting satisfying both defeated the excess-property
-   check that criterion 32 existed to create. Diff-scoping is not enough — 23 was already
-   diff-scoped. Write the exclusion.
+1. **A negative grep must exclude the strings the positive criteria — or the spec's declared
+   signatures, or the code's own documentation — force you to write.** Slices 0, 1 and 2A each lost a
+   criterion to this exact shape. 2A's criterion 23 asserted that `useProjectIO.ts`'s added lines
+   contain no `setProject`, while criterion 32 *required* rewriting the two lines that contain it.
+   The only formatting satisfying both defeated the excess-property check that criterion 32 existed
+   to create. Diff-scoping is not enough — 23 was already diff-scoped. Write the exclusion.
+   **Widened 2026-08-03**: the 2B run hit this shape six times, and five of them a planner checking
+   the lesson against the criteria list alone would never have found. §4.2 writes
+   `isHierarchyBearing`'s JSDoc out verbatim and one bullet of it contains
+   `metadata.attachment === "attached"`, which criterion 76a counts — **this document's own declared
+   signature forced a string a criterion forbids** (Q2B-4). Criterion 23 greps the whole file for
+   `optional|fallbackSql`, so T3's future-column warning could not be written in its natural words
+   (Q2B-6). Criterion 50b counts four function names, so a JSDoc naming its own subject broke it
+   (Q2B-9). Criterion 36 bans `acts_for` under `src/core/persistence/` while criterion 69 *requires*
+   the assertion `acts_for` **0** on the real file, and criterion 77 repeats the collision — the
+   exclusion note in 36 asserts no positive criterion puts that string there, and it is wrong. And a
+   rationale comment in `migrateHierarchy.ts` naming `acts_for` had to be reworded for the same
+   reason. **The sixth degraded shipped code rather than a comment, which is why this lesson cannot
+   stop at documentation:** criteria 65 and 66 collide on one line of `projectIO.ts` — 65 pins it
+   byte-for-byte, 66 requires two new members on it — so the two collections are merged in with
+   `Object.assign` where an object literal belongs (Q2B-13), and that `Object.assign` now has to
+   survive every future reviewer who reads it as an accident. Five of the six cost only a reworded
+   comment; the price of not writing the exclusion is that the sixth is indistinguishable from them
+   until it is in the tree.
 
 2. **A criterion that pins *sites* must also pin the *order within each site*.** This single
    omission generated Q2A-8, Q2A-11 and Q2A-15, two of them with a data-loss direction. Criterion
@@ -753,6 +771,17 @@ on 2026-07-31 because the planner reads this spec and does not read the 2A quest
    2026-07-31, having just cost this document two of the three errors corrected in §4.7:
    `grep -c "setProject("` matches `resetProject(`, which inflated one figure from 5 to 6 and
    another from 9 to 13. List the occurrences verbatim and read them; do not report the count.
+
+6. **A `-t` filter paired with a filename is a criterion that can pass while running nothing.** Added
+   2026-08-03, having just cost the 2B run four of its thirteen corrected commands.
+   `npx vitest run <file> -t "<name>"` where `<file>` does not contain that test reports the file's
+   other tests as skipped, matches nothing, and **exits 0**. Criteria 46, 47, 51 and 58 each named the
+   file their test would naturally have lived in; the 300/385-line caps the same criteria file
+   imposes then forced all four tests into siblings, so four criteria graded green having proved
+   nothing, and 49b escaped only because its command was already directory-scoped. **Line caps move
+   tests between files**, so any criterion pairing a `-t` filter with a specific filename is fragile
+   by construction. Scope the command to the directory — `npx vitest run src/store/ -t "..."` finds
+   the test wherever the cap put it — and grade on the *passed* count, never on the exit code.
 
 **And one that is not a lesson but a standing hazard:** this spec was frozen on 2026-07-29 and the
 tree moved under it on 2026-07-30. Any enumeration, count or line number in it is a measurement with
@@ -903,6 +932,49 @@ reproduces from memory. Everything below is a defect in a document that still ex
   pointing at `.githooks` — **the `.githooks/` directory does not exist.** Still true.
 - `CONSTRAINTS.md:118` says import order is enforced by ESLint. `eslint.config.js` loads no import
   plugin. Still a human review item.
+
+**Defects in this document, measured during the 2B run and recorded here rather than patched into
+the body — §11 exists so the next reader can see what was wrong and how it was found.**
+
+- **§3 contradicts itself on where the derivation goes** — 2026-08-03, by reading two adjacent rows
+  of §3's own file table. The `load.ts` row says "modified — read, migrate, validate, **derive** (see
+  §7)"; the `applyResult.ts` row says "modified — derivation applied here". The row that mentions the
+  derivation first defers to §7, and §7 settles it: **the derivation is in `load.ts`.** Deriving
+  inside `applyGeoPackageResult` instead would leave `GeoPackageLoadResult.entities` carrying raw
+  `parentId` while the store carries derived values — two answers to one question, on the seam this
+  slice exists to close. The `applyResult.ts` annotation should read "modified — carries
+  relationships and integrityEvents through (§7 step 6)". Raised as contradiction C1 by the Phase 1
+  planner; recorded in full as Q2B-1.
+- **§4.4 specifies two things SQLite cannot both do** — 2026-08-03, observed as
+  `Failed to save GeoPackage: NOT NULL constraint failed: relationships.metadata`. The descriptor
+  comment declares `metadata NOT NULL` and the bullet four lines below it says "encode: `null` when
+  the object has no own enumerable keys". 1010 of the 1012 minted edges carry `{}`, so **every save
+  of a project with a hierarchy failed**; found independently by two Phase 3 agents (from the store
+  path and from the table's own write path) and confirmed by a reverted probe under which ten of the
+  eleven remaining failures went green. **Ruled 2026-08-03: drop `NOT NULL`.** §4.4's own decode rule
+  is what settles which half was wrong — `decode(null) -> {}` only means anything if `null` is
+  storable at all. Criterion 22 therefore fails by ruling, not by defect. Q2B-19.
+- **§4.4 cites the wrong trap** — 2026-08-03, by reading the heading against §6's trap list. "None is
+  `optional` — see Trap **T8**" should be **T3/T4**: T3 is `optional: true` without `fallbackSql`
+  throwing on every read, T4 is `ensureOptionalColumns` splicing `constraints` into `ALTER TABLE`. T8
+  is the plain-SQLite-tables trap (`createAttributesTable` / `gpkg_contents`), which is a different
+  claim about the same two files.
+- **§7 step 6's line numbers are stale** — re-measured at BASE `44994ef` on 2026-08-03. It cites
+  `applyResult.ts:47-52` and a "pass-through cast at `:49`"; `applyGeoPackageResult` returns at
+  **`:76-82`**, the cast `result.entities as MapEntity[]` is at **`:78`**, and
+  `projectStateFromLoadResult` is **`:94-103`**. Cite symbols, not numbers.
+- **§10 step 17 cites `useProjectIO.ts:31`** for the save picker's `suggestedName` — re-measured at
+  BASE on 2026-08-03: it is **`src/hooks/projectIO.ts:70`**, moved there by prerequisite commit P1b,
+  which extracted `useProjectIO`'s handlers as React-free functions. Step 17 is the owner's
+  rehearsal; the citation is corrected so nobody chases it mid-migration.
+- **§4.1's two halves disagree** — 2026-08-03, by reading the declared signature against the JSDoc
+  directly above it. The prose says anything not structurally valid "decodes to a **neutral event**
+  rather than throwing"; the signature is
+  `decodeIntegrityEvent(raw: unknown): IntegrityEvent | undefined`, i.e. it **drops**. The
+  implementation followed the signature, so an unreadable row is currently dropped, warned, and gone
+  from the file at the next save. **Ruled 2026-08-03 for the prose:** an unreadable row is
+  *rehabilitated* as a neutral event carrying its raw payload verbatim, never dropped — ADR 0012's
+  doctrine for an unrecognised layer kind, applied one storey down, to a row. Q2B-24.
 
 ---
 
