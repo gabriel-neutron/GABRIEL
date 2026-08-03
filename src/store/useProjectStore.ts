@@ -9,9 +9,9 @@ import { withContestedParentEvents } from "@/core/integrity/contestedParentEvent
 import type { Relationship } from "@/core/relationship/relationship"
 import { activeParentMap, withDerivedParents } from "@/core/relationship/activeParent"
 import { mergeEntities as mergeIdentityGraph } from "@/core/identity/merge"
-import { assignCredibility, confirmCredibility, refuteCredibility, type CredibilityAssessmentResult } from "@/core/provenance/reviewQueue"
-import { createRatingEvent } from "@/core/provenance/ratingEvent"
-import { useProvenanceStore } from "@/store/useProvenanceStore"
+import type { CredibilityAssessmentResult } from "@/core/provenance/reviewQueue"
+import { createClaimActions } from "./projectClaimActions"
+import { createLayerActions } from "./projectLayerActions"
 
 // The two React-free readers over `ProjectState` live in a sibling module so this file stays
 // inside its declared line cap; re-exported here because they are part of the store's public
@@ -176,6 +176,12 @@ export const useProjectStore = create<ProjectState & ProjectActions>()(
   devtools(
     (set, get) => ({
       ...initialState(),
+      // Two concerns whose bodies live in siblings so this file stays inside the 300-line cap
+      // (`CONSTRAINTS.md:113`). They are spread, not re-declared, so `ProjectActions` below stays
+      // the one place the store's whole surface is stated — and a member missing from either
+      // creator is a compile error here, not a runtime hole.
+      ...createLayerActions(set, get),
+      ...createClaimActions(set, get),
 
       setProject({ layers, entities, drawnGeometries, claims, relationships, integrityEvents, selectedEntityId }) {
         set(
@@ -191,73 +197,6 @@ export const useProjectStore = create<ProjectState & ProjectActions>()(
 
       setRelationships(next) {
         commitRelationships(set, get(), next)
-      },
-
-      addLayer(layer) {
-        set((s) => ({ layers: [...s.layers, layer] }), false, "addLayer")
-      },
-
-      addNewLayer() {
-        const { layers } = get()
-        const names = layers.filter((l) => l.kind === "custom" || l.osmData != null).map((l) => l.name)
-        let name = "New layer"
-        for (let n = 1; names.includes(name); n++) name = `New layer ${n}`
-        const id = crypto.randomUUID()
-        set((s) => ({ layers: [...s.layers, { id, name, visible: true, kind: "custom" }] }), false, "addNewLayer")
-      },
-
-      renameLayer(layerId, name) {
-        const trimmed = name.trim()
-        if (!trimmed) return
-        // ADR 0012: the vocabulary is authoritative for echelon layers, so a rename here would
-        // persist in memory, survive one save and revert on the next load. Unlike removeLayer,
-        // `organisation` is deliberately not guarded — Industry's name does round-trip.
-        const layer = get().layers.find((l) => l.id === layerId)
-        if (layer?.kind === "echelon") return
-        set(
-          (s) => ({ layers: s.layers.map((l) => (l.id === layerId ? { ...l, name: trimmed } : l)) }),
-          false,
-          "renameLayer",
-        )
-      },
-
-      removeLayer(id) {
-        const { layers, entities, drawnGeometries, claims, selectedEntityId } = get()
-        const layer = layers.find((l) => l.id === id)
-        if (layer?.kind === "echelon" || layer?.kind === "organisation") return
-        const removedEntityIds = new Set(entities.filter((e) => e.layerId === id).map((e) => e.id))
-        set(
-          {
-            layers: layers.filter((l) => l.id !== id),
-            entities: entities.filter((e) => e.layerId !== id),
-            drawnGeometries: drawnGeometries.filter((g) => g.layerId !== id),
-            claims: claims.filter((c) => !removedEntityIds.has(c.entityId)),
-            selectedEntityId: selectedEntityId && removedEntityIds.has(selectedEntityId) ? null : selectedEntityId,
-          },
-          false,
-          "removeLayer",
-        )
-      },
-
-      moveLayer(layerId, direction) {
-        set((s) => {
-          const layers = [...s.layers]
-          const i = layers.findIndex((l) => l.id === layerId)
-          if (i < 0) return s
-          if (direction === "up" && i === 0) return s
-          if (direction === "down" && i === layers.length - 1) return s
-          const j = direction === "up" ? i - 1 : i + 1
-          ;[layers[i], layers[j]] = [layers[j], layers[i]]
-          return { layers }
-        }, false, "moveLayer")
-      },
-
-      setLayerVisible(id, visible) {
-        set(
-          (s) => ({ layers: s.layers.map((l) => (l.id === id ? { ...l, visible } : l)) }),
-          false,
-          "setLayerVisible",
-        )
       },
 
       addEntity(entity) {
@@ -328,57 +267,6 @@ export const useProjectStore = create<ProjectState & ProjectActions>()(
           false,
           "deleteGeometry",
         )
-      },
-
-      addClaims(claims) {
-        set((s) => ({ claims: [...s.claims, ...claims] }), false, "addClaims")
-      },
-
-      removeClaim(claimId) {
-        set((s) => ({ claims: s.claims.filter((c) => c.id !== claimId) }), false, "removeClaim")
-      },
-
-      confirmClaimCredibility(claimId) {
-        const before = get().claims.find((c) => c.id === claimId)?.credibility ?? null
-        set((s) => ({ claims: confirmCredibility(s.claims, claimId) }), false, "confirmClaimCredibility")
-        const after = get().claims.find((c) => c.id === claimId)?.credibility ?? null
-        if (after === before) return // ineligible — confirmCredibility left it unchanged, nothing to log
-        useProvenanceStore.getState().appendRatingEvent(
-          createRatingEvent({
-            targetType: "claim",
-            targetId: claimId,
-            kind: "credibility",
-            value: String(after),
-            assessor: { kind: "analyst" },
-          }),
-        )
-      },
-
-      refuteClaimCredibility(claimId) {
-        const claimExists = get().claims.some((c) => c.id === claimId)
-        if (!claimExists) return
-        set((s) => ({ claims: refuteCredibility(s.claims, claimId) }), false, "refuteClaimCredibility")
-        useProvenanceStore.getState().appendRatingEvent(
-          createRatingEvent({
-            targetType: "claim",
-            targetId: claimId,
-            kind: "credibility",
-            value: "refuted",
-            assessor: { kind: "analyst" },
-          }),
-        )
-      },
-
-      applyCredibilityToClaims(claimIds, result) {
-        if (result == null) return
-        set((s) => {
-          const idSet = new Set(claimIds)
-          const targeted = s.claims.filter((c) => idSet.has(c.id))
-          if (targeted.length === 0) return s
-          const stamped = assignCredibility(targeted, result)
-          const stampedById = new Map(stamped.map((c) => [c.id, c]))
-          return { claims: s.claims.map((c) => stampedById.get(c.id) ?? c) }
-        }, false, "applyCredibilityToClaims")
       },
 
       setSelectedEntityId(id) {

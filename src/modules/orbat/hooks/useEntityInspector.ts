@@ -2,23 +2,12 @@ import { useCallback, useMemo, useState } from "react"
 import type { DrawnGeometry, MapEntity, PositionMode } from "@/types/domain.types"
 import type { SymbolAffiliation, SymbolDomain, SymbolEchelon } from "@/types/symbol.types"
 import type { OrganisationType } from "@/types/organisation.types"
-import { withActiveParent } from "@/core/relationship/activeParent"
+import { applyNameChange, applyParentChange } from "./entityInspectorCommands"
 import { useProjectStore } from "@/store/useProjectStore"
 import { useProvenanceStore } from "@/store/useProvenanceStore"
 import { createCitationClaim, filterCitationClaims, type Claim } from "@/core/provenance/claim"
 import type { AdmiraltyCredibility, AdmiraltyReliability } from "@/core/provenance/admiralty"
 import type { CredibilityMeta, RatingMeta } from "@/core/provenance/ratingMeta"
-
-function detectEchelonFromName(name: string): SymbolEchelon | null {
-  const n = name.toLowerCase()
-  if (n.includes("division")) return "Division"
-  if (n.includes("brigade")) return "Brigade"
-  if (n.includes("regiment") || n.includes("régiment")) return "Regiment/group"
-  if (n.includes("battalion") || n.includes("bataillon")) return "Battalion/squadron"
-  if (n.includes("company") || n.includes("compagnie")) return "Company/battery/troop"
-  if (n.includes("platoon") || n.includes("section")) return "Platoon/detachment"
-  return null
-}
 
 export type EntityInspectorState = {
   entity: MapEntity | null
@@ -157,14 +146,7 @@ export function useEntityInspector(): EntityInspectorState {
   const handleNameChange = useCallback(
     (name: string) => {
       if (!entity) return
-      const patch: Partial<MapEntity> = { name }
-      if (entity.kind === "unit" && (!entity.echelon || entity.echelon === "")) {
-        const detected = detectEchelonFromName(name)
-        if (detected) {
-          patch.echelon = detected
-        }
-      }
-      updateEntity(entity.id, patch)
+      applyNameChange(entity, name, { updateEntity })
     },
     [entity, updateEntity],
   )
@@ -206,12 +188,9 @@ export function useEntityInspector(): EntityInspectorState {
   const handleParentChange = useCallback(
     (parentId: string | null) => {
       if (!entity) return
-      // `parentId` is derived (ADR 0011); `withActiveParent` REPLACES the child's edge, never adds.
-      setRelationships(withActiveParent(relationships, entity, parentId, crypto.randomUUID()))
-      // Separate concern, kept: an entity positioned BY its parent has nowhere left to be.
-      if (parentId == null && entity.positionMode === "parent") {
-        updateEntity(entity.id, { positionMode: "none" })
-      }
+      // Body in `entityInspectorCommands.ts` (Q2B-21): the edge write and the `positionMode: "none"`
+      // coupling on clear are asserted there, on the function, which a `useCallback` forbids here.
+      applyParentChange(entity, relationships, parentId, crypto.randomUUID(), { setRelationships, updateEntity })
     },
     [entity, relationships, setRelationships, updateEntity],
   )
