@@ -15,12 +15,12 @@ import { activeParentMap, withDerivedParents } from "@/core/relationship/activeP
 import { deriveProvenanceFromEntities, type EntityLedgerInput } from "@/core/provenance/deriveFromEntities"
 import type { Relationship } from "@/core/relationship/relationship"
 import type { IntegrityEvent } from "@/core/integrity/integrityEvent"
-import type { GeoPackageLoadResult, GpkgEntity } from "./types"
-
-/** Deterministic, so a re-detected condition updates one row instead of accumulating rows —
- *  the same first-colon namespacing the migration event and the `hier:` edge ids use. */
-const MULTIPLE_ACTIVE_PREFIX = "integrity:multiple-active-hierarchy:"
-const CROSS_KIND_PREFIX = "integrity:cross-kind-parent:"
+import {
+  crossKindParentEvents,
+  multipleActiveHierarchyEvents,
+  relationshipViolationEvents,
+} from "@/core/integrity/mintOnLoad"
+import type { GeoPackageLoadResult } from "./types"
 
 /** The two codes that make the file unopenable rather than merely flawed. Neither can survive
  *  as a finding: an edge whose endpoint is absent, or whose endpoints are the same entity,
@@ -42,106 +42,6 @@ function throwOnFatalViolations(violations: readonly RelationshipViolation[]): v
   if (fatal.length !== 0) {
     const named = fatal.map((v) => quoted(v.relationshipId) + " " + v.code + " (" + v.detail + ")")
     throw new Error("Unsupported schema: " + String(fatal.length) + " relationship(s) contradict the entity set: " + named.join("; ") + ".")
-  }
-}
-
-/**
- * One event per contested CHILD, not per offending edge: the finding is "this entity has two
- * parents", which two edges assert jointly. The derivation below decides the same condition from
- * the same predicate (`activeParent.ts`), so the row and the derivation cannot disagree — a
- * contested child is absent from `parentById` (Q40) and named here.
- */
-function multipleActiveHierarchyEvents(
-  violations: readonly RelationshipViolation[],
-  rels: readonly Relationship[],
-  entities: readonly GpkgEntity[],
-  now: string,
-): IntegrityEvent[] {
-  const relById = new Map(rels.map((rel) => [rel.id, rel]))
-  const competingByChild = new Map<string, Relationship[]>()
-  for (const violation of violations) {
-    if (violation.code !== "multiple-active-hierarchy") continue
-    const rel = relById.get(violation.relationshipId)
-    if (rel == null) continue
-    const competing = competingByChild.get(rel.fromId)
-    if (competing == null) competingByChild.set(rel.fromId, [rel])
-    else competing.push(rel)
-  }
-
-  const nameById = new Map(entities.map((e) => [e.id, e.name]))
-  const label = (id: string): string => quoted(nameById.get(id) ?? id)
-
-  const events: IntegrityEvent[] = []
-  for (const [childId, competing] of competingByChild) {
-    events.push({
-      id: MULTIPLE_ACTIVE_PREFIX + childId,
-      kind: "multiple-active-hierarchy",
-      createdAt: now,
-      summary: label(childId) + " is placed under " + String(competing.length) +
-        " parents at once (" + competing.map((rel) => label(rel.toId)).join(", ") +
-        "), so it is left without a derived parent until a person records which is correct.",
-      detail: { childId, relationshipIds: competing.map((rel) => rel.id), parentIds: competing.map((rel) => rel.toId) },
-    })
-  }
-  return events
-}
-
-/**
- * T10. `Relationship` places no restriction on the kinds of its endpoints, but the entity
- * validation above throws when a `parentId` does not resolve within its own kind — so a
- * cross-kind hierarchy-bearing edge would derive a parent that makes the NEXT load throw.
- * The pair leaves the derivation by OMISSION (T15: a dangling parent is never written) and is
- * recorded instead. Nothing throws: the edge itself is a legitimate record, and throwing would
- * make a legitimate record unopenable.
- *
- * Mutates the map it is handed — the one the derivation built moments ago for this load, that
- * nobody else holds. Deleting during iteration is safe: each entry is examined once, and one
- * removed before it is reached is simply never visited.
- */
-function crossKindParentEvents(
-  parentById: Map<string, string>,
-  entities: readonly GpkgEntity[],
-  now: string,
-): IntegrityEvent[] {
-  const byId = new Map(entities.map((e) => [e.id, e]))
-  const events: IntegrityEvent[] = []
-  for (const [childId, parentId] of parentById) {
-    const child = byId.get(childId)
-    const parent = byId.get(parentId)
-    // A parent outside the entity set is T15's case and not this one: the derivation already
-    // omits it by the same rule, and there is no second kind to compare against.
-    if (child == null || parent == null) continue
-    if (child.kind === parent.kind) continue
-    parentById.delete(childId)
-    events.push({
-      id: CROSS_KIND_PREFIX + childId,
-      kind: "cross-kind-parent",
-      createdAt: now,
-      summary: quoted(child.name) + " (" + child.kind + ") is recorded under " +
-        quoted(parent.name) + " (" + parent.kind + "), which crosses entity kinds, so no " +
-        "parent is derived for it and the relationship is kept exactly as recorded.",
-      detail: { childId, childKind: child.kind, parentId, parentKind: parent.kind },
-    })
-  }
-  return events
-}
-
-/**
- * Q2B-7. Six non-throwing violation codes — `unknown-type`, `date-order`, `invalid-date`,
- * `missing-required-date`, `invalid-metadata`, `invalid-export-override` — have no
- * `IntegrityEventKind` to be recorded under, and that union is locked at four members. They
- * are neither discarded in silence nor filed under a kind that would misname them; they are
- * surfaced here and the question is recorded in `docs/timelines/SLICE_2B_OPEN_QUESTIONS.md`.
- * Not a throw: none of the six contradicts the entity set, and every edge is still returned
- * exactly as it was recorded.
- */
-function warnUnrecordableViolations(violations: readonly RelationshipViolation[]): void {
-  const unrecordable = violations.filter(
-    (v) => !FATAL_VIOLATION_CODES.has(v.code) && v.code !== "multiple-active-hierarchy",
-  )
-  if (unrecordable.length !== 0) {
-    const preamble = "loadGeoPackage: " + String(unrecordable.length) + " relationship violation(s)"
-    console.warn(preamble + " have no IntegrityEventKind to record them (Q2B-7):", unrecordable)
   }
 }
 
@@ -171,6 +71,10 @@ export async function loadGeoPackage(buffer: ArrayBuffer): Promise<GeoPackageLoa
   try {
     geoPackage = await GeoPackageAPI.open(new Uint8Array(buffer))
 
+    // Q2B-8a: `loadGeoPackage` takes no clock, so the timestamp is read here and read ONCE, so
+    // every event this load mints or rehabilitates shares one instant. `migrateHierarchyToRelationships`
+    // keeps its injected `now` and stays pure and reproducible.
+    const now = new Date().toISOString()
     const layers = readLayers(geoPackage)
     // Legacy organisations (pre-E1 files) fold into the same unified entities array,
     // tagged kind: "corporate" — see organisations.table.ts's migrateLegacyOrganisations.
@@ -185,7 +89,7 @@ export async function loadGeoPackage(buffer: ArrayBuffer): Promise<GeoPackageLoa
     // can tell the migration gate below what it is allowed to gate on: `readRelationships`
     // returns null for an ABSENT table and [] for an empty one (T11).
     const persisted = readRelationships(geoPackage)
-    const persistedEvents = readIntegrityEvents(geoPackage)
+    const persistedEvents = readIntegrityEvents(geoPackage, now)
     const geometries = await readGeometries(geoPackage)
     const sourceCache = readSourceCache(geoPackage)
     // ADR 0006, E2.6: entity.sources no longer exists — derive from the legacy raw
@@ -234,10 +138,6 @@ export async function loadGeoPackage(buffer: ArrayBuffer): Promise<GeoPackageLoa
       }
     }
 
-    // Q2B-8a: `loadGeoPackage` takes no clock, so the timestamp is read here and read ONCE,
-    // so every event this load mints shares one instant. `migrateHierarchyToRelationships`
-    // keeps its injected `now` and stays pure and reproducible.
-    const now = new Date().toISOString()
     // §7 step 3, T11. Gated on the relationships TABLE being absent, never on a row count:
     // deterministic `hier:` ids stop duplication but not resurrection, and after the first
     // save `parent_id` holds the derivation rather than original data, so a second run would
@@ -260,7 +160,10 @@ export async function loadGeoPackage(buffer: ArrayBuffer): Promise<GeoPackageLoa
     const violations = validateRelationships(relationships, entityIds)
     throwOnFatalViolations(violations)
     minted.push(...multipleActiveHierarchyEvents(violations, relationships, entities, now))
-    warnUnrecordableViolations(violations)
+    // The other six codes become durable rows here rather than a console warning (owner ruling,
+    // 2026-08-03, superseding Q2B-7's stopgap): a log is not a record, and nothing an analyst
+    // can acknowledge lives in one.
+    minted.push(...relationshipViolationEvents(violations, relationships, entities, now))
 
     const ratingEvents = readRatingEvents(geoPackage)
 

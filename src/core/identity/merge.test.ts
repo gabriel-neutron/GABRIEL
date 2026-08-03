@@ -224,6 +224,12 @@ describe("mergeEntities", () => {
     expect(integrityEvents[0].detail).toEqual(original)
     expect(integrityEvents[0].detail.fromId).toBe("a")
     expect(integrityEvents[0].detail.toId).toBe("b")
+    // Owner ruling, 2026-08-03: the summary is prose, so it carries the vocabulary's endpoint
+    // labels and never the type's machine name — which stays in `detail`.
+    expect(integrityEvents[0].summary).toBe("A recorded relationship between a subsidiary and a " +
+      "parent org was dropped when Вагнер was merged into Wagner: both of its endpoints are now " +
+      "the same entity.")
+    expect(integrityEvents[0].summary).not.toContain("corporate_parent")
   })
 
   it("leaves a self-loop that arrived as one alone, and mints no event for it", () => {

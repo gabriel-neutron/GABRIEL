@@ -24,6 +24,10 @@ import {
  */
 export const INTEGRITY_EVENTS_TABLE = "integrity_events"
 
+/** Prefixed like every minted id (`integrity:<kind>:<discriminator>`), so an id derived for a
+ *  row that has none of its own cannot land on a real event's. */
+const UNREADABLE_ROW_PREFIX = "integrity:invalid-entry:unreadable-row-"
+
 function tryParse(raw: string): unknown {
   try {
     return JSON.parse(raw) as unknown
@@ -74,6 +78,38 @@ export function createIntegrityEventsTable(geoPackage: GeoPackage): void {
   )
 }
 
+/** A column value is salvageable when it is text with something in it. */
+function salvaged(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim().length > 0 ? value : undefined
+}
+
+/**
+ * ADR 0012's second rule, applied to this table: **no row a project file carries is dropped on
+ * load.** A row `decodeIntegrityEvent` cannot read comes back as a neutral `invalid-entry` event
+ * carrying the whole raw row in `detail`, so nothing on disk is lost and a person can see exactly
+ * what was there. Dropping it would have deleted a durable record at the next save — the control
+ * destroying the data it exists to record — on a file that is not corrupt.
+ *
+ * Salvage before invention: the row's own `id` and `created_at` are kept when they hold anything,
+ * because a row whose only fault is an unreadable `kind` still knows what it is and when it was
+ * written. The derived id names the row's position in append order and is prefixed like every
+ * other event id, so it cannot collide with a real event's.
+ *
+ * The rehabilitated event is itself well formed, so the next load decodes it normally and the raw
+ * row is preserved once, not nested deeper on every open.
+ */
+function rehabilitateRow(row: Record<string, unknown>, position: number, now: string): IntegrityEvent {
+  return {
+    id: salvaged(row.id) ?? UNREADABLE_ROW_PREFIX + String(position),
+    kind: "invalid-entry",
+    createdAt: salvaged(row.created_at) ?? now,
+    summary: "An integrity record this project file already carried could not be read back in " +
+      "full, so it is preserved here exactly as it was found, with every column it held, rather " +
+      "than dropped.",
+    detail: { ...row },
+  }
+}
+
 /**
  * Whole-table-missing check for a pre-2B file: returns `[]`, the ordinary house
  * pattern. The asymmetry with `readRelationships` — which returns `null` for an absent
@@ -85,29 +121,36 @@ export function createIntegrityEventsTable(geoPackage: GeoPackage): void {
  * Ordered by `ORDER BY rowid ASC` — append order is the log's own chronology.
  *
  * Every row goes through `decodeIntegrityEvent` after the per-column decode, and a row it
- * rejects is DROPPED rather than returned: the column decoders coerce, so without the check a
- * row carrying `kind = "whatever"` would be handed to the store typed as an `IntegrityEventKind`
- * and re-written verbatim on the next save, laundering a corrupt row into the record. Dropping
- * rather than throwing is the same fail-closed rule the decoder itself documents — a corrupt
- * integrity row must never make a project unopenable. The drop is surfaced (never silent),
- * because a discarded durable record is exactly the kind of loss this table exists to log.
+ * rejects is REHABILITATED rather than returned as it stands: the column decoders coerce, so
+ * without the check a row carrying `kind = "whatever"` would be handed to the store typed as an
+ * `IntegrityEventKind` and re-written verbatim on the next save, laundering a corrupt row into
+ * the record. Never a throw, either — a corrupt integrity row must not make a project
+ * unopenable. `now` is injected so the read stays reproducible and every event one load produces
+ * shares an instant.
  */
-export function readIntegrityEvents(geoPackage: GeoPackage): IntegrityEvent[] {
+export function readIntegrityEvents(geoPackage: GeoPackage, now: string): IntegrityEvent[] {
   if (!tableExists(geoPackage.connection, INTEGRITY_EVENTS_TABLE)) return []
   const rows = geoPackage.connection.all(
     `SELECT ${buildSelectClause(integrityEventColumns)} FROM ${INTEGRITY_EVENTS_TABLE} ORDER BY rowid ASC`,
   ) as Record<string, unknown>[]
   const events: IntegrityEvent[] = []
-  const rejected: Record<string, unknown>[] = []
-  for (const row of rows) {
+  const rehabilitated: Record<string, unknown>[] = []
+  for (const [position, row] of rows.entries()) {
     const event = decodeIntegrityEvent(decodeRow(integrityEventColumns, row))
-    if (event == null) rejected.push(row)
-    else events.push(event)
+    if (event == null) {
+      rehabilitated.push(row)
+      events.push(rehabilitateRow(row, position, now))
+    } else {
+      events.push(event)
+    }
   }
-  if (rejected.length !== 0) {
+  // Surfaced, never silent: a row that stopped being readable is a finding about the file, and
+  // the console is where a developer sees it in the session it first happened.
+  if (rehabilitated.length !== 0) {
     console.warn(
-      "readIntegrityEvents: dropped " + String(rejected.length) + " structurally invalid row(s):",
-      rejected,
+      "readIntegrityEvents: preserved " + String(rehabilitated.length) +
+        " unreadable row(s) as invalid-entry events:",
+      rehabilitated,
     )
   }
   return events

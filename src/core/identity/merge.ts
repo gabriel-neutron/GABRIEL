@@ -1,7 +1,8 @@
 import type { Entity, PositionMode } from "@/core/entity/entity"
 import type { IntegrityEvent } from "@/core/integrity/integrityEvent"
 import type { Claim } from "@/core/provenance/claim"
-import type { Relationship } from "@/core/relationship/relationship"
+import type { Relationship, RelationshipType } from "@/core/relationship/relationship"
+import { EDGE_TYPES } from "@/core/relationship/vocabulary"
 import type { DrawnGeometry } from "@/types/domain.types"
 
 /**
@@ -151,6 +152,19 @@ function edgeKey(fromId: string, toId: string, rel: Relationship): string {
 }
 
 /**
+ * The vocabulary's own endpoint labels, never the type's machine name: this sentence is the only
+ * surviving trace of the assertion and a person reads it, so a raw identifier mid-sentence is a
+ * leak. `EDGE_TYPES` is keyed by the closed union, but a file authored elsewhere can carry a type
+ * outside it; that clause is then dropped rather than invented, and `validateRelationships`
+ * reports the unknown type in its own right.
+ */
+function endpointClause(type: RelationshipType): string {
+  if (!Object.prototype.hasOwnProperty.call(EDGE_TYPES, type)) return ""
+  const article = (label: string): string => ("aeiou".includes(label.slice(0, 1)) ? "an " : "a ") + label
+  return " between " + article(EDGE_TYPES[type].fromLabel) + " and " + article(EDGE_TYPES[type].toLabel)
+}
+
+/**
  * `detail` carries the dropped edge's original `(id, fromId, toId, type)` quadruple —
  * verbatim and unnormalised. This row is the only surviving record of the assertion, so it
  * must read as it was authored rather than as the merge would have rewritten it.
@@ -163,8 +177,9 @@ function droppedEdgeEvent(rel: Relationship, primary: Entity, secondary: Entity,
     id: "integrity:merge-dropped-edge:" + rel.id,
     kind: "merge-dropped-edge",
     createdAt: now,
-    summary: "A recorded " + rel.type + " relationship was dropped when " + secondary.name +
-      " was merged into " + primary.name + ": both of its endpoints are now the same entity.",
+    summary: "A recorded relationship" + endpointClause(rel.type) + " was dropped when " +
+      secondary.name + " was merged into " + primary.name +
+      ": both of its endpoints are now the same entity.",
     detail: { id: rel.id, fromId: rel.fromId, toId: rel.toId, type: rel.type },
   }
 }

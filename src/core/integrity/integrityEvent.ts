@@ -6,6 +6,7 @@ export type IntegrityEventKind =
   | "multiple-active-hierarchy"
   | "cross-kind-parent"
   | "merge-dropped-edge"
+  | "invalid-entry"
 
 /**
  * Runtime companion to the union, in declaration order — the precedent is
@@ -15,12 +16,24 @@ export type IntegrityEventKind =
  * `multiple-active-hierarchy` is the same string as in `RELATIONSHIP_VIOLATION_CODES`
  * (`relationship/validate.ts:6-10`) on purpose: one condition, one name, so the
  * validator and the durable record cannot drift into parallel taxonomies.
+ *
+ * `invalid-entry` is the fifth member, added by owner ruling on 2026-08-03. It is the
+ * one kind named after what Gabriel DID rather than what it found: something the project
+ * carries could not be validated, and is kept exactly as it stands rather than discarded.
+ * It covers the six relationship violation codes that have no kind of their own
+ * (`unknown-type`, `date-order`, `invalid-date`, `missing-required-date`,
+ * `invalid-metadata`, `invalid-export-override`) and an `integrity_events` row that
+ * cannot be read back. Deliberately not named `relationship-violation`: the same ruling
+ * requires an unreadable row to come back as an event too, and that row need not be
+ * about a relationship at all. Which condition produced it is in `detail`, never guessed
+ * from the kind.
  */
 export const INTEGRITY_EVENT_KINDS = [
   "hierarchy-migrated",
   "multiple-active-hierarchy",
   "cross-kind-parent",
   "merge-dropped-edge",
+  "invalid-entry",
 ] as const satisfies readonly IntegrityEventKind[]
 
 export type IntegrityEvent = {

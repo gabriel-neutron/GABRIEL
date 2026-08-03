@@ -39,12 +39,18 @@ function isValidEvent(event: IntegrityEvent): boolean {
 }
 
 describe("integrityEvent", () => {
-  it("locks the integrity event kinds at four", () => {
+  // Was `locks the integrity event kinds at four`. The union gained `invalid-entry` by owner
+  // ruling on 2026-08-03, superseding criterion 8's "exactly four": the six otherwise
+  // unrecordable violation codes and an unreadable `integrity_events` row now get a durable,
+  // acknowledgeable row instead of a console warning and a silent drop. The deep-equal shape is
+  // what criterion 8 was really protecting, and it is kept.
+  it("locks the integrity event kinds at five", () => {
     expect([...INTEGRITY_EVENT_KINDS]).toEqual([
       "hierarchy-migrated",
       "multiple-active-hierarchy",
       "cross-kind-parent",
       "merge-dropped-edge",
+      "invalid-entry",
     ])
 
     // One condition, one name: the kind must be the SAME string the validator
@@ -73,7 +79,7 @@ describe("integrityEvent", () => {
     }
   })
 
-  it("rejects a row whose kind is outside the four", () => {
+  it("rejects a row whose kind is outside the five", () => {
     // Not a stylistic choice: `kind` is typed as the closed union, so a row
     // carrying anything else cannot come back as an IntegrityEvent without the
     // decoder minting a value the type says cannot exist.

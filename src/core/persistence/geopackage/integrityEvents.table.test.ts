@@ -43,6 +43,9 @@ function descriptorFor(column: string): ColumnDescriptor<IntegrityEvent> {
 
 const EMPTY_CTX: DecodeContext<IntegrityEvent> = { row: {}, decoded: {} }
 
+/** Injected, so a rehabilitated row's `createdAt` is reproducible and a test can assert it. */
+const NOW = "2026-08-03T12:00:00.000Z"
+
 const SAMPLE_EVENT: IntegrityEvent = {
   id: "integrity:hierarchy-migrated",
   kind: "hierarchy-migrated",
@@ -71,7 +74,7 @@ describe("integrityEvents.table", () => {
       const geoPackage = await GeoPackageAPI.open(new Uint8Array(realProjectBuffer()))
       try {
         expect(tableExists(geoPackage.connection, INTEGRITY_EVENTS_TABLE)).toBe(false)
-        const events = readIntegrityEvents(geoPackage)
+        const events = readIntegrityEvents(geoPackage, NOW)
         // The ordinary house pattern. Only `readRelationships` deviates, because only
         // the hierarchy migration gates on a table being absent; this asymmetry is
         // deliberate, and this assertion is what pins it.
@@ -112,8 +115,14 @@ describe("integrityEvents.table", () => {
   })
 
   // --- the fail-closed decoder on the READ path -------------------------------------
+  //
+  // Was `drops a structurally invalid row instead of returning it typed, and says so`, which
+  // asserted `toEqual([SAMPLE_EVENT])` — the drop. Owner ruling, 2026-08-03: no row a project
+  // file carries is dropped on load (ADR 0012 rule 2, applied to this table), because the drop
+  // deleted a durable record at the next save on a file that is not corrupt. The row is still
+  // never returned with its own unreadable `kind`, which is what the original test protected.
   it(
-    "drops a structurally invalid row instead of returning it typed, and says so",
+    "rehabilitates a structurally invalid row instead of dropping it, and says so",
     async () => {
       const geoPackage = await createTestGeoPackage()
       const warn = vi.spyOn(console, "warn").mockImplementation(() => {})
@@ -132,9 +141,56 @@ describe("integrityEvents.table", () => {
             " VALUES ('', 'cross-kind-parent', '2026-07-31T00:00:00.000Z', 's', NULL)",
         )
 
-        const read = readIntegrityEvents(geoPackage)
+        const read = readIntegrityEvents(geoPackage, NOW)
         // Not a throw: a corrupt integrity row must never make a project unopenable.
-        expect(read).toEqual([SAMPLE_EVENT])
+        expect(read).toHaveLength(3)
+        expect(read[0]).toEqual(SAMPLE_EVENT)
+        expect(warn).toHaveBeenCalledTimes(1)
+
+        const [, salvagedId, derivedId] = read
+        // The unreadable `kind` never comes back as itself.
+        expect(salvagedId?.kind).toBe("invalid-entry")
+        expect(derivedId?.kind).toBe("invalid-entry")
+        // Salvage before invention: an id and a timestamp the row carried are kept.
+        expect(salvagedId?.id).toBe("integrity:bad-kind")
+        expect(salvagedId?.createdAt).toBe("2026-07-31T00:00:00.000Z")
+        // A blank id gets a derived one, prefixed so it cannot collide with a real event's.
+        expect(derivedId?.id).toBe("integrity:invalid-entry:unreadable-row-2")
+        // The whole raw row survives verbatim, so nothing on disk is lost.
+        expect(salvagedId?.detail).toEqual({
+          id: "integrity:bad-kind",
+          kind: "whatever",
+          created_at: "2026-07-31T00:00:00.000Z",
+          summary: "s",
+          detail: null,
+          acknowledged_by: null,
+          acknowledged_at: null,
+          acknowledged_note: null,
+        })
+      } finally {
+        warn.mockRestore()
+        geoPackage.close()
+      }
+    },
+    60_000,
+  )
+
+  it(
+    "re-reads a rehabilitated row as an ordinary event, without nesting it again",
+    async () => {
+      const geoPackage = await createTestGeoPackage()
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {})
+      try {
+        createIntegrityEventsTable(geoPackage)
+        geoPackage.connection.run(
+          `INSERT INTO ${INTEGRITY_EVENTS_TABLE} (id, kind, created_at, summary, detail)` +
+            " VALUES ('integrity:bad-kind', 'whatever', '2026-07-31T00:00:00.000Z', 's', NULL)",
+        )
+        // The save the analyst does next: the rehabilitated event replaces the row it came from.
+        const rehabilitated = readIntegrityEvents(geoPackage, NOW)
+        writeIntegrityEvents(geoPackage, rehabilitated)
+
+        expect(readIntegrityEvents(geoPackage, "2026-08-04T00:00:00.000Z")).toEqual(rehabilitated)
         expect(warn).toHaveBeenCalledTimes(1)
       } finally {
         warn.mockRestore()
@@ -156,7 +212,7 @@ describe("integrityEvents.table", () => {
           { ...SAMPLE_EVENT, id: "integrity:first", detail: { childId: "e-1" } },
         ]
         writeIntegrityEvents(geoPackage, events)
-        const read = readIntegrityEvents(geoPackage)
+        const read = readIntegrityEvents(geoPackage, NOW)
         expect(read.map((e) => e.id)).toEqual(["integrity:second", "integrity:first"])
         expect(read).toEqual(events)
         expect(read[0]?.detail).toEqual({})
