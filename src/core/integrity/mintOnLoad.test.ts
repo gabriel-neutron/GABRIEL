@@ -34,9 +34,12 @@ describe("relationshipViolationEvents", () => {
     expect(events[0].kind).toBe("invalid-entry")
     expect((INTEGRITY_EVENT_KINDS as readonly string[])).toContain(events[0].kind)
     expect(events[0].createdAt).toBe(NOW)
+    // Pinned whole rather than by substring: criterion 82 grades the sentence a person reads,
+    // and only an exact match catches it drifting back into a template. One "recorded", in the
+    // tail, where it carries the meaning.
     expect(events[0].summary).toBe(
-      "The relationship recorded from \"3rd Motor Rifle Brigade\" to \"58th Combined Arms Army\" " +
-      "is recorded as having started after it ended, so it is kept exactly as recorded and left " +
+      "The relationship from \"3rd Motor Rifle Brigade\" to \"58th Combined Arms Army\" " +
+      "is dated as having started after it ended, so it is kept exactly as recorded and left " +
       "for a person to correct.",
     )
     // The code and the offending edge are in `detail`, so the sentence stays readable and the

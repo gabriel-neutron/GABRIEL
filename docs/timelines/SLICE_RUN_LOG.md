@@ -1343,3 +1343,37 @@ form — was clean throughout, 316 files rising to 337. One note for the next ru
 `src docs scripts` and therefore NOT repo-root `CONTEXT.md`**, which this slice modified; it was
 byte-scanned separately and was clean.
 
+### Addendum, 2026-08-03 — the libuv workaround does not propagate the exit code, and every "exit 0" reported through it is vacuous
+
+Found while applying the `[HUMAN]` corrections, by accident: a `verify` whose log clearly showed
+`1 failed | 85 passed` still reported `$LASTEXITCODE = 0`. Measured directly against a control:
+
+```
+cmd /c "start /affinity 1 /wait /min cmd /c \"exit 3\""   ->  $LASTEXITCODE = 0
+cmd /c "exit 3"                                            ->  $LASTEXITCODE = 3
+```
+
+**`start` returns the exit code of `start` itself, not of the process it launched**, and `/wait`
+does not change that. So the instruction this project has been giving every runner agent — "read
+the exit code from `$LASTEXITCODE`, never through a pipe" — is sound about pipes and **wrong about
+this wrapper**. Every `exit 0` reported through it in this run and in the 2026-07-31 P1-P3 run was
+green whatever happened inside.
+
+**This is the third member of a family that has now cost this project three times**, after the
+`rg -c $'\x00'` NUL scan (Q36, vacuous for two slices) and the four `vitest -t` filters naming a
+file that does not contain the test (§0.1 of the criteria file). In each case a check reported
+success without performing the test, and in each case the shape is the same: **the observable being
+read is not produced by the thing being checked.**
+
+**No verdict in this run was actually wrong**, because every runner agent was also required to
+report the `Test Files` / `Tests` summary lines verbatim and those were read — the redundancy that
+was asked for as evidence turned out to be the only evidence. But it was luck that the requirement
+existed.
+
+**For the next run:** either read the summary lines and treat the exit code as decoration, or drop
+the wrapper and capture the code properly (`Start-Process -Wait -PassThru` exposes `.ExitCode`;
+setting affinity via `Start-Process -PassThru` then `$p.ProcessorAffinity = 1` keeps the mitigation
+and keeps the code). Do not write another criterion whose expected result is "exit 0" from a wrapped
+command. Worth adding to §8b as a seventh lesson: **a criterion must name an observable the checked
+work actually produces.**
+

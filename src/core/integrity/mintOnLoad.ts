@@ -118,8 +118,8 @@ export function crossKindParentEvents(
  * validator produced belongs in `detail`, and this sentence is read by a person.
  */
 const VIOLATION_CLAUSE: Partial<Record<RelationshipViolationCode, string>> = {
-  "unknown-type": "is recorded under a relationship type this vocabulary does not define",
-  "date-order": "is recorded as having started after it ended",
+  "unknown-type": "uses a relationship type this vocabulary does not define",
+  "date-order": "is dated as having started after it ended",
   "invalid-date": "carries a date that is not a calendar date",
   "missing-required-date": "is missing the start date its type requires",
   "invalid-metadata": "carries a qualifier its type does not declare, or a value outside the set that type allows",
@@ -149,9 +149,12 @@ export function relationshipViolationEvents(
     const rel = relById.get(violation.relationshipId)
     // Named endpoints where the edge is in hand; an edge the set cannot explain is still
     // recorded, under the only name it has.
+    // One "recorded" per sentence, and it is the one in the tail that carries the meaning:
+    // the edge is kept as it stands. Repeating it in the subject and the clause made the
+    // sentence read as a template rather than as something written (criterion 82).
     const subject = rel == null
-      ? "A relationship recorded as " + quoted(violation.relationshipId)
-      : "The relationship recorded from " + label(rel.fromId) + " to " + label(rel.toId)
+      ? "A relationship known only as " + quoted(violation.relationshipId)
+      : "The relationship from " + label(rel.fromId) + " to " + label(rel.toId)
     events.push({
       id: INVALID_ENTRY_PREFIX + violation.code + ":" + violation.relationshipId,
       kind: "invalid-entry",

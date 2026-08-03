@@ -1,6 +1,7 @@
 # Relationships are the hierarchy, and the retained `parentId` is a derivation rather than a second copy
 
-Decided 2026-07-31, in the slice that first writes to `public/project.gpkg`.
+Decided 2026-07-31, in the slice that ships the first write to `public/project.gpkg`. The
+migration code lands here; running it against the real file is a separate, deliberate act.
 
 The `relationships` table becomes the **only** record of who sits under whom. `Entity.parentId` is kept, and is **derived** — recomputed from the active hierarchy-bearing edges on every load and on every edge mutation, by one pure pair of functions (`activeParentMap`, then `withDerivedParents`) and by nothing else. A one-time migration, gated on the **absence** of the `relationships` table and not on its row count, mints one edge per parented entity from the legacy columns: **1012 edges for the 1012 parented entities among 1027** — 999 `subordinate_to` from `units.parent_id` and 13 `corporate_parent` from the legacy `organisations` table, leaving 15 roots. Every minted id is the string `hier:` followed by the child id, which is unambiguous because no id in the file contains a colon.
 
