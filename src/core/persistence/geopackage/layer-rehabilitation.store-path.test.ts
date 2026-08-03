@@ -39,6 +39,9 @@ function makeLoadResultOnLayer(layer: GpkgLayer): GeoPackageLoadResult {
       },
     ],
     ratingEvents: [],
+    // The single entity is a root, so this fixture carries no edges and no integrity findings.
+    relationships: [],
+    integrityEvents: [],
   }
 }
 

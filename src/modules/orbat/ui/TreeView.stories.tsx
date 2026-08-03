@@ -44,6 +44,9 @@ const meta = {
         layers,
         entities,
         drawnGeometries: [],
+        claims: [],
+        relationships: [],
+        integrityEvents: [],
         selectedEntityId: "alpha",
       })
 

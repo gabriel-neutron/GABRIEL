@@ -2,6 +2,7 @@ import { useCallback, useMemo, useState } from "react"
 import type { DrawnGeometry, MapEntity, PositionMode } from "@/types/domain.types"
 import type { SymbolAffiliation, SymbolDomain, SymbolEchelon } from "@/types/symbol.types"
 import type { OrganisationType } from "@/types/organisation.types"
+import { withActiveParent } from "@/core/relationship/activeParent"
 import { useProjectStore } from "@/store/useProjectStore"
 import { useProvenanceStore } from "@/store/useProvenanceStore"
 import { createCitationClaim, filterCitationClaims, type Claim } from "@/core/provenance/claim"
@@ -69,6 +70,8 @@ export function useEntityInspector(): EntityInspectorState {
   const layers = useProjectStore((s) => s.layers)
   const drawnGeometries = useProjectStore((s) => s.drawnGeometries)
   const claims = useProjectStore((s) => s.claims)
+  const relationships = useProjectStore((s) => s.relationships)
+  const setRelationships = useProjectStore((s) => s.setRelationships)
   const updateEntity = useProjectStore((s) => s.updateEntity)
   const deleteGeometry = useProjectStore((s) => s.deleteGeometry)
   const addClaims = useProjectStore((s) => s.addClaims)
@@ -203,13 +206,14 @@ export function useEntityInspector(): EntityInspectorState {
   const handleParentChange = useCallback(
     (parentId: string | null) => {
       if (!entity) return
-      const patch: Partial<MapEntity> = { parentId }
+      // `parentId` is derived (ADR 0011); `withActiveParent` REPLACES the child's edge, never adds.
+      setRelationships(withActiveParent(relationships, entity, parentId, crypto.randomUUID()))
+      // Separate concern, kept: an entity positioned BY its parent has nowhere left to be.
       if (parentId == null && entity.positionMode === "parent") {
-        patch.positionMode = "none"
+        updateEntity(entity.id, { positionMode: "none" })
       }
-      updateEntity(entity.id, patch)
     },
-    [entity, updateEntity],
+    [entity, relationships, setRelationships, updateEntity],
   )
 
   const handleIsExactPositionChange = useCallback(

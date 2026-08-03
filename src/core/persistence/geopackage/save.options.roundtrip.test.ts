@@ -79,6 +79,11 @@ describe("saveGeoPackage options (real pre-E1 fixture, read-only)", () => {
         sources: first.sources,
         claims: first.claims,
         ratingEvents: [ratingEvent],
+        // Fed straight back from the load, like every other option here: the fixture's
+        // hierarchy reaches this save as edges (ADR 0011), and `[]` would wipe the table
+        // and flatten every parent on the reload below.
+        relationships: first.relationships,
+        integrityEvents: first.integrityEvents,
       })
       const second = await loadGeoPackage(Uint8Array.from(bytes).buffer)
 

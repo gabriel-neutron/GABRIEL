@@ -59,7 +59,8 @@ describe("coordinate round-trip", () => {
         ["https://example.org/source-b", "cached snippet B"],
       ])
 
-      const bytes = await saveGeoPackage({ layers, entities, geometries, researchSources: sourceCache, baseBuffer: undefined, sources: undefined, claims: undefined, ratingEvents: undefined })
+      // The one entity is a root, so this save carries no edges and no integrity findings.
+      const bytes = await saveGeoPackage({ layers, entities, geometries, researchSources: sourceCache, baseBuffer: undefined, sources: undefined, claims: undefined, ratingEvents: undefined, relationships: [], integrityEvents: [] })
       const persistedBuffer = Uint8Array.from(bytes).buffer
       const loaded = await loadGeoPackage(persistedBuffer)
 
@@ -126,8 +127,23 @@ describe("coordinate round-trip", () => {
           isExactPosition: false,
         },
       ]
+      // ADR 0011: the edge set is the sole authority for parentId once a file is reloaded, so
+      // "org-2 sits under org-1" has to reach disk as an edge for the assertion below to hold.
+      // Passing `[]` here would not make the fixture simpler, it would delete the parent link
+      // this test round-trips. Shape and id namespace as minted by migrateHierarchy.ts.
+      const relationships = [
+        {
+          id: "hier:org-2",
+          fromId: "org-2",
+          toId: "org-1",
+          type: "corporate_parent" as const,
+          startDate: null,
+          endDate: null,
+          metadata: {},
+        },
+      ]
 
-      const bytes = await saveGeoPackage({ layers, entities, geometries: [], researchSources: undefined, baseBuffer: undefined, sources: undefined, claims: undefined, ratingEvents: undefined })
+      const bytes = await saveGeoPackage({ layers, entities, geometries: [], researchSources: undefined, baseBuffer: undefined, sources: undefined, claims: undefined, ratingEvents: undefined, relationships, integrityEvents: [] })
       const persistedBuffer = Uint8Array.from(bytes).buffer
       const loaded = await loadGeoPackage(persistedBuffer)
 
@@ -181,7 +197,8 @@ describe("coordinate round-trip", () => {
           notes: "predates the analyzed_at/position_mode/is_exact_position columns",
         },
       ]
-      const bytes = await saveGeoPackage({ layers, entities, geometries: [], researchSources: undefined, baseBuffer: undefined, sources: undefined, claims: undefined, ratingEvents: undefined })
+      // The one entity is a root, so this save carries no edges and no integrity findings.
+      const bytes = await saveGeoPackage({ layers, entities, geometries: [], researchSources: undefined, baseBuffer: undefined, sources: undefined, claims: undefined, ratingEvents: undefined, relationships: [], integrityEvents: [] })
       const geoPackage = await GeoPackageAPI.open(new Uint8Array(bytes))
       try {
         geoPackage.connection.run("ALTER TABLE units DROP COLUMN analyzed_at")
@@ -286,7 +303,9 @@ describe("coordinate round-trip", () => {
         },
       ]
 
-      const bytes = await saveGeoPackage({ layers, entities, geometries: [], researchSources: undefined, baseBuffer: undefined, sources: undefined, claims: undefined, ratingEvents: undefined })
+      // No edges: the cross-kind reference under test is the one in the `parent_id` column, and
+      // loadGeoPackage validates that column before it ever looks at the edge set.
+      const bytes = await saveGeoPackage({ layers, entities, geometries: [], researchSources: undefined, baseBuffer: undefined, sources: undefined, claims: undefined, ratingEvents: undefined, relationships: [], integrityEvents: [] })
       await expect(loadGeoPackage(Uint8Array.from(bytes).buffer)).rejects.toThrow(
         /Unsupported schema.*missing parent/,
       )

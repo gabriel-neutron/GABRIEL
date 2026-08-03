@@ -16,10 +16,16 @@ import {
   PROVENANCE_CLAIMS_TABLE,
 } from "./provenanceClaims.table"
 import { createRatingEventsTable, writeRatingEvents } from "./ratingEvents.table"
+import { createRelationshipsTable, writeRelationships } from "./relationships.table"
+import { createIntegrityEventsTable, writeIntegrityEvents } from "./integrityEvents.table"
 import { clearLegacyOrganisationsTable } from "./organisations.table"
 import { createGeoPackageWithRetry } from "./browserSaveFile"
 import { ensureOptionalColumns } from "./columnDescriptor"
 import type { GpkgLayer, GpkgEntity, GpkgGeometry, GpkgSource, GpkgClaim, GpkgRatingEvent } from "./types"
+// Slice 2B's two tables type themselves against the domain types directly, as their own
+// descriptor lists do (`relationships.table.ts:2`); `types.ts` mints no Gpkg* alias for them.
+import type { Relationship } from "@/core/relationship/relationship"
+import type { IntegrityEvent } from "@/core/integrity/integrityEvent"
 
 /**
  * Every member is required, including the five that accept `undefined`: a save replaces
@@ -39,6 +45,16 @@ export type SaveGeoPackageOptions = {
   claims: GpkgClaim[] | undefined
   // Phase 4 (v1.5): same additive pattern as sources/claims above.
   ratingEvents: GpkgRatingEvent[] | undefined
+  /**
+   * Slice 2B. Plain arrays rather than `T | undefined`: the union above marks fields whose
+   * absence is a distinct state from emptiness (no base file, no cache) or that are not yet
+   * threaded through the store. Neither holds here — both are threaded in this slice and
+   * "deliberately nothing here" is `[]`, which the required member already makes visible in a
+   * diff. Both write functions self-clear (see below), so `[]` wipes the table, exactly as a
+   * New Project save intends.
+   */
+  relationships: Relationship[]
+  integrityEvents: IntegrityEvent[]
 }
 
 /**
@@ -48,6 +64,7 @@ export type SaveGeoPackageOptions = {
  */
 export async function saveGeoPackage(options: SaveGeoPackageOptions): Promise<Uint8Array> {
   const { layers, entities, geometries, researchSources, baseBuffer, sources, claims, ratingEvents } = options
+  const { relationships, integrityEvents } = options
   let geoPackage: GeoPackage | null = null
   try {
     if (baseBuffer != null && baseBuffer.byteLength > 0) {
@@ -63,6 +80,13 @@ export async function saveGeoPackage(options: SaveGeoPackageOptions): Promise<Ui
     createProvenanceSourcesTable(geoPackage)
     createProvenanceClaimsTable(geoPackage)
     createRatingEventsTable(geoPackage)
+    // Slice 2B. No `ensureOptionalColumns` call joins the three below for these two: both are
+    // created whole, with no `optional` descriptor, so their `NOT NULL` constraints live in
+    // CREATE TABLE. `ensureOptionalColumns` splices `constraints` into ALTER TABLE ADD COLUMN
+    // (`columnDescriptor.ts:118`), which SQLite rejects for NOT NULL without a constant
+    // default — adding the call would break every file reopened from a baseBuffer.
+    createRelationshipsTable(geoPackage)
+    createIntegrityEventsTable(geoPackage)
 
     // A reopened pre-migration `units`/provenance table (baseBuffer path) may still be
     // missing columns added since its physical creation — add them before any INSERT runs.
@@ -93,6 +117,13 @@ export async function saveGeoPackage(options: SaveGeoPackageOptions): Promise<Ui
     writeProvenanceSources(geoPackage, sources ?? [])
     writeProvenanceClaims(geoPackage, claims ?? [])
     writeRatingEvents(geoPackage, ratingEvents ?? [])
+
+    // Slice 2B's two tables self-clear the same way (`relationships.table.ts:108`,
+    // `integrityEvents.table.ts:102`), so they need no DELETE above either. Their members are
+    // required and non-`undefined`, so there is nothing to default: an omitted key is a compile
+    // error and `[]` is the explicit, diff-visible way to wipe the table.
+    writeRelationships(geoPackage, relationships)
+    writeIntegrityEvents(geoPackage, integrityEvents)
 
     const exported = await geoPackage.export()
     if (!(exported instanceof Uint8Array)) {

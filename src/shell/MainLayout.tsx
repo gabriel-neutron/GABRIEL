@@ -15,6 +15,7 @@ import { FlaskConical } from "lucide-react"
 import type { MapEntity, DrawnGeometry } from "@/types/domain.types"
 import { getDefaultEntityLayerId } from "./entityLayer"
 import type { EnrichmentControls, LayeredResearchControls } from "@/types/layout.types"
+import { withActiveParent } from "@/core/relationship/activeParent"
 import { useProjectStore } from "@/store/useProjectStore"
 import { useSelectedRef } from "@/store/useSelectedRef"
 import { selectEntity, clearSelection } from "@/core/map/selection"
@@ -24,11 +25,7 @@ import { CommandPalette } from "./CommandPalette"
 
 export type { EnrichmentControls, LayeredResearchControls }
 
-function entityFromGeometry(
-  geom: DrawnGeometry,
-  defaultLayerId: string,
-  parentId: string | null,
-): MapEntity {
+function entityFromGeometry(geom: DrawnGeometry, defaultLayerId: string): MapEntity {
   const id = crypto.randomUUID()
   const layerId = geom.layerId ?? defaultLayerId
   return {
@@ -36,7 +33,9 @@ function entityFromGeometry(
     id,
     name: "New entity",
     layerId,
-    parentId,
+    // Derived from the edge set on every load (ADR 0011): a parent written here would be
+    // erased at the next save. The caller commits the real parent as an edge instead.
+    parentId: null,
     affiliation: "Hostile",
     isExactPosition: false,
   }
@@ -92,9 +91,14 @@ export function MainLayout({
   const handleCreateNewEntity = useCallback((geom: DrawnGeometry): void => {
     const s = useProjectStore.getState()
     const defaultLayerId = getDefaultEntityLayerId(s.layers)
-    const entity = entityFromGeometry(geom, defaultLayerId, s.selectedEntityId)
+    const entity = entityFromGeometry(geom, defaultLayerId)
     s.addEntity(entity)
     s.addGeometry({ ...geom, entityId: entity.id })
+    // On the creation path, not deferred to a later save: the selected entity is the new
+    // entity's parent, and an edge is the only place that survives a reload.
+    if (s.selectedEntityId != null) {
+      s.setRelationships(withActiveParent(s.relationships, entity, s.selectedEntityId, crypto.randomUUID()))
+    }
     selectEntity(entity.id)
   }, [])
 

@@ -17,6 +17,7 @@ _Note_: `Entity` is a hand-mirrored flattening of core + profile, not `EntityCor
 **Hierarchy**:
 The parent/child relation between Entities — not a military one (a corporate control chain and a shipowner chain are also trees). Traversed by the shared Hierarchy index.
 _Superseded in part by [ADR 0010](docs/adr/0010-first-class-relationships.md)_: Hierarchy is no longer the **core** relation, but **one derived view** over typed edges — `subordinate_to` and `corporate_parent`. The `relationships` records are the source of truth; `parentId` becomes derived and non-authoritative.
+_Realised by [ADR 0011](docs/adr/0011-relationships-are-the-hierarchy.md)_: the derivation and the migration that mints the first edges from the legacy parent columns. Since then the hierarchy is read from the edges, `parentId` holds the **Active parent** and nothing else, and the retained legacy column is a derivation rather than a copy.
 
 **ORBAT** (Order of Battle):
 The **military view** of the generic Hierarchy — the presentation of Unit-Profile Entities as a command tree. One module's lens on a core capability; no longer Gabriel's only structure.
@@ -57,6 +58,24 @@ The investigative surface a record-tier type belongs to — `orbat`, `military-i
 
 **ExportOverride**:
 Per-edge authorisation to publish **one** assessment-tier edge under CC-BY. Records a proposer, a **different** confirmer, a date, and a rationale. The two-person rule is **ceremony and attribution, not authentication** — Gabriel has no identity system, so the names are free text and git history carries the real attribution. Absent means excluded (the gate fails closed); present on a Record-tier edge it is a violation, because there it authorises nothing while reading as if it did.
+
+**Hierarchy-bearing edge**:
+A Relationship that places a child under a parent — the one question the derived Hierarchy asks of the edge vocabulary. Two types bear it: `subordinate_to`, unless its attachment metadata says `attached` (an absent attachment counts as organic), and `corporate_parent`, always. In both cases only while the edge is **active**, meaning it carries no end date. There is a single definition of the property, shared by the derivation and by the dual-subordination control, so the tree an analyst sees and the violation the validator reports can never disagree about the same pair of edges.
+_Avoid_: "organic subordination" as the general term — organic versus attached is one type's metadata, not the property itself.
+
+**Active parent**:
+The parent an Entity currently derives from its edges, and the only thing `parentId` ever holds. An Entity has an active parent when exactly one hierarchy-bearing edge leaving it is active; zero makes it a **root**, two or more make it a **contested child**. Re-derived on every load and on every edge commit, so `parentId` is a rendering of the edges and never a second record of them — and therefore never a backup of them (ADR [0011](docs/adr/0011-relationships-are-the-hierarchy.md)).
+
+**Contested child**:
+An Entity with two or more competing active hierarchy-bearing edges. It has **no** active parent: it is absent from the derived parent map rather than being handed a winner, and the competing edges are recorded together as an Integrity event. Dual subordination is a finding an analyst is looking for, so Gabriel holds the conflict open rather than resolving it; only a human deleting or dating one of the edges settles it.
+_Avoid_: "conflict", "ambiguous parent" — a contested child is a stated state of the data, not an error in it.
+
+**Integrity event** (`integrity_events`):
+A durable, publishable record of something the data could not represent faithfully, kept in the project file beside the data it describes rather than in a log. Four kinds today: a completed hierarchy migration, a contested child, a hierarchy edge crossing two Entity kinds, and an edge dropped by an identity merge. Each carries a one-sentence **summary written to be read** — naming entities, not ids — and a structured detail that captures the rejected link **verbatim at the moment of rejection**, unnormalised, because a derived value recomputes to nothing and the original pair would otherwise survive exactly one save. An analyst may acknowledge an event; an unacknowledged one blocks nothing, because refusing to save an analyst's only working file is the wrong direction to fail in.
+_Avoid_: warning, error, log entry.
+
+**`hier:` id**:
+The id shape of an edge minted by the one-time hierarchy migration — the literal `hier:` followed by the child Entity's id. It marks an edge as **derived from the legacy parent columns rather than authored by an analyst**, and it is reversible on a first-colon split because no Entity id contains a colon. The determinism makes a repeat run a no-op rather than a duplication, but it is not what protects the file: the migration is gated on the **absence** of the relationships table, because re-minting from a column that now holds the derivation would resurrect edges an analyst had deliberately deleted.
 
 ### Enrichment pipeline
 

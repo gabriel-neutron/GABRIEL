@@ -77,13 +77,18 @@ export function applyGeoPackageResult(
     layers,
     entities: result.entities as MapEntity[],
     drawnGeometries: result.geometries as DrawnGeometry[],
+    // Pass-through, both of them. `entities` already carry the parent derived in `load.ts`
+    // from exactly these edges, so re-deriving here would be a second answer to one question.
+    relationships: result.relationships,
+    integrityEvents: result.integrityEvents,
     selectedEntityId,
   }
 }
 
 /**
  * The one project state every load path hands to setProject. Named rather than inferred so that
- * "no sixth field" is a compile-time property: the literal below is excess-property-checked.
+ * "no eighth field" is a compile-time property: the literal below is excess-property-checked.
+ * (Six became seven when §7 step 6 added `relationships` and `integrityEvents`.)
  */
 export type ProjectStateFromLoadResult = ApplyGeoPackageResultState & { claims: GpkgClaim[] }
 
@@ -98,6 +103,8 @@ export function projectStateFromLoadResult(result: GeoPackageLoadResult): Projec
     entities: applied.entities,
     drawnGeometries: applied.drawnGeometries,
     claims: result.claims,
+    relationships: applied.relationships,
+    integrityEvents: applied.integrityEvents,
     selectedEntityId: applied.selectedEntityId,
   }
 }

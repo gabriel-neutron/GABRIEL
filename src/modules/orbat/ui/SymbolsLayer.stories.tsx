@@ -42,6 +42,9 @@ const meta = {
         layers: [layer],
         entities: [entity],
         drawnGeometries: [geometry],
+        claims: [],
+        relationships: [],
+        integrityEvents: [],
         selectedEntityId: entity.id,
       })
       return <Story />

@@ -10,6 +10,8 @@ function makeState(overrides: Partial<ProjectState> = {}): ProjectState {
     entities: [],
     drawnGeometries: [],
     claims: [],
+    relationships: [],
+    integrityEvents: [],
     selectedEntityId: null,
     entityMergeMap: {},
     ...overrides,
@@ -130,6 +132,7 @@ describe("useProjectStore claims cascade", () => {
         { id: "c-1", entityId: "e-1", field: "sources", value: null, sourceId: "src-1", credibility: null, timestamp: null },
         { id: "c-2", entityId: "e-2", field: "sources", value: null, sourceId: "src-1", credibility: null, timestamp: null },
       ],
+      relationships: [], integrityEvents: [],
       selectedEntityId: null,
     })
     useProjectStore.getState().deleteEntity("e-1")
@@ -151,6 +154,7 @@ describe("useProjectStore claims cascade", () => {
         { id: "c-1", entityId: "e-1", field: "sources", value: null, sourceId: "src-1", credibility: null, timestamp: null },
         { id: "c-2", entityId: "e-2", field: "sources", value: null, sourceId: "src-1", credibility: null, timestamp: null },
       ],
+      relationships: [], integrityEvents: [],
       selectedEntityId: null,
     })
     useProjectStore.getState().removeLayer("custom-1")
@@ -191,6 +195,7 @@ describe("useProjectStore.confirmClaimCredibility (ADR 0009 Confirm gate)", () =
           },
         },
       ],
+      relationships: [], integrityEvents: [],
       selectedEntityId: null,
     })
     useProjectStore.getState().confirmClaimCredibility("c-1")
@@ -207,6 +212,7 @@ describe("useProjectStore.confirmClaimCredibility (ADR 0009 Confirm gate)", () =
       claims: [
         { id: "c-1", entityId: "e-1", field: "sources", value: null, sourceId: "src-1", credibility: 2, timestamp: null },
       ],
+      relationships: [], integrityEvents: [],
       selectedEntityId: null,
     })
     useProjectStore.getState().confirmClaimCredibility("c-1")
@@ -222,6 +228,7 @@ describe("useProjectStore.confirmClaimCredibility (ADR 0009 Confirm gate)", () =
       claims: [
         { id: "c-1", entityId: "e-1", field: "sources", value: null, sourceId: "src-1", credibility: 2, timestamp: null },
       ],
+      relationships: [], integrityEvents: [],
       selectedEntityId: null,
     })
     useProjectStore.getState().refuteClaimCredibility("c-1")
@@ -256,6 +263,7 @@ describe("useProjectStore.applyCredibilityToClaims (detached credibility patch)"
       entities: [{ kind: "unit", id: "e-1", name: "A", layerId: "custom-1", parentId: null }],
       drawnGeometries: [],
       claims,
+      relationships: [], integrityEvents: [],
       selectedEntityId: null,
     })
   }
@@ -320,6 +328,9 @@ describe("useProjectStore mergeEntities (ADR 0006, E3)", () => {
       claims: [
         { id: "c-1", entityId: "b", field: "sources", value: null, sourceId: "src-1", credibility: null, timestamp: null },
       ],
+      // ADR 0011: the hierarchy IS the edge set, so "child is under b" is an EDGE. A post-2B
+      // store carries edges; `parentId` alone is derived and would be nulled by the derivation.
+      relationships: [{ id: "r-1", fromId: "child", toId: "b", type: "subordinate_to", startDate: null, endDate: null, metadata: {} }], integrityEvents: [],
       selectedEntityId: "b",
     })
     useProjectStore.getState().mergeEntities("a", "b")
@@ -345,6 +356,7 @@ describe("useProjectStore mergeEntities (ADR 0006, E3)", () => {
       ],
       drawnGeometries: [],
       claims: [],
+      relationships: [], integrityEvents: [],
       selectedEntityId: null,
     })
     useProjectStore.getState().mergeEntities("a", "c")
@@ -359,6 +371,7 @@ describe("useProjectStore mergeEntities (ADR 0006, E3)", () => {
       entities: [{ kind: "unit", id: "a", name: "Wagner", layerId: "custom-1", parentId: null }],
       drawnGeometries: [],
       claims: [],
+      relationships: [], integrityEvents: [],
       selectedEntityId: null,
     })
     // secondaryId "ghost" was never a real entity (e.g. a stale duplicate-candidate row) —

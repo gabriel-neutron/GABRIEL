@@ -71,6 +71,12 @@ describe("real project through the store path (public/project.gpkg)", () => {
         sources: snapshot.sources,
         claims: snapshot.claims,
         ratingEvents: snapshot.ratingEvents,
+        // From the snapshot, exactly as performProjectSave takes them (projectSave.ts): after
+        // ADR 0011 the edge set IS the hierarchy, so a hard-coded `[]` here would not be a
+        // neutral fixture value — it would wipe the relationships table and make the parent-map
+        // comparison below assert nothing but "everything flattened to null, twice".
+        relationships: snapshot.relationships,
+        integrityEvents: snapshot.integrityEvents,
       })
       const reloaded = await loadGeoPackage(Uint8Array.from(bytes).buffer)
 

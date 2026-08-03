@@ -27,6 +27,9 @@ function makeLoadResult(): GeoPackageLoadResult {
       },
     ],
     ratingEvents: [],
+    // The single entity is a root, so this fixture carries no edges and no integrity findings.
+    relationships: [],
+    integrityEvents: [],
   }
 }
 
@@ -48,12 +51,16 @@ describe("projectStateFromLoadResult", () => {
       { id: "custom-1", name: "Task Force", visible: false, kind: "custom" },
       { id: INDUSTRY_LAYER_ID, name: "Industry", visible: true, kind: "organisation" },
     ])
-    // No sixth field reaches setProject.
+    // No UNDECLARED field reaches setProject. Slice 2B took the declared set from five to seven:
+    // `relationships` and `integrityEvents` are required on setProject, and this literal is the
+    // one place a silent eighth would show up.
     expect(Object.keys(state).sort()).toEqual([
       "claims",
       "drawnGeometries",
       "entities",
+      "integrityEvents",
       "layers",
+      "relationships",
       "selectedEntityId",
     ])
   })

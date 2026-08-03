@@ -32,6 +32,8 @@ describe("useProjectStore.renameLayer (ADR 0012)", () => {
       entities: [],
       drawnGeometries: [],
       claims: [],
+      relationships: [],
+      integrityEvents: [],
       selectedEntityId: null,
     })
   })

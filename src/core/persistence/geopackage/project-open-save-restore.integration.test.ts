@@ -46,6 +46,8 @@ describe("project open/save/session-restore flow", () => {
       layers, entities, geometries,
       researchSources: sourceCache, baseBuffer: undefined,
       sources: undefined, claims: undefined, ratingEvents: undefined,
+      // The single entity is a root, so this snapshot carries no edges and no findings.
+      relationships: [], integrityEvents: [],
     })
     const bufferToPersist = Uint8Array.from(exported).buffer
     await saveProject(bufferToPersist)

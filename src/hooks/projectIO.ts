@@ -6,7 +6,7 @@ import {
 } from "@/core/persistence/geopackage"
 import { applyDeterministicRatingPipeline } from "@/core/provenance/ratingPipeline"
 import { INDUSTRY_LAYER_ID } from "@/types/organisation.types"
-import { performProjectSave, type ProjectSaveDeps } from "./projectSave"
+import { performProjectSave, type ProjectSaveDeps, type ProjectSaveInput } from "./projectSave"
 import { useProjectStore, selectPersistableSnapshot } from "@/store/useProjectStore"
 import { useSourceCacheStore } from "@/store/useSourceCacheStore"
 import { useOsmViewStore } from "@/store/useOsmViewStore"
@@ -163,6 +163,11 @@ export async function performNewProject(
       sources: undefined,
       claims: undefined,
       ratingEvents: undefined,
+      // `[]`, not `undefined`: a new project deliberately has no edges and no integrity findings,
+      // and the seed file's own rows must not survive into it. The other fields stay `undefined`
+      // because for them absence still means something else (no base file, no cache).
+      relationships: [],
+      integrityEvents: [],
     })
     await deps.writeGeoPackageToFile(bytes)
     deps.notify("New project created.")
@@ -216,7 +221,10 @@ export async function performSaveProject(
 ): Promise<void> {
   // The store calls it sourceCache, persistence calls it researchSources; renamed on the way in so
   // performProjectSave forwards it under one name (P3).
-  const { layers, entities, geometries, sourceCache: researchSources, sources, claims, ratingEvents } = selectPersistableSnapshot(
+  const {
+    layers, entities, geometries, sourceCache: researchSources,
+    sources, claims, ratingEvents, relationships, integrityEvents,
+  } = selectPersistableSnapshot(
     useProjectStore.getState(),
     useSourceCacheStore.getState().sourceCache,
     useProvenanceStore.getState().sources,
@@ -225,10 +233,15 @@ export async function performSaveProject(
   ui.setBusy(true)
   ui.setError(null)
   try {
-    await performProjectSave(
+    // The literal below is left byte-for-byte as Slice 2A wrote it: it carries the read of the
+    // authority flag that the save guard turns on, and where that read sits was paid for in 2A.
+    // Slice 2B's two collections are therefore merged onto it rather than folded into it, so the
+    // read cannot drift. The ProjectSaveInput annotation keeps a forgotten member a compile error.
+    const input: ProjectSaveInput = Object.assign(
       { layers, entities, geometries, researchSources, sources, claims, ratingEvents, snapshotIsAuthoritative: authority.current },
-      deps,
+      { relationships, integrityEvents },
     )
+    await performProjectSave(input, deps)
     // A save the analyst authorised and which landed is what makes the snapshot stand for the
     // persisted project; without this, Save 2 is refused over what Save 1 itself wrote.
     authority.current = true

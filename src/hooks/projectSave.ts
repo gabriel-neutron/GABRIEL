@@ -5,6 +5,8 @@ import type {
   GpkgSource,
   GpkgClaim,
   GpkgRatingEvent,
+  GpkgRelationship,
+  GpkgIntegrityEvent,
   SaveGeoPackageOptions,
 } from "@/core/persistence/geopackage"
 import type { LoadedProject } from "@/services/projectStorage.service"
@@ -29,6 +31,14 @@ export interface ProjectSaveInput {
    * error rather than a silent loss of the audit trail.
    */
   ratingEvents: GpkgRatingEvent[]
+  /**
+   * Slice 2B, and plain arrays rather than `T | undefined` for the same reason
+   * SaveGeoPackageOptions declares them that way: writeRelationships and writeIntegrityEvents
+   * self-clear too, so absence is not a distinct state here — "deliberately nothing here" is `[]`,
+   * and a required member keeps that choice visible at every call site.
+   */
+  relationships: GpkgRelationship[]
+  integrityEvents: GpkgIntegrityEvent[]
   /**
    * Whether this session established that the in-memory snapshot stands for the persisted
    * project. Required, not optional, so a call site that forgets it is a compile error.
@@ -73,6 +83,8 @@ export async function performProjectSave(input: ProjectSaveInput, deps: ProjectS
     sources: input.sources,
     claims: input.claims,
     ratingEvents: input.ratingEvents,
+    relationships: input.relationships,
+    integrityEvents: input.integrityEvents,
   })
   await deps.writeGeoPackageToFile(bytes)
   const buffer = new ArrayBuffer(bytes.length)

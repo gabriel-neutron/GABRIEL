@@ -1,14 +1,22 @@
 import { create } from "zustand"
-import { devtools } from "zustand/middleware"
+import { devtools, type NamedSet } from "zustand/middleware"
 import { getDefaultEchelonLayers } from "@/core/persistence/geopackage"
 import type { Layer, MapEntity, DrawnGeometry } from "@/types/domain.types"
 import { INDUSTRY_LAYER_ID } from "@/types/organisation.types"
 import type { Claim } from "@/core/provenance/claim"
-import type { Source } from "@/core/provenance/source"
+import type { IntegrityEvent } from "@/core/integrity/integrityEvent"
+import { withContestedParentEvents } from "@/core/integrity/contestedParentEvents"
+import type { Relationship } from "@/core/relationship/relationship"
+import { activeParentMap, withDerivedParents } from "@/core/relationship/activeParent"
 import { mergeEntities as mergeIdentityGraph } from "@/core/identity/merge"
 import { assignCredibility, confirmCredibility, refuteCredibility, type CredibilityAssessmentResult } from "@/core/provenance/reviewQueue"
-import { createRatingEvent, type RatingEvent } from "@/core/provenance/ratingEvent"
+import { createRatingEvent } from "@/core/provenance/ratingEvent"
 import { useProvenanceStore } from "@/store/useProvenanceStore"
+
+// The two React-free readers over `ProjectState` live in a sibling module so this file stays
+// inside its declared line cap; re-exported here because they are part of the store's public
+// surface and nine call sites import `selectPersistableSnapshot` from this path.
+export { selectPersistableSnapshot, unacknowledgedIntegrityEvents } from "./projectSnapshot"
 
 // ---------------------------------------------------------------------------
 // State
@@ -26,6 +34,10 @@ export interface ProjectState {
    * themselves are NOT entity-keyed and live in the peripheral `useProvenanceStore`.
    */
   claims: Claim[]
+  /** The edge set (ADR 0011). Authoritative for `entity.parentId`, which is derived from it. */
+  relationships: Relationship[]
+  /** Durable integrity findings, persisted alongside the edges rather than surfaced and lost. */
+  integrityEvents: IntegrityEvent[]
   selectedEntityId: string | null
   /**
    * Runtime-only secondaryId -> primaryId breadcrumb left by `mergeEntities`, not persisted
@@ -48,9 +60,54 @@ function initialState(): ProjectState {
     entities: [],
     drawnGeometries: [],
     claims: [],
+    relationships: [],
+    integrityEvents: [],
     selectedEntityId: null,
     entityMergeMap: {},
   }
+}
+
+/** zustand's own type for a `devtools`-wrapped setter, whose third action-name argument
+ *  exists only under that middleware. */
+type SetFn = NamedSet<ProjectState & ProjectActions>
+
+/**
+ * Private, deliberately: the edge set and the `parentId` derived from it must never be written
+ * apart. Every relationship mutation funnels through here, and the ONE `set` writes the edges AND
+ * the re-derived entities in a single object literal, so no subscriber can observe them out of
+ * step (ADR 0005 atomicity). The derivation runs on `next`, before the `set` — reading it back off
+ * the store afterwards would be a second notification and a second answer to one question. Load
+ * reaches the same pure derivation through `load.ts`/`applyGeoPackageResult`, one path for both.
+ *
+ * `rest` exists for the one mutation that rewrites more than the edges: a merge also replaces
+ * entities, claims, geometries and the merge map, and emitting those as a second `set` would put
+ * merged entities and stale edges one notification apart — exactly what this function prevents.
+ * Its `entities`, when given, are what the derivation runs over, since the pre-merge array still
+ * holds the record the merge removed.
+ *
+ * The integrity rows come out of the SAME derivation, in the same `set`: `activeParentMap`
+ * decides which children are contested, and a contested child silently loses its parent on
+ * screen. Leaving the record to the next load would mean the analyst sees the change now and the
+ * ledger learns of it only after a save and a reload — a visible data change with nothing
+ * written down, which is what the ledger exists to prevent. The clock is read here because this
+ * is the store boundary; everything below it takes `now` injected.
+ */
+function commitRelationships(
+  set: SetFn,
+  state: ProjectState,
+  next: Relationship[],
+  rest?: Partial<ProjectState>,
+): void {
+  const parents = activeParentMap(next)
+  const entities = withDerivedParents(rest?.entities ?? state.entities, parents)
+  const integrityEvents = withContestedParentEvents(
+    rest?.integrityEvents ?? state.integrityEvents,
+    parents.contested,
+    next,
+    entities,
+    new Date().toISOString(),
+  )
+  set({ ...rest, relationships: next, entities, integrityEvents }, false, "commitRelationships")
 }
 
 // ---------------------------------------------------------------------------
@@ -62,10 +119,17 @@ export interface ProjectActions {
     layers: Layer[]
     entities: MapEntity[]
     drawnGeometries: DrawnGeometry[]
-    claims?: Claim[]
+    // Required, not optional: an optional record field a call site forgets is a record that
+    // silently does not exist, and the defaulted claims member was that hole on the ledger.
+    claims: Claim[]
+    relationships: Relationship[]
+    integrityEvents: IntegrityEvent[]
     selectedEntityId: string | null
   }): void
   resetProject(): void
+  /** The single public entry to the edge set. Replaces it wholesale and rewrites every derived
+   *  `parentId` in the same notification. Callers mint the edges; the store never invents one. */
+  setRelationships(next: Relationship[]): void
 
   addLayer(layer: Layer): void
   addNewLayer(): void
@@ -108,44 +172,14 @@ export interface ProjectActions {
 // Store
 // ---------------------------------------------------------------------------
 
-/**
- * The single source of truth for what data gets written to disk. `sourceCache`/
- * `sources` live in peripheral stores (ADR 0005/0006) — passed in explicitly rather
- * than read off `ProjectState` so this stays the one place callers assemble a save
- * snapshot from, even though the data now spans multiple stores.
- */
-export function selectPersistableSnapshot(
-  state: ProjectState,
-  sourceCache: Map<string, string>,
-  sources: Source[] = [],
-  ratingEvents: RatingEvent[] = [],
-) {
-  const nonOsmLayerIds = new Set(state.layers.filter((l) => l.osmData == null).map((l) => l.id))
-  const entities = state.entities
-    .filter((e) => nonOsmLayerIds.has(e.layerId))
-    .map((e) => ({ ...e, name: e.name.trim() || "Untitled" }))
-  const survivingEntityIds = new Set(entities.map((e) => e.id))
-  return {
-    layers: state.layers.map((l) => ({ ...l, kind: l.kind ?? (l.osmData != null ? ("osm" as const) : undefined) })),
-    entities,
-    geometries: state.drawnGeometries.filter((g) => nonOsmLayerIds.has(g.layerId)),
-    sourceCache,
-    // Only the claims belonging to a surviving (non-OSM) entity are persisted —
-    // otherwise an OSM entity filtered out above would leave a dangling claim.entityId.
-    claims: state.claims.filter((c) => survivingEntityIds.has(c.entityId)),
-    sources,
-    ratingEvents,
-  }
-}
-
 export const useProjectStore = create<ProjectState & ProjectActions>()(
   devtools(
     (set, get) => ({
       ...initialState(),
 
-      setProject({ layers, entities, drawnGeometries, claims, selectedEntityId }) {
+      setProject({ layers, entities, drawnGeometries, claims, relationships, integrityEvents, selectedEntityId }) {
         set(
-          { layers, entities, drawnGeometries, claims: claims ?? [], selectedEntityId, entityMergeMap: {} },
+          { layers, entities, drawnGeometries, claims, relationships, integrityEvents, selectedEntityId, entityMergeMap: {} },
           false,
           "setProject",
         )
@@ -153,6 +187,10 @@ export const useProjectStore = create<ProjectState & ProjectActions>()(
 
       resetProject() {
         set(initialState(), false, "resetProject")
+      },
+
+      setRelationships(next) {
+        commitRelationships(set, get(), next)
       },
 
       addLayer(layer) {
@@ -249,27 +287,35 @@ export const useProjectStore = create<ProjectState & ProjectActions>()(
       },
 
       mergeEntities(primaryId, secondaryId) {
-        set((s) => {
-          const { entities, claims, geometries } = mergeIdentityGraph(
-            { entities: s.entities, claims: s.claims, geometries: s.drawnGeometries },
-            primaryId,
-            secondaryId,
-          )
-          // mergeIdentityGraph is a no-op (returns its input unchanged) when the ids are equal,
-          // either is missing, or the kinds differ — only record the remap when the secondary
-          // genuinely existed before this call and was removed by it. Checking post-merge
-          // absence alone would also match a secondaryId that was already gone (deleted, or
-          // never real), wrongly redirecting that id onto primaryId for later consumers.
-          const merged = s.entities.some((e) => e.id === secondaryId) && !entities.some((e) => e.id === secondaryId)
-          // The primary survives; a selection pointing at the now-gone secondary follows it.
-          return {
-            entities,
-            claims,
-            drawnGeometries: geometries,
-            selectedEntityId: s.selectedEntityId === secondaryId ? primaryId : s.selectedEntityId,
-            entityMergeMap: merged ? { ...s.entityMergeMap, [secondaryId]: primaryId } : s.entityMergeMap,
-          }
-        }, false, "mergeEntities")
+        const s = get()
+        // A merge rewrites the edge set, so it goes through `commitRelationships` like every
+        // other relationship mutation — its `rest` argument carries the merge's own slices into
+        // the same single `set`, so no subscriber can see merged entities against stale edges.
+        const { entities, claims, geometries, relationships, integrityEvents } = mergeIdentityGraph(
+          { entities: s.entities, claims: s.claims, geometries: s.drawnGeometries, relationships: s.relationships },
+          primaryId,
+          secondaryId,
+          new Date().toISOString(),
+        )
+        // mergeIdentityGraph is a no-op (returns its input unchanged) when the ids are equal,
+        // either is missing, or the kinds differ — only record the remap when the secondary
+        // genuinely existed before this call and was removed by it. Checking post-merge
+        // absence alone would also match a secondaryId that was already gone (deleted, or
+        // never real), wrongly redirecting that id onto primaryId for later consumers.
+        const merged = s.entities.some((e) => e.id === secondaryId) && !entities.some((e) => e.id === secondaryId)
+        // The primary survives; a selection pointing at the now-gone secondary follows it.
+        commitRelationships(set, s, relationships, {
+          entities,
+          claims,
+          drawnGeometries: geometries,
+          // Appended, never replaced: a dropped-edge finding is the only trace left of an
+          // assertion someone made, so it accumulates alongside the ledger it belongs to.
+          integrityEvents: integrityEvents.length === 0
+            ? s.integrityEvents
+            : [...s.integrityEvents, ...integrityEvents],
+          selectedEntityId: s.selectedEntityId === secondaryId ? primaryId : s.selectedEntityId,
+          entityMergeMap: merged ? { ...s.entityMergeMap, [secondaryId]: primaryId } : s.entityMergeMap,
+        })
       },
 
       addGeometry(geom) {

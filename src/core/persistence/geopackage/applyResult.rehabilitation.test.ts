@@ -20,6 +20,10 @@ function makeLoadResult(layers: GpkgLayer[]): GeoPackageLoadResult {
     sources: [],
     claims: [],
     ratingEvents: [],
+    // Layer rehabilitation is the subject here; these fixtures carry no entities, so no edges
+    // and no integrity findings either.
+    relationships: [],
+    integrityEvents: [],
   }
 }
 

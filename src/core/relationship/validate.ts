@@ -52,23 +52,33 @@ function describeValue(value: unknown): string {
 }
 
 /**
- * An organic subordination that has not ended — the hierarchy-bearing edge.
+ * The single definition of "this edge places a child under a parent".
+ * Consumed by `activeParentMap` AND by `countActiveOrganicParents`, so the
+ * derivation and the control cannot disagree.
  *
- * Organic is the default and "attached" the marked exception, so an edge that
- * records no attachment still bears hierarchy. Requiring an explicit "organic"
- * would make the dual-subordination gate inert on exactly the population it
- * guards: attachment is optional everywhere, and the 999 subordinate_to edges
- * Slice 2 mints from the legacy parent_id column carry none. The spec asks this
- * control to hold a real finding open — dual subordination "may be true: block
- * until a human records which it is, never until someone deletes one, or the
- * control destroys the finding" (GABRIEL_V2_SLICE_0_1_BUILD.md:575-576) — and a
- * control that is off by default blocks nothing. Fail closed is the safety
- * property. Owner ruling, 2026-07-29.
+ * - `subordinate_to`, unless `metadata.attachment` is `"attached"`. Absent
+ *   attachment counts as organic (owner Ruling 2, 2026-07-29).
+ * - `corporate_parent`, always — those 13 edges ARE the industry hierarchy
+ *   (GABRIEL_V2_SLICE_0_1_BUILD.md:521-525).
+ * - Active in both cases: `isActive(rel)` with no date, i.e. `endDate == null`.
+ *
+ * Organic-by-default is load-bearing, not a convenience. Requiring an explicit
+ * "organic" would make the dual-subordination gate inert on exactly the
+ * population it guards: attachment is optional everywhere, and the 999
+ * subordinate_to edges minted from the legacy parent_id column carry none. The
+ * spec asks this control to hold a real finding open — dual subordination "may
+ * be true: block until a human records which it is, never until someone deletes
+ * one, or the control destroys the finding"
+ * (GABRIEL_V2_SLICE_0_1_BUILD.md:575-576) — and a control that is off by default
+ * blocks nothing. Fail closed is the safety property.
  */
-function isActiveOrganicSubordination(rel: Relationship): boolean {
+export function isHierarchyBearing(rel: Relationship): boolean {
+  if (rel.type === "corporate_parent") return isActive(rel)
   if (rel.type !== "subordinate_to") return false
-  if (rel.metadata?.attachment === "attached") return false
-  return isActive(rel)
+  // Written `!==` so that no attachment, a null one and an undefined one all
+  // read as organic; only the marked exception opts out (Trap T6, and the
+  // ruling above).
+  return rel.metadata?.attachment !== "attached" && isActive(rel)
 }
 
 /**
@@ -137,10 +147,15 @@ function exportOverrideProblem(rel: Relationship, definition: EdgeTypeDefinition
   return undefined
 }
 
+/**
+ * Counts every active hierarchy-bearing parent, corporate ones included — the
+ * "Organic" in the name is now the narrower historical case, kept only because
+ * the name is referenced by the acceptance criteria.
+ */
 function countActiveOrganicParents(rels: Relationship[]): Map<string, number> {
   const counts = new Map<string, number>()
   for (const rel of rels) {
-    if (!isActiveOrganicSubordination(rel)) continue
+    if (!isHierarchyBearing(rel)) continue
     counts.set(rel.fromId, (counts.get(rel.fromId) ?? 0) + 1)
   }
   return counts
@@ -214,13 +229,13 @@ export function validateRelationships(
       if (problems.length > 0) report("invalid-metadata", rel, problems.join("; "))
     }
 
-    if (isActiveOrganicSubordination(rel)) {
+    if (isHierarchyBearing(rel)) {
       const conflicts = organicParentCounts.get(rel.fromId) ?? 0
       if (conflicts > 1) {
         report(
           "multiple-active-hierarchy", rel,
           "entity " + quote(rel.fromId) + " has " + String(conflicts) +
-          " active organic subordinate_to edges, and may have only one",
+          " active hierarchy-bearing edges, and may have only one",
         )
       }
     }

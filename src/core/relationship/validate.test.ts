@@ -114,6 +114,25 @@ describe("validateRelationships", () => {
     expect(violations).toHaveLength(2)
   })
 
+  it("draws the conflict for one active subordinate_to and one active corporate_parent", () => {
+    // Q39: one definition of hierarchy-bearing, so a unit edge and a corporate
+    // edge on the same child are two parents, not one of each kind.
+    const mixed: Relationship[] = [
+      rel({ id: "q-1", type: "subordinate_to", fromId: "child", toId: "p1" }),
+      rel({ id: "q-2", type: "corporate_parent", fromId: "child", toId: "p2" }),
+    ]
+
+    const violations = validateRelationships(mixed)
+    expect(codesOf(violations)).toEqual(["multiple-active-hierarchy", "multiple-active-hierarchy"])
+    expect(violations.map((violation) => violation.relationshipId)).toEqual(["q-1", "q-2"])
+
+    // The same child, once the corporate edge has ended: no conflict at all.
+    expect(validateRelationships([
+      mixed[0],
+      rel({ id: "q-2", type: "corporate_parent", fromId: "child", toId: "p2", endDate: "2024-01-01" }),
+    ])).toEqual([])
+  })
+
   it("counts a subordinate_to edge that records no attachment as organic", () => {
     // Owner ruling 2026-07-29: organic is the default, "attached" the marked
     // exception. Slice 2 mints its subordinate_to edges without an attachment,

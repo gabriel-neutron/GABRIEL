@@ -10,7 +10,12 @@ import { performProjectSave, type ProjectSaveDeps, type ProjectSaveInput } from 
 function makeInput(overrides: Partial<ProjectSaveInput> = {}): ProjectSaveInput {
   return {
     layers: [{ id: "division", name: "Division", visible: true, kind: "echelon" }],
-    entities: [{ kind: "unit", id: "entity-1", name: "1st Battalion", layerId: "division", parentId: null }],
+    entities: [
+      { kind: "unit", id: "entity-1", name: "1st Battalion", layerId: "division", parentId: null },
+      // Second entity so the edge below has both endpoints inside the fixture: a dangling
+      // endpoint is a fatal violation on load (load.ts), which is not what this fixture stands for.
+      { kind: "unit", id: "entity-2", name: "2nd Battalion", layerId: "division", parentId: "entity-1" },
+    ],
     geometries: [
       { id: "geometry-1", layerId: "division", entityId: "entity-1", type: "point", lat: 50.45, lng: 30.52 },
     ],
@@ -38,6 +43,31 @@ function makeInput(overrides: Partial<ProjectSaveInput> = {}): ProjectSaveInput 
         timestamp: "2026-07-30T00:00:00.000Z",
       },
     ],
+    // Slice 2B's two fields, non-empty like every other one above and for the same reason. They
+    // are declared on ProjectSaveInput as plain arrays, not `T | undefined`, so they are supplied
+    // here rather than defaulted at the call site: a `?? []` would put the "wipe the table"
+    // decision somewhere a diff cannot see it, and it is the required member — not a fallback —
+    // that makes a forgotten field a compile error, which is what this helper exists to preserve.
+    relationships: [
+      {
+        id: "hier:entity-2",
+        fromId: "entity-2",
+        toId: "entity-1",
+        type: "subordinate_to",
+        startDate: null,
+        endDate: null,
+        metadata: {},
+      },
+    ],
+    integrityEvents: [
+      {
+        id: "integrity:hierarchy-migrated",
+        kind: "hierarchy-migrated",
+        createdAt: "2026-07-30T00:00:00.000Z",
+        summary: "The 1 parent-child link carried in this project's legacy parent column is now recorded as a typed relationship.",
+        detail: { mintedEdges: 1 },
+      },
+    ],
     snapshotIsAuthoritative: true,
     ...overrides,
   }
@@ -45,9 +75,10 @@ function makeInput(overrides: Partial<ProjectSaveInput> = {}): ProjectSaveInput 
 
 /**
  * A snapshot that is empty in every data dimension, matching the three guard tests whose names
- * say "empty snapshot": an emptied `researchSources` and `ratingEvents` count as much as the four
- * arrays, since a save replaces each of those tables too. Callers keep passing
- * `snapshotIsAuthoritative` explicitly — it is the axis those tests vary.
+ * say "empty snapshot": an emptied `researchSources` and `ratingEvents` count as much as the
+ * arrays, since a save replaces each of those tables too — and since Slice 2B that includes
+ * `relationships` and `integrityEvents`, whose write functions self-clear like the rest. Callers
+ * keep passing `snapshotIsAuthoritative` explicitly — it is the axis those tests vary.
  */
 function emptySnapshotInput(overrides: Partial<ProjectSaveInput> = {}): ProjectSaveInput {
   return makeInput({
@@ -57,6 +88,8 @@ function emptySnapshotInput(overrides: Partial<ProjectSaveInput> = {}): ProjectS
     sources: [],
     researchSources: new Map(),
     ratingEvents: [],
+    relationships: [],
+    integrityEvents: [],
     ...overrides,
   })
 }

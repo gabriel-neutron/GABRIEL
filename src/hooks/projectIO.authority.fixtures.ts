@@ -35,6 +35,10 @@ export function makeLoadResult(): GeoPackageLoadResult {
     sources: [],
     claims: [],
     ratingEvents: [],
+    // This fixture carries no edges: its single entity has no parent, so there is nothing for
+    // the hierarchy to record and nothing for the loader to have found wrong with it.
+    relationships: [],
+    integrityEvents: [],
   }
 }
 
