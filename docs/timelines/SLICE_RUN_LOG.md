@@ -1146,3 +1146,200 @@ in this run used the `start /affinity 1 /wait /min` workaround and every reporte
 `$LASTEXITCODE`, never through a pipe. `npm run scan:nul` — the real scanner, never the vacuous `rg`
 form — was clean at every commit, 308 files rising to 316.
 
+---
+
+## Run 2026-08-03 — Slice 2B, the hierarchy migration
+
+`BASE` **`f9f1046`** (the commit P3 landed on). Committed at **`8527d44`**, 53 files, 5753
+insertions. **Iterations used: 1 of 3.** `npm run verify` green at the start (72 files / 548 tests)
+and green at the commit (**83 files / 633 tests / 0 failed / 0 skipped**, `scan-nul` clean at 337
+files, `tsc -b && vite build` clean). **`public/project.gpkg` is byte-identical throughout —
+md5 `7d0b0e592a1128a0d83e7575110bf2dc`, absent from `git status` at every checkpoint, and no stray
+`gabriel-*.gpkg` anywhere in the tree. §10, the rehearsal, was deliberately NOT run.**
+
+Three uncommitted owner doc edits (the build-loop retarget, §8b, the 2A question closure) were
+committed first as `44994ef` so the migration commit could not sweep them in.
+
+### The grade
+
+**73 of 83 criteria pass. Zero implementation failures.** Four criterion defects, six `[HUMAN]`
+pending. Thirteen of the 73 passes needed a corrected command — the literal one was defective for a
+reason unrelated to the code — and **four of those were vacuously green**.
+
+| phase | agents | outcome |
+|---|---|---|
+| 1 | planner | 83 criteria, frozen. Re-measured every enumeration; found four more spec errors |
+| 2 | 11 coding agents in 5 waves | all landed; 3 forced deviations, each recorded before it was made |
+| 3 | 5 test authors | 145 new tests; one found a blocking implementation defect |
+| 4 | runner (no edits) | **PASS**, twice — before and after the Phase 5 fixes |
+| 5 | 2 review axes + 1 fix agent | 2 hard + 6 judgement findings; 4 fixed, 4 deliberately not |
+| 6 | grader (wrote nothing) | **0 implementation failures** |
+
+No agent graded its own work. The Phase 1 planner and the Phase 6 grader each died once from
+session-budget exhaustion and were relaunched with tighter briefs; the second attempt succeeded both
+times.
+
+### What the run measured that the documents had wrong
+
+Per §8b's standing hazard, every enumeration was re-measured. **Five were wrong, and three of those
+were in the correction table §4.7 added on 2026-07-31 to fix the previous two.**
+
+- **`setProject` call sites are 21**, not §4.7's 18 and not §9 clause 5's 22. P2 added three after
+  §4.7 was written (`layer-rehabilitation.store-path.test.ts` ×2, `useProjectStore.renameLayer.test.ts`).
+- **`selectPersistableSnapshot` call sites are 9**, not 8. Same cause.
+- **§7 step 6's `applyResult.ts:47-52` / `:49`** is stale; the cast is at `:78`.
+- **§10 step 17 cites `useProjectIO.ts:31`** for the picker's `suggestedName`; it is `projectIO.ts:70`.
+- **§4.4's "None is `optional` — see Trap T8"** names the wrong trap; it is T3/T4.
+- Newly measured, unrecorded anywhere: **`useEntityInspector.ts` was already 301 lines**, over the
+  cap, before this slice modified it. It now sits at **305 of its 305 ceiling — zero headroom.**
+
+### The blocking defect, and the ruling that cleared it
+
+**§4.4 specifies two things SQLite cannot both do:** `metadata NOT NULL` and "encode to `null` when
+the object has no own enumerable keys". Criteria 22 and 25 inherited the contradiction. 1010 of the
+1012 minted edges carry `{}`, so **every save of a project with a hierarchy failed** with
+`NOT NULL constraint failed: relationships.metadata`. Found independently by two Phase 3 agents,
+from the store path and from the table's own write path.
+
+**Owner ruled mid-run: drop `NOT NULL`, keep `encode({}) -> null`.** The decode side settles which
+half was wrong — criterion 25 requires `decode(null) -> {}`, which only means anything if `null` is
+storable. **Criterion 22 therefore fails by ruling, not by defect.** The owner also ruled that
+`useProjectIO.load-state.test.ts`'s "no sixth field" assertion updates to seven keys, its intent (no
+*undeclared* field reaches `setProject`) being unchanged.
+
+### The four criterion defects
+
+1. **15a** expects exactly four paths under `src/core/relationship/`; there are five, because
+   criterion 6's 300-line cap *explicitly directs* the truth table into a sibling file. **15a and 6
+   cannot both hold.** 15b/15c pass, so the Q39 scope limit it exists for is intact.
+2. **22** — the `NOT NULL` ruling above.
+3. **36** (`acts_for` unreachable) matches one line: `migration.store-path.test.ts:212`, which
+   **criterion 69 requires** ("no third type, `acts_for` 0"). Criterion 36's own exclusion note
+   asserts no positive criterion puts that string there; the assertion is false. **This is §8b
+   lesson 1 failing on its own terms.**
+4. **77** — two of its eight bullets match, both self-inflicted: the same `acts_for` line, and
+   `useProjectStore.renameLayer.test.ts`, which §2's own file table lists as compile-forced.
+
+### Four vacuous greens — measured, not inferred
+
+Criteria **46, 47, 51 and 58** name a test file that the 300/385-line caps forced their test into a
+**sibling** of. All four literal commands **exit 0 while running nothing**:
+
+| criterion | literal | corrected |
+|---|---|---|
+| 46 | `1 skipped / 8 skipped`, **exit 0** | dir-scoped: `1 passed / 24 skipped` |
+| 47 | `1 skipped / 8 skipped`, **exit 0** | dir-scoped: `2 passed / 23 skipped` |
+| 51 | `1 skipped / 8 skipped`, **exit 0** | dir-scoped: `1 passed / 24 skipped` |
+| 58 | `18 skipped (18)`, **exit 0** | `src/store/` scoped: `1 passed / 4 skipped` |
+
+49b escaped only because its command was already directory-scoped. **Re-point all four before this
+criteria file is reused.** Also **55d** expects 21 `getState().setProject(` and now measures 24 —
+Phase 3's new test files raise it; the production count is still exactly 3, which is what it is for.
+
+### §8b lesson 1 needs widening, on six pieces of evidence
+
+A negative grep must exclude the strings the positive criteria force you to write. This run hit the
+same shape **six times**, and only once was it a code string:
+
+- **Q2B-4** — §4.2's *verbatim JSDoc* contains `metadata.attachment === "attached"`, which criterion
+  76a counts. The spec's own declared signature forced a string a criterion forbids.
+- **Q2B-6** — criterion 23 greps the file for `optional`/`fallbackSql`, so T3's future-column warning
+  could not be written in its natural words.
+- **Q2B-9** — criterion 50b counts four function names, so a JSDoc naming its own subject broke it.
+- **Q2B-13** — criteria 65 and 66 collide on one line, forcing `Object.assign` where a literal
+  belongs. **The first time this degraded shipped code rather than a comment.**
+- **36 / 77** — above.
+- Task E had to reword a rationale comment naming `acts_for`.
+
+**Recommendation: widen the lesson to "the strings the positive criteria _or the spec's declared
+signatures or the code's own documentation_ force you to write."**
+
+### What the review caught that no criterion did
+
+Both axes converged on `decodeIntegrityEvent` from opposite directions — Standards called it
+Speculative Generality, Spec called it an unimplemented requirement. **It was neither: it was
+unwired.** §4.1 declares it the fail-closed decoder and §10 step 16 counts "zero rejected rows",
+but `readIntegrityEvents` returned every row, so `kind = "whatever"` reached the store typed as
+`IntegrityEventKind`. Fixed.
+
+**And the one that mattered most: `ActiveParentMap.contested` was dead in production.** §4.3 says
+the competing ids are returned "at the point the conflict is decided, so the caller mints the
+integrity event without a second validation pass" — and ADR 0011 repeats it — but the **edit** path
+computed `activeParentMap`, discarded `contested`, and ran no validation. An analyst creating a
+contest in-session saw the child's parent drop to `null` **with no integrity event minted at all**;
+the finding surfaced only after a save and reload. Every agent's tests passed because they all
+exercised the *load* path, where `validateRelationships` mints it as a side effect. **No criterion
+covered this. Only reading §4.3's stated rationale against the call graph found it.** Fixed by
+`src/core/integrity/contestedParentEvents.ts`, consumed inside `commitRelationships`' single `set`.
+
+### Deliberately not fixed, and why
+
+`load.ts`'s five new helpers are Divergent Change — none takes a `GeoPackage`; they are pure
+integrity policy in a persistence adapter, and the file sits at 295 of 300. Extracting them late in
+the run was more risk than it bought. Also left: the duplicated `tryParse`/decode across the two
+table modules, `countActiveOrganicParents`'s now-historical name (criterion 14a pins it), and
+`projectIO.ts`'s `Object.assign` — **"simplifying" that one would break frozen criterion 65.**
+
+### Open questions — 24 recorded, none guessed silently
+
+All in `SLICE_2B_OPEN_QUESTIONS.md`. The three the owner must rule on:
+
+- **Q2B-7 — the audit trail has a hole.** Six of the nine violation codes (`unknown-type`,
+  `date-order`, `invalid-date`, `missing-required-date`, `invalid-metadata`,
+  `invalid-export-override`) have **no matching `IntegrityEventKind`**, which criterion 8 locks at
+  four. §7 step 4 says every non-fatal code "becomes an `integrity_events` row"; it cannot. They are
+  currently `console.warn` — a log, not a record. Dead on today's file (criterion 70 asserts zero
+  violations); live the first time a foreign tool or a hand edit writes one.
+- **Q2B-24** — a structurally invalid `integrity_events` row is now dropped and warned, i.e. gone
+  from the file at the next save. Rule on it together with Q2B-7.
+- **Q2B-22 — the merge acyclicity guarantee is gone by design.** `resolveParent` promoted a primary
+  out of the secondary's subtree; criterion 61 deletes it, and Q40 forbids electing a winner, so an
+  ancestor merged into its descendant now leaves the survivor *contested* instead. Nothing in the
+  criteria required acyclicity and `buildOrbat` is cycle-safe, but a guarantee was traded for a rule
+  and that trade was never written down.
+
+Also recorded: **Q2B-1** (§3 contradicts itself on where the derivation goes; its `load.ts` row
+defers to §7, which settles it), **Q2B-5c** (the count assertion was unreachable as specified — a
+duplicate child id is what makes it fire, and what makes criterion 40 testable), **Q2B-10** (§4.7
+specifies a *private* `commitRelationships` while criterion 62a grades a *public* action it never
+declares; `setRelationships` had to be introduced to compile at all), **Q2B-16** (that function
+needed a fourth parameter to keep merge atomic in one `set`), **Q2B-21** (`handleParentChange` is
+unreachable without jsdom, which was ruled against, so 62c tests the collaborators and not the hook
+body).
+
+### `[HUMAN]` — awaiting the morning reader
+
+1. **79** — ADR 0011's prose: the four required arguments.
+2. **80** — `CONTEXT.md`'s five glossary entries.
+3. **81** — the `hierarchy-migrated` `summary` must read as publishable, not as a log line. Test 74
+   only asserts it is non-empty.
+4. **82** — the same bar for `merge-dropped-edge` and `cross-kind-parent`.
+5. **83** — schedule the file-cap splits: `useProjectStore.ts` 394, `useProjectStore.test.ts` 384,
+   **`useEntityInspector.ts` 305 of 305 — the next line added to it fails criterion 6.**
+6. **78b is now closed:** ADR 0011 is in commit `8527d44`, not trailing it.
+
+### Six files exist that §2's file table does not list
+
+None out of scope, none graded: `src/store/projectSnapshot.ts` (57, the Phase 5 extraction that
+keeps criterion 5 under 400), `src/core/integrity/contestedParentEvents.ts` (69), and four
+cap-forced test siblings — `migration.store-path.fixtures.test.ts` (181),
+`isHierarchyBearing.test.ts` (74), `useProjectStore.snapshot.test.ts` (71),
+`useEntityInspector.parent.test.ts` (121).
+
+Two further notes for whoever writes Slice 3: `multiple-active-hierarchy` is now minted from **two**
+places (`load.ts` off `validateRelationships`, `contestedParentEvents.ts` off `activeParentMap`),
+emitting the same id shape with a test pinning the string — decide whether `load.ts` re-points at the
+shared minter. And `setProject` writes `relationships` **directly**, not through
+`commitRelationships`, which is correct because `load.ts` already derived — but criterion 56a's
+"every relationship mutation funnels through it" is true only if a whole-project replacement is not a
+mutation.
+
+### Environment
+
+The libuv `new_time >= loop->time` abort **did not fire once** in this run, unlike 2026-07-30. Every
+`verify` still used the `start /affinity 1 /wait /min` workaround and every exit code came from
+`$LASTEXITCODE`, never through a pipe. `npm run scan:nul` — the real scanner, never the vacuous `rg`
+form — was clean throughout, 316 files rising to 337. One note for the next run: **`scan:nul` covers
+`src docs scripts` and therefore NOT repo-root `CONTEXT.md`**, which this slice modified; it was
+byte-scanned separately and was clean.
+
