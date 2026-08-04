@@ -163,7 +163,7 @@ Gabriel v2.0 turns the project file from a catalogue of nodes into an auditable,
 
 87. As a GEOINT analyst, I want to enter site-activity conclusions as rated Claims, so that imagery findings join the fusion without imagery living in Gabriel.
 88. As a two-person team, I want an explicit hand-off protocol for the project file, so that we never silently overwrite each other.
-89. As a two-person team, I want the canonical file versioned in a private repository, so that a lost laptop is not a lost investigation.
+89. As a two-person team, I want the canonical file versioned in a repository, so that a lost laptop is not a lost investigation. **Amended 2026-08-04:** originally *a private repository*. The owner has ruled that code and data are both public, so the canonical file is versioned in `github.com/gabriel-neutron/GABRIEL` itself. The requirement's substance — the file under version control and off any single machine — is met, and ADR 0011's revert point `5b0d2ed` is exactly this.
 90. As a two-person team, I want a failed push to reveal a collision, so that concurrent edits are detected rather than discovered later.
 91. As an analyst, I want Telegram collection running in the background throughout the window, so that a corpus exists when the corroboration question is finally asked.
 
@@ -300,7 +300,7 @@ Design principle, stated explicitly because it governs cost and recall: **weak s
 ### 12. Collaboration and continuity
 
 - **Baton pass on one canonical file.** Viable because the imagery boundary keeps the GEOINT analyst's Gabriel sessions short and mostly additive.
-- **A private repository — not the public code repository — versions the canonical project file and the documents folder, and *is* the baton:** pull before opening, push at end of session; a rejected push is the collision detector (the shorter session replays its work). It doubles as backup and as an audit trail of who changed what when.
+- **The repository versions the canonical project file and the documents folder, and *is* the baton:** pull before opening, push at end of session; a rejected push is the collision detector (the shorter session replays its work). It doubles as backup and as an audit trail of who changed what when. **Amended 2026-08-04:** this read *a private repository — not the public code repository*. The owner has ruled code and data both public, so there is one repository and it is the public one. Note what the amendment does **not** settle: the separation existed so the working file — which this document says "will contain named natural persons and unproven analyst hypotheses" — was not the thing the world could read. That filter still does not exist, and the working file is now the artefact `ViewPage` serves to the public map. Publishing a gated export instead of the working file remains owed.
 - Import-as-Proposals between two project files is **deferred**; the Proposal spine makes it cheap to add if baton-passing proves painful.
 
 ### 13. Telegram module

@@ -118,9 +118,10 @@ Running from now, not gated on any stage.
 - **Baton discipline.** One canonical project file. Pull before opening, push at end of session; a
   rejected push *is* the collision detector. The first silent overwrite will happen on a tired
   evening — the rule is only as good as the reflex.
-- **Private repository backup.** The canonical `.gpkg` and the documents folder live in a private
-  repo, never the public code repo. It is simultaneously the baton, the backup, and the audit
-  trail.
+- **Repository backup.** The canonical `.gpkg` and the documents folder live in the repository. It
+  is simultaneously the baton, the backup, and the audit trail. **Amended 2026-08-04:** read
+  "private repo, never the public code repo" until the owner ruled code and data both public. The
+  repo is `github.com/gabriel-neutron/GABRIEL`, public since 2026-05-05, verified against the API.
 - **AI budget stays frugal.** Deterministic indexes first; model calls scoped, cached, manually
   triggered. No background agents.
 - **Review capacity is the real bottleneck.** If a queue structurally exceeds two analysts, narrow

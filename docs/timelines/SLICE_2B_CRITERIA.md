@@ -134,6 +134,29 @@ splits (`SLICE_RUN_LOG.md`, "Six files exist that §2's file table does not list
 | `src/store/useProjectStore.snapshot.test.ts` | 71 | cap-forced sibling; holds 58's test (Q2B-20) |
 | `src/modules/orbat/hooks/useEntityInspector.parent.test.ts` | 121 | criterion 62c's test, written without jsdom (Q2B-21) |
 
+### 0.6 Criterion 79 rests on a fact that was never true — the repository is public
+
+Criterion **79(a)** requires ADR 0011 to record that "the real backup is the private repo's git
+history pinned at **`5b0d2ed`**". Measured 2026-08-04 against the GitHub API rather than assumed:
+`github.com/gabriel-neutron/GABRIEL` returns `"private": false` and has been public since it was
+created on 2026-05-05 — so the repository was already public on 2026-07-31 when this criterion was
+frozen, and on 2026-08-03 when the run graded it **pass**. The criterion is **not edited**
+(Prohibition 2), and the grade stands: ADR 0011 did say what 79(a) asked it to say. Both were
+wrong about the world, which is a different failure from a criterion the implementation missed —
+and it is the first one in this project where *every* participant, criterion and artefact agreed
+with each other and none of them checked.
+
+The owner has since ruled that code and data are both public, so this is the intended state. ADR
+0011's paragraph carries a dated correction; `GABRIEL_V2_PRD.md` requirement 89 and its baton-pass
+rule, `GABRIEL_V2_TIMELINE.md` and `GABRIEL_V2_SLICE_0_1_BUILD.md` carry the same. **The backup
+argument itself survives** — `5b0d2ed`'s blob is still byte-identical to the file on disk, re-verified
+the same day at md5 `7d0b0e59…` / 4,984,832 bytes.
+
+**For §8b:** this is the seventh lesson's sibling. Lesson 7 says a criterion must name an observable
+the checked work actually produces; this one says a criterion must not assert a fact about the
+world that nobody is required to measure. 79(a) graded a *document against a document*, and the
+loop has no step at which the underlying claim is checked against anything outside the repo.
+
 ---
 
 ## 1. Measurement corrections

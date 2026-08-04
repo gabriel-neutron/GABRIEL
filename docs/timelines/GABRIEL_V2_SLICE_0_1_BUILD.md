@@ -533,8 +533,10 @@ Resolved by an expert panel review (analyst / editorial judge / platform enginee
 - **The retained `parent_id` column is NOT a backup.** If `relationships` is ever empty, the
   derived parent goes null and the column is nulled in the same save — primary and backup
   fail together, perfectly correlated. It is a convenience for the nine existing read
-  consumers. **The backup is the private repo's git history.** Pin the pre-migration commit
-  SHA in the slice's PR description before the migration ever runs.
+  consumers. **The backup is the repo's git history.** Pin the pre-migration commit
+  SHA in the slice's PR description before the migration ever runs. (Read "the private repo's"
+  until 2026-08-04; the repository is public, and the owner has ruled that it should be. The pin
+  is `5b0d2ed` — see ADR 0011.)
 - **The migration has no `kind` heuristic.** One rule for the 999 unit links
   (`subordinate_to`), and one explicit id-keyed table for the 13 corporate links (below), so
   the classification is reviewable in a diff rather than inferred at runtime.

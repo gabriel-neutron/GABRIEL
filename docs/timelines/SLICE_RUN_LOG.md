@@ -1377,3 +1377,129 @@ and keeps the code). Do not write another criterion whose expected result is "ex
 command. Worth adding to §8b as a seventh lesson: **a criterion must name an observable the checked
 work actually produces.**
 
+
+---
+
+## Run 2026-08-04 — the §10 rehearsal, read-only half; two live defects; the public-repo correction
+
+`BASE` **`2020536`**. **§10 steps 17-28 were NOT run** — the owner authorised the read-only half
+only, and `public/project.gpkg` is byte-identical throughout at md5
+`7d0b0e592a1128a0d83e7575110bf2dc`, mtime unchanged, absent from `git status` at every checkpoint.
+
+### §10 pre-flight 1-5 and steps 6-16, measured
+
+Run through a temporary harness under `src/`, deleted afterwards; the file was read once with
+`readFileSync` and never opened for writing.
+
+| step | result |
+|---|---|
+| 1 tree clean | yes |
+| 2 disk md5 equals `git show 5b0d2ed:public/project.gpkg` | **yes** — both `7d0b0e59…`, 4,984,832 bytes. The pinned revert point is real |
+| 3 `npm run verify` | 86 files / 649 tests at the start |
+| 5 integrity queries, re-run rather than trusted | `PRAGMA integrity_check` returns ok; **0** dangling, **0** self-loops, **0** cycles, **0** cross-kind, **0** duplicate ids |
+
+**The two fingerprints. Compare against these rather than re-deriving them.**
+
+```
+Hash A  71cc3b332e6f50f3ce772f43d321ab6b6044b7abf6d06620508a5197804673a2   1012 entries
+Hash B  7e6570ef74b436336a76cd94965b7aca0f05bec2461cdbf945749bbcf49fac84   1024 of 1027 renderable
+```
+
+Hash A is the sorted, serialised `entityId -> parentId` map; Hash B the sorted, serialised
+**rendered** position map from `computeAllEntityPositions`, coordinates fixed at nine decimals.
+
+Steps 9-16 all measured as specified: 1012 minted (999 `subordinate_to` + 13 `corporate_parent`, no
+third type), **0** violations across all nine codes, 1012 distinct `hier:<childId>` ids, exactly 2
+priced edges (Rostec to KAMAZ 49.9, Rostec to Kalashnikov 25), `activeParentMap` deep-equal to the
+pre-migration map with 0 contested, Motovilikha to Techmash to Rostec at both hops, Rostec 12
+incoming, second pass 1012 with `skippedAlreadyPresent` 1012, one `hierarchy-migrated` event.
+
+**Step 19's in-memory equivalent held: Hash A and Hash B are both byte-identical after a
+save/reload round trip.** That is the assertion ADR 0011 calls the only one that catches a subtly
+wrong derivation while the edge count reads a perfect 1012.
+
+### Three measurement corrections
+
+1. **§10 step 8 cannot be performed as written.** It asks for row counts of `claims`, `sources` and
+   `rating_events`; **those tables do not exist in this file.** It corroborates §1's note that the
+   file has never been re-saved by post-E1 code, but a runner following step 8 literally would
+   stall or invent numbers. Actual counts: `units` 1010, `organisations` 17, `layers` 16,
+   `geometries` 291, `research_sources` 5.
+2. **§1's "741 position-derived" is units-only and is exactly right** (599 `none` + 142 `parent`).
+   Across all entities it is **750**: nine corporate entities are also position-derived, all
+   `none`. Recorded nowhere before.
+3. **Hash B covers 1024 of 1027** — three entities render nowhere at all. §10 step 7's "over all
+   1027 entities" is loose wording, not a wrong expectation.
+
+### Two live defects, found by the Slice 3 design panel, fixed at `3c98dc2`
+
+Both predate or were made reachable by 2B, and neither is in Slice 3's scope.
+
+- **`deleteEntity` wrote a project file that would not reopen.** It removed the row and left the
+  children's derived `parentId` pointing at it; that reaches `units.parent_id` through
+  `selectPersistableSnapshot`, and `load.ts:127` throws `entity references missing parent` on the
+  next open. `projectSnapshot.ts:41-42` filters *edges* onto removed entities with a comment naming
+  an unopenable file as the hazard — the derived field walked past that guard. Now routed through
+  `commitRelationships`, as `mergeEntities` directly below it already was.
+- **`collectDescendants` hung the tab on a parent cycle.** The seventh hierarchy walker and the
+  only one with no cycle guard. Reachable in two edits: Q2B-22 traded away the merge acyclicity
+  guarantee and the parent picker (`useEntityInspector.ts:99`) filters only self and kind, so a
+  descendant is selectable.
+
+**Both fixes were measured red before they were measured green** — the three delete cases fail on
+the assertion, the two cycle cases fail by timeout at 3794ms and 4344ms against the unfixed code.
+Given this project's three vacuous checks, a regression test never observed failing is not
+evidence.
+
+### The repository is public, and five documents said otherwise
+
+Measured against the GitHub API, not assumed: `github.com/gabriel-neutron/GABRIEL` returns
+`"private": false`, public since **2026-05-05** — so it was already public when criterion 79 was
+frozen and when the 2B run graded it a pass. **The owner has ruled that code and data are both
+public**, so this is the intended state; what was wrong was five documents asserting otherwise,
+including ADR 0011's backup argument, which is the sentence the whole irreversible-write plan rests
+on. All five now carry dated corrections. The backup argument itself survives: `5b0d2ed` is still
+byte-identical to the file on disk.
+
+**This is a new failure shape, and §8b should carry it.** Lesson 7 says a criterion must name an
+observable the checked work actually produces. This one is its sibling: **a criterion must not
+assert a fact about the world that nothing in the loop is required to measure.** Criterion 79(a)
+graded a document against a document. Every participant agreed with every artefact, and none of
+them checked. Recorded in full at §0.6 of `SLICE_2B_CRITERIA.md`; the criterion is not edited and
+its pass stands.
+
+### Vocabulary amended to `1.1.0`
+
+Four record-tier `publicDefinition` strings had drifted off the PRD's stated legal posture — that
+record-tier labels describe documents and observations, "so that the answer to a challenge is 'the
+filing exists', the only defence a two-person team can sustain". `subordinate_to`, `fields` and
+`produces` asserted facts about the world; **`supplies` had lost its evidentiary threshold
+entirely** (the PRD requires a contract or at least two transaction records). Amended in all three
+places they live — `vocabulary.ts`, `vocabulary.test.ts`'s verbatim copies, and the
+`GABRIEL_V2_SLICE_0_1_BUILD.md` block they were transcribed from — with the version bumped in the
+same commit, which is the deliberate-amendment gate ADR 0010 describes. Minor rather than major: no
+type moved, only prose. Free now and expensive after the first release, which is why it was done
+now.
+
+The vocabulary's own rule caught a first attempt: definitions may contain no backtick, because they
+ship verbatim in the CC-BY dataset. The lock test earned its keep.
+
+### Data licensed separately
+
+`LICENSE-DATA.md` declares CC BY 4.0 over `public/project.gpkg`, exported datasets, the edge
+definitions and `docs/`, leaving MIT on the code. The README's "dataset artifacts *can* be released
+separately ... *when* published" was written as though publication were ahead; the file is already
+downloadable and is already what `ViewPage` serves. The new file is explicit about what the data
+does not yet support: no export gate, named natural persons present, all 1,012 edges undated, and
+**742 of 999 parented units carrying no source at all** (measured 2026-08-04).
+
+### Still owed
+
+- **§10 steps 17-28** — the first write. Unrun, and the owner's.
+- **A gated export.** `ViewPage.tsx:37` serves `/project.gpkg`, so the public map *is* the working
+  file, which `GABRIEL_V2_PRD.md` explicitly forbids. Deferred by the owner, recorded here.
+- **Slice 3, correctness scope**: `hierarchyIndex.ts` with a `ParentLink` tri-state,
+  `Orbat.parentOf`, the six consumers ported, the two `multiple-active-hierarchy` minters unified
+  onto `contestedParentEvents.ts`, and contested children made visible — all three design lenses
+  independently found that ADR 0011's "contested children are visible but unresolved" is false.
+  They are absent from the tree, indistinguishable from roots, and gone from the map for the 741.

@@ -62,8 +62,18 @@ Accepted proposals affect the current session state, and become authoritative on
 
 ## License
 
-Code in this repository is licensed under the [MIT License](LICENSE).
-Dataset artifacts can be released separately under `CC-BY 4.0` when published.
+Two licences, because this repository holds two different things.
+
+- **Code** — [MIT](LICENSE). Everything under `src/`, `scripts/`, `sidecar/`.
+- **Data** — [CC BY 4.0](LICENSE-DATA.md). `public/project.gpkg`, any exported dataset, the edge-type
+  published definitions, and `docs/`.
+
+This used to read "dataset artifacts *can* be released separately under CC-BY 4.0 *when* published".
+That was written as though publication were still ahead: this repository is public, so
+`public/project.gpkg` is already downloadable and is already what the read-only map serves.
+[`LICENSE-DATA.md`](LICENSE-DATA.md) states the licence that actually applies today, and is
+explicit about what the data does and does not yet support — the export gate is not built, the
+hierarchy edges are undated, and most are unsourced.
 
 ## Technical Documentation
 

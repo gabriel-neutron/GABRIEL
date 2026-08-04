@@ -716,7 +716,7 @@ catches the failure mode that actually matters.
 
 ---
 
-## 8b. Writing 2B's criteria — six lessons, each of which already cost a criterion
+## 8b. Writing 2B's criteria — eight lessons, each of which already cost a criterion
 
 **Read this before freezing `SLICE_2B_CRITERIA.md`.** These were scattered across Q2A-9, Q2A-12,
 Q2A-15 and the 2A fix pass, where a Phase 1 planner would never find them. They are collected here
@@ -782,6 +782,30 @@ on 2026-07-31 because the planner reads this spec and does not read the 2A quest
    tests between files**, so any criterion pairing a `-t` filter with a specific filename is fragile
    by construction. Scope the command to the directory — `npx vitest run src/store/ -t "..."` finds
    the test wherever the cap put it — and grade on the *passed* count, never on the exit code.
+
+7. **A criterion must name an observable the checked work actually produces.** Added 2026-08-03
+   from the run log's addendum. `cmd /c "start /affinity 1 /wait /min ..."` returns the exit code of
+   `start`, not of the process it launched — measured against a control, `exit 3` through the wrapper
+   reports **0** — so every "exit 0" this project reported through the libuv workaround was green
+   whatever happened inside. That is the third member of a family, after the `rg`-based NUL scan
+   (vacuous for two slices) and lesson 6's `-t` filters. **In each case the observable being read was
+   not produced by the thing being checked.** Never write a criterion whose expected result is
+   "exit 0" from a wrapped command; read the `Test Files` / `Tests` summary lines and treat the exit
+   code as decoration. If you want a real code, `Start-Process -PassThru` then set
+   `$p.ProcessorAffinity = 1` and read `$p.ExitCode` — it keeps the mitigation and keeps the code.
+
+8. **A criterion must not assert a fact about the world that nothing in the loop is required to
+   measure.** Added 2026-08-04, and it is lesson 7's sibling one storey out. Criterion 79(a) required
+   ADR 0011 to record that the backup is "the **private** repo's git history pinned at `5b0d2ed`".
+   The ADR said exactly that, so the criterion passed — and the repository had been **public** since
+   2026-05-05, three months before the criterion was frozen. Nothing was wrong with the
+   implementation, the criterion, or the grading: **79(a) graded a document against a document**, and
+   no step of the loop compares such a claim against anything outside the repo. Every participant
+   agreed with every artefact and none of them checked. Where a criterion rests on an external fact —
+   repository visibility, a licence, a published source, an upstream API — it must name the command
+   that observes it (here, one call to the GitHub API returning `"private": false`). Recorded at §0.6
+   of `SLICE_2B_CRITERIA.md`; the criterion was not edited and its pass stands, because the failure
+   is in what the loop can see, not in what it graded.
 
 **And one that is not a lesson but a standing hazard:** this spec was frozen on 2026-07-29 and the
 tree moved under it on 2026-07-30. Any enumeration, count or line number in it is a measurement with
