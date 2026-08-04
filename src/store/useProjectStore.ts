@@ -217,12 +217,23 @@ export const useProjectStore = create<ProjectState & ProjectActions>()(
       },
 
       deleteEntity(entityId) {
-        set((s) => ({
-          entities: s.entities.filter((e) => e.id !== entityId),
-          drawnGeometries: s.drawnGeometries.filter((g) => g.entityId !== entityId),
-          claims: s.claims.filter((c) => c.entityId !== entityId),
-          selectedEntityId: s.selectedEntityId === entityId ? null : s.selectedEntityId,
-        }), false, "deleteEntity")
+        const s = get()
+        // Removing the row is not enough now that `parentId` is derived: the deleted entity's
+        // children keep it, `selectPersistableSnapshot` writes it to `units.parent_id`, and
+        // `load.ts` throws `entity references missing parent` on the next open — a delete that
+        // makes the project file unopenable. Routing through `commitRelationships` re-derives
+        // from the surviving edge set in the same `set`, so those children come back as roots.
+        commitRelationships(
+          set,
+          s,
+          s.relationships.filter((r) => r.fromId !== entityId && r.toId !== entityId),
+          {
+            entities: s.entities.filter((e) => e.id !== entityId),
+            drawnGeometries: s.drawnGeometries.filter((g) => g.entityId !== entityId),
+            claims: s.claims.filter((c) => c.entityId !== entityId),
+            selectedEntityId: s.selectedEntityId === entityId ? null : s.selectedEntityId,
+          },
+        )
       },
 
       mergeEntities(primaryId, secondaryId) {

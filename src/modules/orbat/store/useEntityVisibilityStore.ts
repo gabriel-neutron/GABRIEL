@@ -18,13 +18,23 @@ export interface EntityVisibilityActions {
   reset(): void
 }
 
+/**
+ * The seventh hierarchy walker in this codebase, and the only one that was not cycle-safe.
+ * `buildOrbat` guards explicitly and `computePositions` is saved by its `progress` flag; this
+ * one enqueued forever on a parent cycle and hung the tab. Cycles are reachable: Q2B-22 records
+ * that the merge acyclicity guarantee was traded away rather than replaced, and the parent
+ * picker (`useEntityInspector.ts:99`) filters only self and kind, so a descendant is selectable.
+ * Two edits make a 2-cycle, and either visibility toggle then never returns.
+ */
 function collectDescendants(entities: MapEntity[], rootId: string): string[] {
   const result: string[] = [rootId]
+  const seen = new Set<string>([rootId])
   const queue = [rootId]
   while (queue.length > 0) {
     const current = queue.shift()!
     for (const e of entities) {
-      if (e.parentId === current) {
+      if (e.parentId === current && !seen.has(e.id)) {
+        seen.add(e.id)
         result.push(e.id)
         queue.push(e.id)
       }

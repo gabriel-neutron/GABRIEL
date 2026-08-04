@@ -2,7 +2,12 @@ import { beforeEach, describe, expect, it } from "vitest"
 import type { IntegrityEvent } from "@/core/integrity/integrityEvent"
 import type { Relationship } from "@/core/relationship/relationship"
 import type { Layer, MapEntity } from "@/types/domain.types"
-import { unacknowledgedIntegrityEvents, useProjectStore, type ProjectState } from "./useProjectStore"
+import {
+  selectPersistableSnapshot,
+  unacknowledgedIntegrityEvents,
+  useProjectStore,
+  type ProjectState,
+} from "./useProjectStore"
 
 /**
  * Criteria 56d and 57a. Lives beside useProjectStore.test.ts rather than inside it: that file is
@@ -186,5 +191,40 @@ describe("unacknowledgedIntegrityEvents", () => {
     expect(unacknowledgedIntegrityEvents(useProjectStore.getState())).toEqual([])
     seed([], [], [event("i-1", { acknowledgedAt: "2026-07-31T12:00:00.000Z" })])
     expect(unacknowledgedIntegrityEvents(useProjectStore.getState())).toEqual([])
+  })
+})
+
+describe("deleteEntity keeps the project openable", () => {
+  beforeEach(() => {
+    useProjectStore.getState().resetProject()
+  })
+
+  it("re-derives the orphaned children instead of leaving them pointing at the deleted row", () => {
+    seed([unit("p"), unit("c", "p")], [edge("hier:c", "c", "p")])
+    useProjectStore.getState().deleteEntity("p")
+    expect(useProjectStore.getState().entities.map((e) => [e.id, e.parentId])).toEqual([["c", null]])
+  })
+
+  it("drops every edge touching the deleted entity, in either direction", () => {
+    seed(
+      [unit("p"), unit("c", "p"), unit("g", "c")],
+      [edge("hier:c", "c", "p"), edge("hier:g", "g", "c")],
+    )
+    useProjectStore.getState().deleteEntity("c")
+    expect(useProjectStore.getState().relationships.map((r) => r.id)).toEqual([])
+    expect(useProjectStore.getState().entities.map((e) => [e.id, e.parentId]))
+      .toEqual([["p", null], ["g", null]])
+  })
+
+  // The regression itself, stated as the predicate `load.ts` throws on. Before the fix the
+  // snapshot carried `c.parentId = "p"` with no `p` row, which reaches `units.parent_id` and
+  // makes the saved file refuse to reopen — a delete that destroys the project.
+  it("writes no entity whose parentId is missing from the same snapshot", () => {
+    seed([unit("p"), unit("c", "p")], [edge("hier:c", "c", "p")])
+    useProjectStore.getState().deleteEntity("p")
+    const snapshot = selectPersistableSnapshot(useProjectStore.getState(), new Map())
+    const ids = new Set(snapshot.entities.map((e) => e.id))
+    const dangling = snapshot.entities.filter((e) => e.parentId != null && !ids.has(e.parentId))
+    expect(dangling).toEqual([])
   })
 })
