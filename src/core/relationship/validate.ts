@@ -1,5 +1,6 @@
 import type { Relationship, RelationshipType } from "./relationship"
 import { decodeExportOverride, isSelfConfirmedOverride } from "./relationship"
+import { isHierarchyBearing } from "./isHierarchyBearing"
 import type { EdgeTypeDefinition, MetadataRule, MetadataSpec } from "./vocabulary"
 import { EDGE_TYPES } from "./vocabulary"
 
@@ -19,19 +20,6 @@ export type RelationshipViolation = {
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/
 
-/**
- * No date: active means the edge has not ended. With a date: the half-open
- * interval, so an edge ended on D is absent on D and present the day before.
- * Both comparisons are string compares, which is only sound on well-formed
- * YYYY-MM-DD input — malformed dates are caught separately as invalid-date.
- */
-export function isActive(rel: Relationship, onDate?: string): boolean {
-  if (onDate === undefined) return rel.endDate == null
-  const startedBy = rel.startDate == null || rel.startDate <= onDate
-  const notYetEnded = rel.endDate == null || rel.endDate > onDate
-  return startedBy && notYetEnded
-}
-
 function definitionFor(type: RelationshipType): EdgeTypeDefinition | undefined {
   return Object.prototype.hasOwnProperty.call(EDGE_TYPES, type) ? EDGE_TYPES[type] : undefined
 }
@@ -49,36 +37,6 @@ function describeValue(value: unknown): string {
   if (typeof value === "number" || typeof value === "boolean") return String(value)
   if (value === null) return "null"
   return typeof value
-}
-
-/**
- * The single definition of "this edge places a child under a parent".
- * Consumed by `activeParentMap` AND by `countActiveOrganicParents`, so the
- * derivation and the control cannot disagree.
- *
- * - `subordinate_to`, unless `metadata.attachment` is `"attached"`. Absent
- *   attachment counts as organic (owner Ruling 2, 2026-07-29).
- * - `corporate_parent`, always — those 13 edges ARE the industry hierarchy
- *   (GABRIEL_V2_SLICE_0_1_BUILD.md:521-525).
- * - Active in both cases: `isActive(rel)` with no date, i.e. `endDate == null`.
- *
- * Organic-by-default is load-bearing, not a convenience. Requiring an explicit
- * "organic" would make the dual-subordination gate inert on exactly the
- * population it guards: attachment is optional everywhere, and the 999
- * subordinate_to edges minted from the legacy parent_id column carry none. The
- * spec asks this control to hold a real finding open — dual subordination "may
- * be true: block until a human records which it is, never until someone deletes
- * one, or the control destroys the finding"
- * (GABRIEL_V2_SLICE_0_1_BUILD.md:575-576) — and a control that is off by default
- * blocks nothing. Fail closed is the safety property.
- */
-export function isHierarchyBearing(rel: Relationship): boolean {
-  if (rel.type === "corporate_parent") return isActive(rel)
-  if (rel.type !== "subordinate_to") return false
-  // Written `!==` so that no attachment, a null one and an undefined one all
-  // read as organic; only the marked exception opts out (Trap T6, and the
-  // ruling above).
-  return rel.metadata?.attachment !== "attached" && isActive(rel)
 }
 
 /**

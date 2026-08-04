@@ -1,3 +1,5 @@
+import type { ParentLink, ParentLinkSource } from "@/core/relationship/hierarchyIndex"
+
 export interface OrbatNode {
   id: string
   parentId: string | null
@@ -10,17 +12,32 @@ export interface Orbat<T extends OrbatNode> {
   ancestors(id: string, maxUp?: number): T[]
   /** All descendants in BFS order, bounded by `maxDown` levels. Cycle-safe. */
   descendants(id: string, maxDown?: number): T[]
-  /** Top-level items: `parentId` null, orphaned (parent absent), or the entry point of a disconnected cycle. */
+  /** Top-level items: no parent, orphaned (parent absent), CONTESTED, or the entry point of a
+   *  disconnected cycle. Four different findings, so a browsing surface that renders them
+   *  identically is asserting something none of them says — ask `parentOf` which one it is. */
   roots(): T[]
   /** BFS waves from `roots()`. Disconnected cycles are appended as trailing waves after all reachable items. */
   layers(maxLayers?: number): T[][]
   /** 0 for roots, incrementing down the tree. -1 for an unknown id. */
   depthOf(id: string): number
   isRoot(id: string): boolean
+  /**
+   * WHY this item is where it is, rather than only where. Built with an index this is the
+   * edge set's own answer, so a contest is distinguishable from a root — which `roots()`,
+   * `depthOf` and the `parentId` field structurally cannot do. Built without one it is the
+   * structural answer, and carries no edges.
+   *
+   * `unknown` for an id outside this Orbat's items. A `parent` link may still name an id
+   * outside them: that is the orphan case, and `roots()` already covers it.
+   */
+  parentOf(id: string): ParentLink
 }
 
+const UNKNOWN: ParentLink = { state: "unknown" }
+const ROOT: ParentLink = { state: "root" }
+
 /**
- * Orphan policy: an item whose `parentId` points to a missing id is treated as a root — visible
+ * Orphan policy: an item whose parent is a missing id is treated as a root — visible
  * in trees/hierarchy panels and eligible for enrichment, matching the one call site
  * (layered-research) that already had this behaviour and tests.
  *
@@ -29,20 +46,47 @@ export interface Orbat<T extends OrbatNode> {
  * `computePositions` (geometry.ts) still leaves it off the map. Pin it with its own geometry
  * or restore its parent to place it.
  *
- * Cycle policy: a fully disconnected cyclic component (every member's `parentId` resolves to
+ * Cycle policy: a fully disconnected cyclic component (every member's parent resolves to
  * another member of the same component) gets a synthetic root at its lexicographically smallest
  * id, so it renders instead of vanishing and so ancestor/depth walks can't infinite-loop.
+ *
+ * `index` is the edge set, and is the authority for who sits under whom when it is supplied
+ * (ADR 0011). Only a `parent` link places an item: a contested child gets no parent, exactly
+ * as it gets none in the derived field, so the shape of the tree is unchanged and the reason
+ * for it is no longer lost. Omit the index and every answer comes from `parentId`, which is
+ * what every consumer did before Slice 3.
  */
-export function buildOrbat<T extends OrbatNode>(items: T[]): Orbat<T> {
+export function buildOrbat<T extends OrbatNode>(items: T[], index?: ParentLinkSource): Orbat<T> {
   const byId = new Map<string, T>()
   for (const item of items) byId.set(item.id, item)
 
+  function parentOf(id: string): ParentLink {
+    const item = byId.get(id)
+    if (item == null) return UNKNOWN
+    if (index != null) return index.linkFor(id)
+    if (item.parentId == null) return ROOT
+    return byId.has(item.parentId)
+      ? { state: "parent", parentId: item.parentId, via: [] }
+      : { state: "unresolvable", parentId: item.parentId, via: [] }
+  }
+
+  const parentIdById = new Map<string, string | null>()
+  for (const item of items) {
+    const link = index == null ? null : index.linkFor(item.id)
+    parentIdById.set(
+      item.id,
+      link == null ? item.parentId : link.state === "parent" ? link.parentId : null,
+    )
+  }
+  const parentIdOf = (item: T): string | null => parentIdById.get(item.id) ?? null
+
   const childrenByParent = new Map<string, T[]>()
   for (const item of items) {
-    if (item.parentId == null) continue
-    const siblings = childrenByParent.get(item.parentId)
+    const parentId = parentIdOf(item)
+    if (parentId == null) continue
+    const siblings = childrenByParent.get(parentId)
     if (siblings) siblings.push(item)
-    else childrenByParent.set(item.parentId, [item])
+    else childrenByParent.set(parentId, [item])
   }
 
   function childrenOf(id: string): T[] {
@@ -73,9 +117,10 @@ export function buildOrbat<T extends OrbatNode>(items: T[]): Orbat<T> {
     }
   }
 
-  const structuralRoots = items.filter(
-    (item) => item.parentId == null || !byId.has(item.parentId),
-  )
+  const structuralRoots = items.filter((item) => {
+    const parentId = parentIdOf(item)
+    return parentId == null || !byId.has(parentId)
+  })
   bfsFrom(structuralRoots)
 
   const remaining = items.filter((item) => !visited.has(item.id))
@@ -91,14 +136,14 @@ export function buildOrbat<T extends OrbatNode>(items: T[]): Orbat<T> {
   function ancestors(id: string, maxUp = Infinity): T[] {
     const result: T[] = []
     const seen = new Set<string>([id])
-    let currentId = byId.get(id)?.parentId ?? null
+    let currentId = parentIdById.get(id) ?? null
     while (currentId != null && result.length < maxUp) {
       if (seen.has(currentId)) break
       const node = byId.get(currentId)
       if (!node) break
       result.push(node)
       seen.add(currentId)
-      currentId = node.parentId
+      currentId = parentIdOf(node)
     }
     return result
   }
@@ -140,5 +185,5 @@ export function buildOrbat<T extends OrbatNode>(items: T[]): Orbat<T> {
     return maxLayers == null ? layers : layers.slice(0, maxLayers)
   }
 
-  return { childrenOf, ancestors, descendants, roots, layers: layersFn, depthOf, isRoot }
+  return { childrenOf, ancestors, descendants, roots, layers: layersFn, depthOf, isRoot, parentOf }
 }

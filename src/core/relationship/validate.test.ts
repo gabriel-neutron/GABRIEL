@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest"
 import type { ExportOverride, Relationship, RelationshipType } from "./relationship"
-import { isActive, RELATIONSHIP_VIOLATION_CODES, validateRelationships } from "./validate"
+import { isActive } from "./isHierarchyBearing"
+import { RELATIONSHIP_VIOLATION_CODES, validateRelationships } from "./validate"
 import { RECORD_TIER_TYPES } from "./vocabulary"
 
 const VALID_OVERRIDE: ExportOverride = {

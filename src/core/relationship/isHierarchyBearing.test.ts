@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 import type { Relationship, RelationshipType } from "./relationship"
-import { isHierarchyBearing } from "./validate"
+import { isHierarchyBearing } from "./isHierarchyBearing"
 import { EDGE_TYPES } from "./vocabulary"
 
 /** The truth table for "this edge places a child under a parent" lives here rather

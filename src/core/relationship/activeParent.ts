@@ -1,6 +1,7 @@
 import type { EntityKind } from "@/core/entity/entity"
 import type { Relationship, RelationshipType } from "./relationship"
-import { isHierarchyBearing } from "./validate"
+import { hierarchyIndex, type HierarchyIndexOptions } from "./hierarchyIndex"
+import { isHierarchyBearing } from "./isHierarchyBearing"
 
 export type ActiveParentMap = {
   /** child id -> parent id. A CONTESTED child is ABSENT from this map. It is not
@@ -13,41 +14,25 @@ export type ActiveParentMap = {
 }
 
 /**
- * Derives the single parent of each child from the edge set.
+ * The two halves of a `ParentLink` that a `Map<string, string>` can carry, projected
+ * out of `hierarchyIndex`.
  *
- * Hierarchy-bearing-ness is decided ONLY by `isHierarchyBearing`, never by a
- * local type test: a second predicate here could drift from the control in
- * `validate.ts`, and the derivation and the control disagreeing is precisely the
- * failure mode that would let a blocked conflict still reshape the tree.
+ * This is a projection and no longer a second derivation. `contested` exists here
+ * only because the caller needs the half of a tri-state that `parentById` cannot
+ * express; `ParentLink` is that tri-state made a type, and anything that needs to
+ * tell a contest from a root at the point of reading should take the index instead.
  *
- * The edge reads "A <type> B" with `fromId` always A, so the CHILD is `fromId`
- * and the PARENT is `toId` — the same keying `countActiveOrganicParents` uses.
- *
- * Two or more competing edges do not elect a winner (Q40). Picking one would
- * silently resolve a finding a human is supposed to adjudicate, so the child is
- * left unmapped and every competing edge id is handed back for the integrity
- * event. Two edges from the same child to the same parent are still two
- * competing edges: they are two separate assertions, and collapsing them would
- * be the derivation deciding they say the same thing.
+ * The signature is unchanged, so `load.ts` and `useProjectStore` keep their shape.
+ * Called with no options it is exactly what it was before Slice 3: no `entityIds`
+ * means no link can be `unresolvable`, so every single-edge child lands in
+ * `parentById` and Trap T15 stays where it was, in `withDerivedParents`.
  */
-export function activeParentMap(rels: Relationship[]): ActiveParentMap {
-  const edgesByChild = new Map<string, Relationship[]>()
-  for (const rel of rels) {
-    if (!isHierarchyBearing(rel)) continue
-    const existing = edgesByChild.get(rel.fromId)
-    if (existing == null) edgesByChild.set(rel.fromId, [rel])
-    else existing.push(rel)
-  }
-
-  const parentById = new Map<string, string>()
-  const contested = new Map<string, string[]>()
-  for (const [childId, edges] of edgesByChild) {
-    const only = edges.length === 1 ? edges[0] : undefined
-    if (only != null) parentById.set(childId, only.toId)
-    else contested.set(childId, edges.map((edge) => edge.id))
-  }
-
-  return { parentById, contested }
+export function activeParentMap(
+  rels: Relationship[],
+  options?: HierarchyIndexOptions,
+): ActiveParentMap {
+  const index = hierarchyIndex(rels, options)
+  return { parentById: index.parents(), contested: index.contested() }
 }
 
 /**
@@ -95,12 +80,17 @@ export function withActiveParent(
  * `parentById` comes back `null` whatever it carried, because the edge set is
  * the sole authority for the field once it is derived.
  *
- * The id-set check is Trap T15, not defensiveness. `buildOrbat` (hierarchy.ts:77)
- * treats an unresolvable parent as a root while `load.ts:60-63` THROWS on one, and
- * this derivation sits between the two opposite policies. `activeParentMap` sees
- * only edges, so this is the first point that knows the entity set; reproducing
- * the orphan policy here by OMISSION is what keeps a dangling parent from ever
- * being written and re-read as a corrupt-file diagnosis on the next load.
+ * The id-set check is Trap T15, not defensiveness. `buildOrbat` treats an
+ * unresolvable parent as a root while `load.ts` records one against the entity
+ * set, and this derivation sits between the two policies. Reproducing the orphan
+ * policy here by OMISSION is what keeps a dangling parent from ever being written
+ * and re-read as a corrupt-file diagnosis on the next load.
+ *
+ * `hierarchyIndex` can now reach the same conclusion, and better — it answers
+ * `"unresolvable"` where this can only answer `null`. The check stays because the
+ * two agree by construction: both OMIT, so an index built with `entityIds` makes
+ * this a no-op and an index built without it leaves this the only guard. What must
+ * never appear is a third policy that maps the case to a value.
  */
 export function withDerivedParents<T extends { id: string; parentId: string | null }>(
   items: T[],

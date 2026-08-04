@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest"
-import { isHierarchyBearing } from "@/core/relationship/validate"
+import { isHierarchyBearing } from "@/core/relationship/isHierarchyBearing"
 import { applyParentChange } from "./entityInspectorCommands"
 import { useProjectStore } from "@/store/useProjectStore"
 import type { Layer, MapEntity } from "@/types/domain.types"
