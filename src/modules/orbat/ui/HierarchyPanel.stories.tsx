@@ -1,6 +1,7 @@
 import { useState } from "react"
 import type { Meta, StoryObj } from "@storybook/react-vite"
 import { HierarchyPanel } from "./HierarchyPanel"
+import type { Relationship } from "@/core/relationship/relationship"
 import { useProjectStore } from "@/store/useProjectStore"
 import type { MapEntity } from "@/types/domain.types"
 
@@ -88,6 +89,35 @@ const entities: MapEntity[] = [
   },
 ]
 
+/**
+ * The edge set is the hierarchy (ADR 0011), and `parentId` above is its projection — so the
+ * story has to carry both or it depicts a state the app cannot produce. `entity-b` is
+ * deliberately claimed by two parents at once: that is the case the panel could not render
+ * before Slice 3, and it is what the Contested badge is for.
+ */
+const relationships: Relationship[] = [
+  ...entities
+    .filter((e) => e.parentId != null)
+    .map((e) => ({
+      id: "hier:" + e.id,
+      fromId: e.id,
+      toId: e.parentId!,
+      type: "subordinate_to" as const,
+      startDate: null,
+      endDate: null,
+      metadata: {},
+    })),
+  {
+    id: "hier:entity-b:contested",
+    fromId: "entity-b",
+    toId: "entity-log",
+    type: "subordinate_to",
+    startDate: null,
+    endDate: null,
+    metadata: {},
+  },
+]
+
 function StoryHarness() {
   const [hiddenEntityIds, setHiddenEntityIds] = useState<Set<string>>(new Set())
 
@@ -121,7 +151,7 @@ const meta = {
         entities,
         drawnGeometries: [],
         claims: [],
-        relationships: [],
+        relationships,
         integrityEvents: [],
         selectedEntityId: "entity-hq",
       })

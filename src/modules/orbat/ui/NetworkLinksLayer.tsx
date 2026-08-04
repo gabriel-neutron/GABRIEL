@@ -6,7 +6,8 @@ import { useMapInteractive } from "@/core/map/useMapViewStore"
 import { usePositionMap } from "@/core/map/usePositionMap"
 import type { MapEntity } from "@/types/domain.types"
 import type { LatLng } from "@/core/coordinates"
-import { buildOrbat } from "@/core/entity/hierarchy"
+import { buildOrbat, type Orbat } from "@/core/entity/hierarchy"
+import { hierarchyIndex } from "@/core/relationship/hierarchyIndex"
 
 const NETWORK_LINE_OPTIONS = {
   color: "#a855f7",
@@ -19,9 +20,8 @@ const MAX_DEGREE = 3
 
 function visibleNetworkIds(
   selectedId: string,
-  entities: MapEntity[]
+  orbat: Orbat<MapEntity>,
 ): Set<string> {
-  const orbat = buildOrbat(entities)
   const visible = new Set<string>([selectedId])
   for (const ancestor of orbat.ancestors(selectedId, MAX_DEGREE)) visible.add(ancestor.id)
   for (const descendant of orbat.descendants(selectedId, MAX_DEGREE)) visible.add(descendant.id)
@@ -31,6 +31,7 @@ function visibleNetworkIds(
 /** Self-contained map layer (ADR 0007) — reads its own position/viewport inputs. */
 export const NetworkLinksLayer = memo(function NetworkLinksLayer(): React.ReactElement | null {
   const entities = useProjectStore((s) => s.entities)
+  const relationships = useProjectStore((s) => s.relationships)
   const selectedEntityId = useProjectStore((s) => s.selectedEntityId)
   const showNetworks = useMapPrefsStore((s) => s.showNetworks)
   const interactive = useMapInteractive()
@@ -42,22 +43,32 @@ export const NetworkLinksLayer = memo(function NetworkLinksLayer(): React.ReactE
     const selected = entities.find((e) => e.id === selectedEntityId)
     if (!selected) return []
 
-    const visibleIds = visibleNetworkIds(selectedEntityId, entities)
+    const orbat = buildOrbat(
+      entities,
+      hierarchyIndex(relationships, { entityIds: new Set(entities.map((e) => e.id)) }),
+    )
+    const visibleIds = visibleNetworkIds(selectedEntityId, orbat)
     const result: Array<{ key: string; positions: LatLng[] }> = []
 
     for (const entity of entities) {
-      if (!entity.parentId || !visibleIds.has(entity.parentId) || !visibleIds.has(entity.id)) continue
+      // No line for a contested child. Drawing both competing edges would be the truthful
+      // rendering and is a feature this layer does not have yet; drawing one would pick a
+      // winner. Until then, nothing drawn is the honest answer.
+      const link = orbat.parentOf(entity.id)
+      if (link.state !== "parent") continue
+      const parentId = link.parentId
+      if (!visibleIds.has(parentId) || !visibleIds.has(entity.id)) continue
       const fromPos = positionMap.get(entity.id)
-      const toPos = positionMap.get(entity.parentId)
+      const toPos = positionMap.get(parentId)
       if (!fromPos || !toPos) continue
       result.push({
-        key: `edge-${entity.parentId}-${entity.id}`,
+        key: `edge-${parentId}-${entity.id}`,
         positions: [fromPos, toPos],
       })
     }
 
     return result
-  }, [showNetworks, selectedEntityId, entities, positionMap])
+  }, [showNetworks, selectedEntityId, entities, relationships, positionMap])
 
   if (links.length === 0) return null
 

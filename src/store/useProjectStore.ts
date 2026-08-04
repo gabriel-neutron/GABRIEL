@@ -97,6 +97,7 @@ function commitRelationships(
   state: ProjectState,
   next: Relationship[],
   rest?: Partial<ProjectState>,
+  action = "commitRelationships",
 ): void {
   const parents = activeParentMap(next)
   const entities = withDerivedParents(rest?.entities ?? state.entities, parents)
@@ -107,7 +108,7 @@ function commitRelationships(
     entities,
     new Date().toISOString(),
   )
-  set({ ...rest, relationships: next, entities, integrityEvents }, false, "commitRelationships")
+  set({ ...rest, relationships: next, entities, integrityEvents }, false, action)
 }
 
 // ---------------------------------------------------------------------------
@@ -184,11 +185,17 @@ export const useProjectStore = create<ProjectState & ProjectActions>()(
       ...createClaimActions(set, get),
 
       setProject({ layers, entities, drawnGeometries, claims, relationships, integrityEvents, selectedEntityId }) {
-        set(
-          { layers, entities, drawnGeometries, claims, relationships, integrityEvents, selectedEntityId, entityMergeMap: {} },
-          false,
-          "setProject",
-        )
+        // Through the same derivation as every other write to the edge set, not around it.
+        // It used to be safe around it because `load.ts` had already derived and nothing read
+        // the edges directly — the field WAS the hierarchy for every consumer. Now that six
+        // consumers read the index, a caller handing over entities and edges that disagree
+        // gets a tree built from the edges and a `parentId` that says otherwise, which is two
+        // answers to one question on the seam ADR 0011 exists to close. Idempotent on a loaded
+        // project: `load.ts` derives from these same edges, so this re-derives the same values.
+        commitRelationships(set, get(), relationships, {
+          layers, entities, drawnGeometries, claims, integrityEvents, selectedEntityId,
+          entityMergeMap: {},
+        }, "setProject")
       },
 
       resetProject() {

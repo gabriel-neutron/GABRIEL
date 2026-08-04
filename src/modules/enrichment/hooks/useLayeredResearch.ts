@@ -5,6 +5,7 @@ import {
   type LayeredResearchResult,
 } from "@/modules/enrichment/services/research/layered-research.service"
 import { DEFAULT_RICHNESS_THRESHOLD } from "@/modules/enrichment/services/research/entity-richness"
+import { hierarchyIndex } from "@/core/relationship/hierarchyIndex"
 import type { DrawnGeometry, MapEntity } from "@/types/domain.types"
 import type { EnrichmentResponse } from "@/types/enrichment.types"
 import { useProjectStore } from "@/store/useProjectStore"
@@ -46,6 +47,7 @@ export function useLayeredResearch(
 ) {
   const { onEntityAnalyzed } = options
   const claims = useProjectStore((s) => s.claims)
+  const relationships = useProjectStore((s) => s.relationships)
   const provenanceSources = useProvenanceStore((s) => s.sources)
   const [status, setStatus] = useState<LayeredResearchStatus>("idle")
   const [progress, setProgress] = useState<ProgressState | null>(null)
@@ -83,8 +85,13 @@ export function useLayeredResearch(
       const controller = new AbortController()
       abortRef.current = controller
 
-      // Build the BFS order upfront so the dialog can show the full entity list
-      const bfsLayers = buildBfsLayers(entities)
+      // Build the BFS order upfront so the dialog can show the full entity list. Over the
+      // same index the run itself uses, or the dialog would list an order the run does not take.
+      const bfsLayers = buildBfsLayers(
+        entities,
+        undefined,
+        hierarchyIndex(relationships, { entityIds: new Set(entities.map((e) => e.id)) }),
+      )
       const orderedIds = bfsLayers.flat().map((e) => e.id)
       const recentAnalyzedEntityIds = buildRecentAnalyzedEntityIds()
       const combinedSkipEntityIds = new Set<string>([
@@ -109,6 +116,7 @@ export function useLayeredResearch(
           sourceCache,
           claims,
           sources: provenanceSources,
+          relationships,
           maxEntities: batchSize,
           skipEntityIds: combinedSkipEntityIds,
           richnessThreshold,
@@ -154,6 +162,7 @@ export function useLayeredResearch(
       entities,
       drawnGeometries,
       claims,
+      relationships,
       provenanceSources,
       batchSize,
       richnessThreshold,

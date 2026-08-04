@@ -47,7 +47,8 @@ function parentMap(entities: readonly MapEntity[]): Map<string, string> {
 
 function positionMap(result: GeoPackageLoadResult): Map<string, LatLng> {
   return new Map(
-    computeAllEntityPositions(result.entities, result.geometries).map((p) => [p.entity.id, p.position]),
+    computeAllEntityPositions(result.entities, result.geometries)
+      .positioned.map((p) => [p.entity.id, p.position]),
   )
 }
 

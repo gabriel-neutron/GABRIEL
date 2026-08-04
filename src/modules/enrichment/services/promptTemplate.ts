@@ -8,7 +8,12 @@ export function buildDefaultEnrichmentPrompt(
   const name = String(feature.properties?.name ?? "Unknown")
   const echelon = String(feature.properties?.echelon ?? "unknown")
   const country = String(feature.properties?.country ?? "unknown")
-  const parentName = context.parent?.name ?? "none"
+  // "none" is a claim, not a blank. For an entity recorded under two parents at once it is
+  // the wrong claim, so the unresolved contest is stated instead of asserted away.
+  const contested = context.contestedParents ?? []
+  const parentName = contested.length > 0
+    ? `disputed — recorded under ${contested.map((p) => p.name).join(" and ")} at once, unresolved`
+    : context.parent?.name ?? "none"
   const children = context.children.map((child) => child.name).join(", ") || "none"
 
   const lines = [

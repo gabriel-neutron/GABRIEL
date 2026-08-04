@@ -1,5 +1,7 @@
 import type { DrawnGeometry, MapEntity } from "@/types/domain.types"
 import { buildOrbat } from "@/core/entity/hierarchy"
+import { hierarchyIndex, type ParentLinkSource } from "@/core/relationship/hierarchyIndex"
+import type { Relationship } from "@/core/relationship/relationship"
 import type {
   EnrichmentResponse,
   EnrichmentUsage,
@@ -50,6 +52,9 @@ export type LayeredResearchOptions = {
   claims?: Claim[]
   /** This project's provenance sources (ADR 0006, E2.6) — used to resolve claims to URLs. */
   sources?: Source[]
+  /** This project's edge set (ADR 0011) — the authority for who sits under whom. Omitted,
+   *  the run falls back to the derived `parentId` field and cannot see a contest. */
+  relationships?: Relationship[]
   /** Stop after this many BFS layers. Default: unlimited. */
   maxLayers?: number
   /** Stop after processing this many entities total. Default: unlimited. */
@@ -82,11 +87,19 @@ export type LayeredResearchOptions = {
 
 /**
  * Builds BFS layers from a flat entity list, via the shared Orbat traversal module.
- * layer[0] = roots (parentId null, orphaned, or a disconnected cycle's entry point)
- * layer[N] = entities whose parentId is in layer[N-1]
+ * layer[0] = roots (no parent, orphaned, CONTESTED, or a disconnected cycle's entry point)
+ * layer[N] = entities whose parent is in layer[N-1]
+ *
+ * A contested entity is enriched in the first layer rather than skipped: it is a real
+ * entity with a real research question, and the contest is about its parent, not about it.
+ * What must not travel downstream is the claim that it has none — see `toEnrichmentContext`.
  */
-export function buildBfsLayers(entities: MapEntity[], maxLayers?: number): MapEntity[][] {
-  return buildOrbat(entities).layers(maxLayers)
+export function buildBfsLayers(
+  entities: MapEntity[],
+  maxLayers?: number,
+  index?: ParentLinkSource,
+): MapEntity[][] {
+  return buildOrbat(entities, index).layers(maxLayers)
 }
 
 function sleep(ms: number): Promise<void> {
@@ -189,7 +202,10 @@ export async function runLayeredResearch(
   let totalInputTokens = 0
   let totalOutputTokens = 0
 
-  const bfsLayers = buildBfsLayers(entities, options.maxLayers)
+  const index = options.relationships == null
+    ? undefined
+    : hierarchyIndex(options.relationships, { entityIds: new Set(entities.map((e) => e.id)) })
+  const bfsLayers = buildBfsLayers(entities, options.maxLayers, index)
   const allEntities = bfsLayers.flat()
   const totalEntities = allEntities.length
   let done = 0
@@ -238,7 +254,9 @@ export async function runLayeredResearch(
         const poolHintUrls = projectLedgerUrls(entityClaims, sourceById)
 
         const { response, usage } = await runEnrichment(
-          buildEnrichmentRequest(entity, entities, drawnGeometries, { poolHintUrls, claims: entityClaims }),
+          buildEnrichmentRequest(entity, entities, drawnGeometries, {
+            poolHintUrls, claims: entityClaims, parentLink: index?.linkFor(entity.id),
+          }),
           { providers: bundle, signal: options.signal },
         )
 

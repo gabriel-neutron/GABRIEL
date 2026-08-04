@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useRef, useState } from "react"
 import { buildDefaultEnrichmentPrompt, buildEnrichmentRequest, ENRICHMENT_MAX_DEPTH_DEFAULT, runEnrichment } from "@/modules/enrichment/services"
 import { toEnrichmentFeature, toEnrichmentContext } from "@/modules/enrichment/services/enrichmentAdapters"
+import { hierarchyIndex } from "@/core/relationship/hierarchyIndex"
 import {
   acceptProposalToOverlay,
   clearFeatureEnrichmentState,
@@ -49,6 +50,7 @@ export function useEnrichment({
   const claims = useProjectStore((s) => s.claims)
   const addClaims = useProjectStore((s) => s.addClaims)
   const entityMergeMap = useProjectStore((s) => s.entityMergeMap)
+  const relationships = useProjectStore((s) => s.relationships)
 
   const selectedEntity = useMemo(
     () => (selectedEntityId ? entities.find((entity) => entity.id === selectedEntityId) ?? null : null),
@@ -59,9 +61,18 @@ export function useEnrichment({
     () => (selectedEntity ? toEnrichmentFeature(selectedEntity, drawnGeometries) : null),
     [selectedEntity, drawnGeometries],
   )
+  // The edge set, so a selected entity with two recorded parents is described to the model
+  // as disputed rather than as independent (ADR 0011).
+  const parentLink = useMemo(
+    () => (selectedEntity
+      ? hierarchyIndex(relationships, { entityIds: new Set(entities.map((e) => e.id)) })
+        .linkFor(selectedEntity.id)
+      : undefined),
+    [entities, relationships, selectedEntity],
+  )
   const context = useMemo(
-    () => (selectedEntity ? toEnrichmentContext(selectedEntity, entities) : null),
-    [entities, selectedEntity],
+    () => (selectedEntity ? toEnrichmentContext(selectedEntity, entities, parentLink) : null),
+    [entities, selectedEntity, parentLink],
   )
   const overlay = useMemo(
     () => getFeatureOverlay(state, selectedEntityId),
@@ -212,7 +223,9 @@ export function useEnrichment({
       }),
     )
     await runnerRef.current.run(
-      buildEnrichmentRequest(selectedEntity, entities, drawnGeometries, { prompt: draftPrompt, claims }),
+      buildEnrichmentRequest(selectedEntity, entities, drawnGeometries, {
+        prompt: draftPrompt, claims, parentLink,
+      }),
       {
         onProgress: (progress) => {
           setState((current) => updateEnrichmentProgress(current, progress))
@@ -245,7 +258,7 @@ export function useEnrichment({
         onFinally: () => {},
       },
     )
-  }, [context, draftPrompt, drawnGeometries, entities, feature, selectedEntity, state.run.status, claims])
+  }, [context, draftPrompt, drawnGeometries, entities, feature, parentLink, selectedEntity, state.run.status, claims])
 
   const accept = useCallback(
     (proposal: EnrichmentProposal) => {

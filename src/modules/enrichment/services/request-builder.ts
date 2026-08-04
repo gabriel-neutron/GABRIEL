@@ -1,5 +1,6 @@
 import type { DrawnGeometry, MapEntity } from "@/types/domain.types"
 import type { EnrichmentRequest } from "@/types/enrichment.types"
+import type { ParentLink } from "@/core/relationship/hierarchyIndex"
 import type { Claim } from "@/core/provenance/claim"
 import { filterCitationClaims } from "@/core/provenance/claim"
 import { toEnrichmentFeature, toEnrichmentContext } from "./enrichmentAdapters"
@@ -14,6 +15,9 @@ export type BuildEnrichmentRequestOptions = {
   poolHintUrls?: string[]
   /** This project's provenance claims (ADR 0006, E2.6) — gates whether "sources" is proposed. */
   claims?: Claim[]
+  /** The edge set's answer to where this entity sits. Supply it wherever the edges are in
+   *  hand: without it a contested entity is described to the model as having no parent. */
+  parentLink?: ParentLink
 }
 
 export function buildEnrichmentRequest(
@@ -23,7 +27,7 @@ export function buildEnrichmentRequest(
   opts?: BuildEnrichmentRequestOptions,
 ): EnrichmentRequest {
   const feature = toEnrichmentFeature(entity, drawnGeometries)
-  const context = toEnrichmentContext(entity, entities)
+  const context = toEnrichmentContext(entity, entities, opts?.parentLink)
   const prompt = opts?.prompt ?? buildDefaultEnrichmentPrompt(feature, context, opts?.poolHintUrls)
   const hasExistingSources = filterCitationClaims(opts?.claims ?? [], entity.id).length > 0
   return {

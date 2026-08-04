@@ -29,6 +29,15 @@ export type EnrichmentContextChild = {
 export type EnrichmentContext = {
   parent: EnrichmentContextParent
   children: EnrichmentContextChild[]
+  /**
+   * The competing parents of an entity recorded under more than one at once. Present only
+   * then, and never alongside a `parent`.
+   *
+   * It exists because `parent: null` is not a neutral value in a prompt: it renders as
+   * "parent=none", which asserts independence — an affirmative ORBAT claim, made about the
+   * one entity that has two masters, into a request whose output becomes sourced claims.
+   */
+  contestedParents?: EnrichmentContextChild[]
 }
 
 export type OutputSchemaProperty = {
