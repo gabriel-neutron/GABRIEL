@@ -13,12 +13,14 @@ import type { IntegrityEvent } from "./integrityEvent"
  * condition updates one row instead of accumulating rows — the same first-colon namespacing
  * `contestedParentEvents.ts` and the `hier:` edge ids use.
  */
-const MULTIPLE_ACTIVE_PREFIX = "integrity:multiple-active-hierarchy:"
 const CROSS_KIND_PREFIX = "integrity:cross-kind-parent:"
 const INVALID_ENTRY_PREFIX = "integrity:invalid-entry:"
+const STALE_PARENT_PREFIX = "integrity:invalid-entry:stale-parent:"
 
 /** Only the name and the kind are read, so entities and any other named record share the shape. */
 type KindedRecord = { id: string; name: string; kind: string }
+
+type ParentedRecord = KindedRecord & { parentId: string | null }
 
 function quoted(value: string): string {
   return "\"" + value + "\""
@@ -30,39 +32,63 @@ function labeller(entities: readonly KindedRecord[]): (id: string) => string {
 }
 
 /**
- * One event per contested CHILD, not per offending edge: the finding is "this entity has two
- * parents", which two edges assert jointly. The load's derivation decides the same condition
- * from the same predicate (`activeParent.ts`), so the row and the derivation cannot disagree —
- * a contested child is absent from `parentById` (Q40) and named here.
+ * There is no `multipleActiveHierarchyEvents` here. It lived in this file until Slice 3 and
+ * was a SECOND detection of a condition the derivation had already decided: it re-read
+ * `validateRelationships`' output to rediscover which children had two parents, while
+ * `hierarchyIndex` was handing the same answer back with the competing edges attached. ADR
+ * 0011 ruled the competing ids are returned "at the point the conflict is decided, so the
+ * caller mints the integrity event without running a second validation pass" — this was that
+ * pass. `contestedParentEvents.ts` is now the only minter, on the load path and the edit path
+ * alike, so a contest recorded while an analyst works and the same contest re-detected by the
+ * next load cannot come out worded two ways.
+ *
+ * The `multiple-active-hierarchy` VIOLATION code stays in `validateRelationships`:
+ * that function is documented as callable without an entity set, and deleting the code
+ * would silence dual subordination for every caller that is not the loader.
  */
-export function multipleActiveHierarchyEvents(
-  violations: readonly RelationshipViolation[],
-  rels: readonly Relationship[],
+
+/**
+ * T14/Slice 3. The persisted `parent_id` on a migrated file is a DERIVATION, rewritten from
+ * the edge set on every save — so a value that no longer resolves is a stale copy, not a
+ * record, and `withDerivedParents` is about to overwrite it. Its only surviving effect was
+ * the ability to make the project unopenable, which is a control destroying the work it
+ * exists to protect. It is recorded and left unread instead.
+ *
+ * `invalid-entry` rather than a kind of its own, on that kind's own terms: something the
+ * project carries could not be validated, and is kept exactly as it stands rather than
+ * discarded. Which condition produced it is in `detail`, never guessed from the kind.
+ */
+export function stalePersistedParentEvents(
+  stale: readonly ParentedRecord[],
   entities: readonly KindedRecord[],
   now: string,
 ): IntegrityEvent[] {
-  const relById = new Map(rels.map((rel) => [rel.id, rel]))
-  const competingByChild = new Map<string, Relationship[]>()
-  for (const violation of violations) {
-    if (violation.code !== "multiple-active-hierarchy") continue
-    const rel = relById.get(violation.relationshipId)
-    if (rel == null) continue
-    const competing = competingByChild.get(rel.fromId)
-    if (competing == null) competingByChild.set(rel.fromId, [rel])
-    else competing.push(rel)
-  }
-
+  const byId = new Map(entities.map((entity) => [entity.id, entity]))
   const label = labeller(entities)
   const events: IntegrityEvent[] = []
-  for (const [childId, competing] of competingByChild) {
+  for (const child of stale) {
+    const parentId = child.parentId
+    if (parentId == null) continue
+    // Two causes reach this function and a reader needs to know which: a parent that is gone,
+    // and one that is there but of the other kind.
+    const parent = byId.get(parentId)
+    const clause = parent == null
+      ? "under a parent this project does not contain"
+      : "under " + label(parentId) + ", which crosses entity kinds"
     events.push({
-      id: MULTIPLE_ACTIVE_PREFIX + childId,
-      kind: "multiple-active-hierarchy",
+      id: STALE_PARENT_PREFIX + child.id,
+      kind: "invalid-entry",
       createdAt: now,
-      summary: label(childId) + " is placed under " + String(competing.length) +
-        " parents at once (" + competing.map((rel) => label(rel.toId)).join(", ") +
-        "), so it is left without a derived parent until a person records which is correct.",
-      detail: { childId, relationshipIds: competing.map((rel) => rel.id), parentIds: competing.map((rel) => rel.toId) },
+      summary: label(child.id) + " (" + child.kind + ") is stored " + clause +
+        ", so the stored value is left unread and the relationships are taken as the record " +
+        "of who sits under whom.",
+      detail: {
+        code: "stale-parent",
+        entityId: child.id,
+        entityKind: child.kind,
+        parentId,
+        parentKind: parent?.kind ?? null,
+      },
     })
   }
   return events

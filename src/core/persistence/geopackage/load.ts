@@ -15,10 +15,11 @@ import { activeParentMap, withDerivedParents } from "@/core/relationship/activeP
 import { deriveProvenanceFromEntities, type EntityLedgerInput } from "@/core/provenance/deriveFromEntities"
 import type { Relationship } from "@/core/relationship/relationship"
 import type { IntegrityEvent } from "@/core/integrity/integrityEvent"
+import { withContestedParentEvents } from "@/core/integrity/contestedParentEvents"
 import {
   crossKindParentEvents,
-  multipleActiveHierarchyEvents,
   relationshipViolationEvents,
+  stalePersistedParentEvents,
 } from "@/core/integrity/mintOnLoad"
 import type { GeoPackageLoadResult } from "./types"
 
@@ -118,16 +119,25 @@ export async function loadGeoPackage(buffer: ArrayBuffer): Promise<GeoPackageLoa
     // pooled one (which would silently accept a cross-kind parent reference).
     const unitIds = new Set(entities.filter((e) => e.kind === "unit").map((e) => e.id))
     const corporateIds = new Set(entities.filter((e) => e.kind === "corporate").map((e) => e.id))
+    // The parent check throws only on a file that has NOT been migrated. There, the raw
+    // `parent_id` values are the record and `migrateHierarchyToRelationships` is about to mint
+    // an edge from each, so an unresolvable one would become an edge with a dangling endpoint —
+    // a fatal violation, discovered later and diagnosed worse. Once `relationships` exists the
+    // same column is a derivation that `withDerivedParents` overwrites below, and its only
+    // surviving effect is the ability to make the analyst's project unopenable. It is recorded
+    // instead, by the policy `crossKindParentEvents` already established for the mirror case.
+    const stalePersistedParents: typeof entities = []
     for (const e of entities) {
       if (!layerIds.has(e.layerId)) {
         throw new Error("Unsupported schema: entity references missing layer.")
       }
-      if (e.parentId != null) {
-        const sameKindIds = e.kind === "corporate" ? corporateIds : unitIds
-        if (!sameKindIds.has(e.parentId)) {
-          throw new Error("Unsupported schema: entity references missing parent.")
-        }
+      if (e.parentId == null) continue
+      const sameKindIds = e.kind === "corporate" ? corporateIds : unitIds
+      if (sameKindIds.has(e.parentId)) continue
+      if (persisted === null) {
+        throw new Error("Unsupported schema: entity references missing parent.")
       }
+      stalePersistedParents.push(e)
     }
     for (const g of geometries) {
       if (!layerIds.has(g.layerId)) {
@@ -159,11 +169,13 @@ export async function loadGeoPackage(buffer: ArrayBuffer): Promise<GeoPackageLoa
     // §7 step 4, after the migration, which is what gets the minted edges validated at all.
     const violations = validateRelationships(relationships, entityIds)
     throwOnFatalViolations(violations)
-    minted.push(...multipleActiveHierarchyEvents(violations, relationships, entities, now))
-    // The other six codes become durable rows here rather than a console warning (owner ruling,
-    // 2026-08-03, superseding Q2B-7's stopgap): a log is not a record, and nothing an analyst
-    // can acknowledge lives in one.
+    // Six of the nine codes become durable rows here rather than a console warning (owner
+    // ruling, 2026-08-03, superseding Q2B-7's stopgap): a log is not a record, and nothing an
+    // analyst can acknowledge lives in one. The seventh, multiple-active-hierarchy, is minted
+    // below from the derivation that decides it rather than from a second pass over these
+    // violations (Slice 3); the last two are fatal and threw above.
     minted.push(...relationshipViolationEvents(violations, relationships, entities, now))
+    minted.push(...stalePersistedParentEvents(stalePersistedParents, entities, now))
 
     const ratingEvents = readRatingEvents(geoPackage)
 
@@ -173,6 +185,11 @@ export async function loadGeoPackage(buffer: ArrayBuffer): Promise<GeoPackageLoa
     const derived = activeParentMap(relationships)
     const crossKindEvents = crossKindParentEvents(derived.parentById, entities, now)
     const derivedEntities = withDerivedParents(entities, derived)
+    // The contests this derivation has just decided, through the one minter the edit path uses
+    // too. An empty ledger is passed rather than the persisted one because `mergeIntegrityEvents`
+    // below already gives the persisted row precedence — it may carry an acknowledgement that a
+    // freshly minted copy cannot.
+    minted.push(...withContestedParentEvents([], derived.contested, relationships, entities, now))
 
     return {
       layers,

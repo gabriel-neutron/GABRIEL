@@ -284,34 +284,10 @@ describe("coordinate round-trip", () => {
     }
   })
 
-  it(
-    "rejects a corporate entity whose parentId points at a unit (cross-kind parent references are invalid)",
-    async () => {
-      const layers: GpkgLayer[] = [
-        { id: "division", name: "Division", visible: true, kind: "echelon" },
-        { id: "industry", name: "Industry", visible: true, kind: "organisation" },
-      ]
-      const entities: MapEntity[] = [
-        { kind: "unit", id: "unit-1", name: "1st Division", layerId: "division", parentId: null },
-        {
-          kind: "corporate",
-          id: "org-1",
-          name: "Cross-kind org",
-          type: "other",
-          layerId: "industry",
-          parentId: "unit-1",
-        },
-      ]
-
-      // No edges: the cross-kind reference under test is the one in the `parent_id` column, and
-      // loadGeoPackage validates that column before it ever looks at the edge set.
-      const bytes = await saveGeoPackage({ layers, entities, geometries: [], researchSources: undefined, baseBuffer: undefined, sources: undefined, claims: undefined, ratingEvents: undefined, relationships: [], integrityEvents: [] })
-      await expect(loadGeoPackage(Uint8Array.from(bytes).buffer)).rejects.toThrow(
-        /Unsupported schema.*missing parent/,
-      )
-    },
-    30_000,
-  )
+  // The two `parent_id` column policies moved to `parentColumn.policy.test.ts` when this file
+  // crossed the 300-line cap (CONSTRAINTS.md:113). They are one concern of their own: what a
+  // load does with a stored parent it cannot resolve, which differs by whether the file has
+  // been migrated.
 
   it("polygon ring coordinates survive write→read", () => {
     const ring = [
