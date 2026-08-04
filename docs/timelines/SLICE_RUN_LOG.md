@@ -1503,12 +1503,12 @@ does not yet support: no export gate, named natural persons present, all 1,012 e
   onto `contestedParentEvents.ts`, and contested children made visible — all three design lenses
   independently found that ADR 0011's "contested children are visible but unresolved" is false.
   They are absent from the tree, indistinguishable from roots, and gone from the map for the 741.
-  **Built 2026-08-05, below.**
+  **Built 2026-08-04, below.**
 
 
 ---
 
-## Run 2026-08-05 — Slice 3, the consumer rewrite: the edges become the hierarchy the app reads
+## Run 2026-08-04 — Slice 3, the consumer rewrite: the edges become the hierarchy the app reads
 
 `BASE` **`d3c7c2f`**. **§10 steps 17-28 were still NOT run.** `public/project.gpkg` is
 byte-identical throughout at md5 `7d0b0e592a1128a0d83e7575110bf2dc`, absent from `git status` at
@@ -1589,10 +1589,10 @@ weaker evidence than a wrong value would have been.
 1. **`via` is `readonly Relationship[]`, not a single `Relationship`.** An `Orbat` built without
    an index has no edges to show, and one array-valued field lets `parent`, `contested` and
    `unresolvable` share one accessor rather than forcing an impossible singular value.
-2. **`unresolvable` covers T15 only, not cross-kind.** Cross-kind needs entity *kinds*, which
-   neither the edge set nor the index carries; `crossKindParentEvents` still decides it. Giving
-   the index a kind-aware resolver was the alternative and was rejected as a second policy for a
-   settled question.
+2. ~~**`unresolvable` covers T15 only, not cross-kind.**~~ **Reversed the same day — this was a
+   bug, not a deviation.** See "The code review, and the bug it found" below. Giving the index a
+   kind-aware resolver was the alternative and was wrongly rejected here as "a second policy for
+   a settled question"; the settled question had two readers, and only one of them was told.
 3. **`unplacedByContest` has no renderer.** It is returned, tested and documented, and nothing in
    the UI reads it yet — the same gap as known defect 4 (nothing renders integrity events at
    all). `HierarchyPanel`'s badge is the visibility fix the handoff named; a map notice belongs
@@ -1620,10 +1620,52 @@ cap and are now further over: `layered-research.service.ts` 338 → 356 and `use
 320 → 334, both from threading the edge set through. `useProjectStore.ts` sits exactly at 300.
 Nothing in `npm run verify` checks the cap, so it is recorded here rather than discovered later.
 
+### The code review, and the bug it found
+
+`/code-review` ran both axes against `d3c7c2f`. The Spec axis found a real defect that this
+run had reasoned its way past, and it is worth recording exactly how.
+
+**A cross-kind edge derived a parent through the index and did not through the field.** The
+index was given entity IDS, so it could not see kinds; a `unit -> corporate` edge came back
+`{state:"parent"}`. The field path meanwhile deleted the pair, because `crossKindParentEvents`
+*mutated* `parentById` on its way to minting the event. So after the six consumers moved onto
+the index, `usePositionMap` would ring a unit around a corporate parent that ADR 0011 says must
+derive nothing — while `entity.parentId` said it had none. Two answers to one question, on the
+exact seam ADR 0011 exists to close.
+
+The deviation was recorded in this log as deliberate ("`unresolvable` covers T15 only, not
+cross-kind... `crossKindParentEvents` still decides it"), and the reasoning was sound as far as
+it went — but the decision was never propagated to the READERS, and `geometry.ts` carried a
+comment asserting the two paths "agree, because the field is a projection of the same edges",
+which was false for this pair. **A documented deviation is not a safe deviation.** The real
+corpus has no cross-kind pair, so all three fingerprints stayed green throughout.
+
+The fix: `hierarchyIndex` takes `entities` rather than `entityIds`, so it can see kinds, and
+`unresolvable` now means what the original handoff design said it meant — T15 **and**
+cross-kind. `crossKindParentEvents` reads `unresolvable()` instead of deleting from a map it
+was handed; deleting made it part of the derivation while looking like a reporter, and it
+corrected only one of the two readings. Both derivation call sites — `load.ts` and
+`commitRelationships` — now pass the entities, so the edit path refuses a cross-kind parent
+too, which it never did. Measured red first: the existing "cross-kind parent is recorded, not
+thrown" fixture now asserts the index's answer and failed with `state: 'parent'`.
+
+The Standards axis's strongest finding was the same construction written seven times
+(`hierarchyIndex(rels, { entityIds: new Set(entities.map(e => e.id)) })`). That is now
+`useHierarchyIndex` in `src/hooks/`, which also stops two hooks rebuilding the index per
+render. `parentIdOf(link)` replaces the four hand-written `state === "parent" ? … : null`
+ternaries, and `ROOT_LINK`/`UNKNOWN_LINK` are declared once.
+
+Three documentation defects it caught were real and are fixed: this entry and the ADR
+correction were **dated 2026-08-05, a day into the future**; `ARCHITECTURE.md` and
+`CONSTRAINTS.md` still named `useMemo` keys the change had altered; and the comment claiming
+`geopackage.service.test.ts` had been brought under the 300-line cap was false (316). The
+fingerprint test's own comment claiming `linkFor` avoids testing the projection against itself
+was also wrong, and now states plainly what the comparison does and does not prove.
+
 ### Still owed after this run
 
 - **§10 steps 17-28** — the first write. Unrun, and the owner's.
-- **Two files over the cap**, above.
+- **Two files over the cap**, above; and `geopackage.service.test.ts` still at 316.
 - **A gated export.** `ViewPage.tsx:37` still serves the working file.
 - **The six defects the handoff left standing**, minus the two this run had to take: defect 2
   (`setProject`) is done, defect 3 (`contestedParentEvents` untested) is done. Still open:

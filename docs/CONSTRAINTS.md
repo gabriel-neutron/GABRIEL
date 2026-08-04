@@ -138,8 +138,12 @@ boundary, enforced by branded `LatLng` / `LngLat` types.
 ## Performance Guidelines
 
 - `computeAllEntityPositions` (orbital BFS) must be called inside a `useMemo` keyed on
-  `[entities, drawnGeometries]`. Never move it into render-time logic.
-- `NetworkLinksLayer` BFS traversal must be inside `useMemo([entities, selectedEntityId])`.
+  `[entities, drawnGeometries, hierarchyIndex]`. Never move it into render-time logic.
+- `NetworkLinksLayer` BFS traversal must be inside
+  `useMemo([entities, hierarchyIndex, selectedEntityId])`.
+- The hierarchy index itself is built once, by `useHierarchyIndex` (`src/hooks/`), and never
+  by a consumer inline: seven hand-built copies are seven chances for two surfaces to disagree
+  about who sits under whom, and each one is an O(edges) rebuild per render.
 - `SymbolsLayer` keeps a stable Leaflet `L.Icon` map in state, refreshed in `useLayoutEffect`
   from visible markers so icons are not recreated every pan; prune happens when marker keys change.
 - Zustand selectors in map components must return stable references.

@@ -808,7 +808,7 @@ on 2026-07-31 because the planner reads this spec and does not read the 2A quest
    is in what the loop can see, not in what it graded.
 
 9. **The byte layer needs its own check, because every layer above it reports success.** Added
-   2026-08-05 from the Slice 3 run. A source file rewritten through PowerShell 5.1's
+   2026-08-04 from the Slice 3 run. A source file rewritten through PowerShell 5.1's
    `Set-Content -Encoding utf8` came back with a UTF-8 BOM prepended and 28 bytes longer, while the
    edit it was supposed to apply had not matched at all (CRLF). A BOM compiles, lints, passes 691
    tests and shows as a whole-file rewrite in the diff. It was caught by reading the first three

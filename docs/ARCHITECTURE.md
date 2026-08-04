@@ -131,8 +131,8 @@ Passing the index is what makes step 3 possible; without it a contest is indisti
 from a root and `unplacedByContest` is empty. `usePositionMap` builds it from the store's
 edge set.
 
-This function is always called inside `useMemo([entities, drawnGeometries])` in `MapView`.
-Never call it at render time.
+This function is always called inside `useMemo([entities, drawnGeometries, index])`, via
+`usePositionMap`. Never call it at render time.
 
 ---
 
