@@ -32,10 +32,11 @@ Stated plainly, because a licence that hides the limitations of its data is wort
 licence at all:
 
 - **`public/project.gpkg` is the live working file, not a gated publication.** What is published
-  is what the analysts are working on, including unproven hypotheses. Since 2026-08-04 the export
-  gate itself exists as a tested pure predicate (`src/core/export/exportGate.ts`) and its rules are
-  published below, but **nothing applies it to this file** — it is the filter for a future release,
-  not a description of what you are downloading.
+  is what the analysts are working on, including unproven hypotheses. Since 2026-08-04 the gate
+  exists (`src/core/export/exportGate.ts`), its rules are published below, and the app's **Export**
+  action writes a gated CC-BY release in CSV, GeoJSON and JSON-LD. But **the gate is not applied to
+  this file** — `project.gpkg` is the working file, served unfiltered, and a gated release is a
+  separate artefact somebody has to choose to cut. Do not mistake this download for one.
 - **It no longer contains named natural persons — but its git history does.** Corrected
   2026-08-04. The whole file was probed for every surface a person could be named on: 1,027 entity
   names, 151 notes, every alias, every source URL. The only such surface was the `research_sources`

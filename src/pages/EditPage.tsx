@@ -20,7 +20,7 @@ export function EditPage({ onViewMode, onOpenAbout }: EditPageProps): React.Reac
     useProjectStore()
   const { sourceCache, mergeSourceCache } = useSourceCacheStore()
 
-  const { busy, error, restoredFromSession, handleNew, handleOpen, handleSave } = useProjectIO()
+  const { busy, error, restoredFromSession, handleNew, handleOpen, handleSave, handleExportRelease } = useProjectIO()
 
   const handleCreateNewOrganisation = useCallback((geom: DrawnGeometry) => {
     const org: MapEntity = {
@@ -161,6 +161,7 @@ export function EditPage({ onViewMode, onOpenAbout }: EditPageProps): React.Reac
           onNewProject: handleNew,
           onOpenProject: handleOpen,
           onSaveProject: handleSave,
+          onExportRelease: handleExportRelease,
         }}
         onCreateNewOrganisation={handleCreateNewOrganisation}
         onOverpassUnavailable={() =>

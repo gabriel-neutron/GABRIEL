@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import { loadGeoPackage, saveGeoPackage } from "@/core/persistence/geopackage"
 import { loadProject, saveProject, clearProject } from "@/services/projectStorage.service"
 import { useProjectStore } from "@/store/useProjectStore"
+import { useProvenanceStore } from "@/store/useProvenanceStore"
+import { performReleaseExport, writeReleaseFilesToDirectory } from "./releaseExport"
 import {
   loadSeedGeoPackageBuffer,
   performNewProject,
@@ -84,5 +86,31 @@ export function useProjectIO() {
     )
   }, [])
 
-  return { busy, error, restoredFromSession, handleNew, handleOpen, handleSave }
+  const handleExportRelease = useCallback(async (): Promise<void> => {
+    await performReleaseExport(
+      {
+        // Read at call time, not closed over: an export must describe the project as it stands
+        // when the analyst asks, not as it stood when this callback was created.
+        snapshot: () => {
+          const s = useProjectStore.getState()
+          return {
+            entities: s.entities,
+            relationships: s.relationships,
+            claims: s.claims,
+            geometries: s.drawnGeometries,
+            // Sources live in the peripheral provenance store (ADR 0005/0006), the same split
+            // `selectPersistableSnapshot` has to bridge.
+            sources: useProvenanceStore.getState().sources,
+            generatedAt: "",
+          }
+        },
+        writeFiles: writeReleaseFilesToDirectory,
+        notify,
+        now: () => new Date().toISOString(),
+      },
+      { setBusy, setError },
+    )
+  }, [])
+
+  return { busy, error, restoredFromSession, handleNew, handleOpen, handleSave, handleExportRelease }
 }

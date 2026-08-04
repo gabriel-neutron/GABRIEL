@@ -1892,3 +1892,71 @@ applies to **0 rows**. There is not one assessment-tier edge in the project.
 - **Nothing applies the gate.** `ViewPage.tsx:37` and `projectIO.ts:81` still serve the working
   file, and no serializer (CSV, GeoJSON, JSON-LD) exists to apply the predicate to.
 - **The four standing defects**, unchanged.
+
+## Run 2026-08-04 — the serialisers: the gate stops being a predicate nothing applies
+
+Owner ruled: build the serialisers so the gate does something. The gate had been shipped tested
+and wired to nothing, which is the "a value nothing reads" defect one storey up from where the
+2B Spec review found it the first time.
+
+### What a release is
+
+Five files and a README, produced as `Map<filename, contents>` by a pure function. The caller
+decides where bytes land, so the part that decides **what the world gets to read** is entirely
+testable and none of it needs a DOM. One gate feeds every format, so CSV, GeoJSON and JSON-LD
+cannot come to disagree about what was withheld — which is the whole reason the PRD asks for one
+predicate rather than one per serialiser.
+
+The README is not a courtesy. It states the attribution, the licence, and **what was withheld in
+numbers**, because otherwise the absence of a row is indistinguishable from an absence of
+evidence: for a hierarchy dataset that is the difference between "not subordinate" and "we did not
+publish the subordination". `graph.jsonld` carries the `publicDefinition` of every edge type it
+actually used and stamps `EDGE_VOCABULARY_VERSION`, which is `LICENSE-DATA.md`'s standing
+requirement that definitions travel with the edges.
+
+### The honesty rule that cost the most output
+
+`entities.geojson` publishes **recorded geometry only**. 275 of 1,027 entities have a geometry;
+the other 752 get `"geometry": null` and `positionSource: "none"`.
+
+Gabriel can derive a display position for an entity from its parent's, and most of what its map
+draws is derived that way — so exporting derived positions would have made a far more useful
+QGIS layer. It would also have put 752 coordinates into a CC-BY dataset that no source ever
+recorded. That is the invented midpoint of ADR 0011 wearing different clothes, and the cost of
+refusing it is exactly the kind of cost that gets quietly reversed later, so the reason is in the
+test, in the README and here.
+
+### Two dependencies not taken
+
+No CSV library: the whole of what this needs is one escaping rule, and that rule is the only
+place a CSV writer goes wrong. It matters here — this corpus's names are full of commas and
+quotation marks ("Motorized Rifle Battalion (Attached / Alt.)") and its notes contain newlines,
+so an unescaped writer would shift columns on exactly the rows a reuser looks at hardest. The
+corpus test parses its own output back and counts rows to prove it.
+
+No zip library: the export writes into a directory the analyst picks. The app already requires
+the File System Access API to save at all, so this adds no capability, no archive format, and
+the analyst can see what was written without unpacking it.
+
+### Measured on the real corpus, not on fixtures
+
+The unit tests build two-entity fixtures, which is the wrong scale to catch a CSV that breaks on
+one quotation mark. So the serialisers are also run over the real 1,027-entity project and
+pinned: 1,027 GeoJSON features, 275 with geometry and 752 without, 252 relationships, both edge
+type definitions present, and CSV row counts parsed back out of the emitted text.
+
+The 275 figure was independently confirmed against the file (`SELECT COUNT(DISTINCT entity_id)`)
+rather than trusted because the assertion went green — a number a test asserts is only evidence
+if it was not chosen to make the test pass.
+
+### Still owed after this run
+
+- **§10 steps 17-28** — the first write of the derived model. Unrun, and the owner's.
+- **Nothing gates the served file.** `ViewPage.tsx:37` and `projectIO.ts:81` still fetch the
+  working `project.gpkg` unfiltered. The Export action produces a gated artefact; it does not
+  change what the public map loads.
+- **A release has never actually been cut.** The path is tested end to end in Node, and the
+  button is verified present in edit mode and absent in read-only, but the directory picker is a
+  native dialog no test drives.
+- **The history rewrite**, ruled against on 2026-08-04 and documented instead.
+- **The four standing defects**, unchanged.

@@ -24,6 +24,8 @@ export type ProjectFileActions = {
   onNewProject: () => void
   onOpenProject: (file: File) => void
   onSaveProject: () => void
+  /** Writes a gated CC-BY release, which is a different act from saving the working file. */
+  onExportRelease: () => void
 }
 
 type Props = {
@@ -154,6 +156,19 @@ export function AppShell({
         title="Save project"
       >
         Save
+      </Button>
+      <Button
+        type="button"
+        size="sm"
+        variant="outline"
+        disabled={busy}
+        onClick={projectFileActions?.onExportRelease}
+        // Saving writes the working file, which holds everything. Exporting writes a public
+        // release, which does not — and the difference is the whole point of the gate, so the
+        // two actions say so rather than sitting side by side as if they were variants.
+        title="Export a gated CC BY 4.0 release. Unsourced and assessment-tier relationships are withheld."
+      >
+        Export
       </Button>
     </>
   )
