@@ -1672,3 +1672,134 @@ was also wrong, and now states plainly what the comparison does and does not pro
   `updateEntity` accepting a `parentId` patch (1), nothing rendering integrity events (4),
   attachment modelled but unauthorable (5), `withActiveParent` deleting rather than end-dating
   the previous subordination (6), the public map being the working file (7).
+
+## Run 2026-08-04 — the integrity reader: the ledger gets an audience, and the map states its absences
+
+`BASE` **`7a2d9d4`**. **§10 steps 17-28 were still NOT run.** `public/project.gpkg` is
+byte-identical throughout at md5 `7d0b0e592a1128a0d83e7575110bf2dc`, 4,984,832 bytes, absent from
+`git status` at every checkpoint — including after the app was driven against it in a browser,
+which reads it over HTTP and cannot write to it.
+
+`npm run verify` green: **98 test files / 726 tests / 0 failed / 0 skipped** (from 93/692),
+`scan:nul` clean at 371, all 22 changed files byte-scanned separately for NUL and BOM and clean,
+`tsc -b && vite build` clean.
+
+### The owner's four rulings, taken before anything was built
+
+1. Build **§2 and §3 together** — the integrity reader, with the unplaced-by-contest statement
+   living in the same surface.
+2. Acknowledging is **free text plus git attribution**, not a two-person ceremony.
+3. The surface is a **new fixed left panel**, not a badge on HierarchyPanel.
+4. The name scan becomes a **committed script taking its names out of band**.
+
+### What shipped
+
+| item | where |
+|---|---|
+| The all-history name scan, names supplied out of band | `scripts/scan-names.mjs`, `npm run scan:names` |
+| Acknowledgement as a pure, clock-injected write | `src/core/integrity/acknowledge.ts` |
+| Feed ordering, kind labels, detail rendering — the panel's testable half | `src/core/integrity/integrityFeed.ts` |
+| The statement of an absence | `src/core/map/unplacedNotice.ts` |
+| One call site for the position derivation, returning both halves | `src/hooks/useEntityPositions.ts` |
+| `usePositionMap` reduced to a projection of it, signature unchanged | `src/core/map/usePositionMap.ts` |
+| The store's only writer to the ledger | `src/store/projectIntegrityActions.ts` |
+| The reader itself, a fixed core panel beside Layers | `src/components/shared/IntegrityPanel.tsx`, `IntegrityEventCard.tsx` |
+| Three states worth reviewing, built from edges so the store mints the event | `src/stories/shared/IntegrityPanel.stories.tsx` |
+| Why acknowledging is not confirming | `docs/adr/0013-acknowledging-is-not-confirming.md` |
+
+### The scan script proves itself before it is trusted, and was proved four ways
+
+The recorded trap was that `strings` is not installed, so a `strings`-based scan prints nothing
+and looks clean whatever the file contains. The deeper problem is that **`git grep` alone only
+searches the current tree**, so a name deleted in a later commit is still pushed. The script
+sweeps `git cat-file --batch-all-objects`, which is every object in the database — blobs, trees
+(which carry filenames), commits (message plus author and committer identity), annotated tags,
+and unreachable objects a `rev-list` walk misses.
+
+It refuses to report clean unless it has just found a **control token** known to be in history,
+for the same reason `scan-nul.mjs` self-checks its detector. Measured, not assumed:
+
+| probe | expected | observed |
+|---|---|---|
+| no names configured | exit 2 | exit 2 |
+| a needle known present in history | found, exit 1 | found in 20+ objects, exit 1 |
+| a needle present **only inside `project.gpkg`** (the SQLite magic) | found | found; `git grep -ail` confirms the only text-level match is the binary itself |
+| a needle known absent | clean, exit 0 | clean across 3,673 objects |
+| a control token that does not exist | refuse to report clean | exit 2, "the scan is vacuous" |
+
+The binary probe is the one that matters: it is the case a `strings`-based scan reports clean on.
+
+**The scan has not been RUN against the real names** — they are the owner's and are supplied
+through `GABRIEL_SCAN_NAMES` or a gitignored `.scan-names`, which the script refuses to run
+against if git ever starts tracking it. So **the push is still owed**, and is still gated on it.
+
+### Red proofs, graded honestly
+
+- **The store action**: 6 tests, all 6 red against the missing action, green after. Ordinary.
+- **The two pure core modules**: red as module-not-found. This is the **weak kind** — the failure
+  is "cannot import", not "wrong answer" — and is named as such for the same reason Slice 3
+  named the geometry red weak.
+- **The composition test** (`unplacedNotice.integration.test.ts`) was green on first run, which is
+  not evidence. It was then proved against an **injected fault**: `computeAllEntityPositions`
+  called without the index, which is exactly the shape that made the value empty in the first
+  place. 2 of its 3 assertions went red; the fault was reverted. That is the strongest proof in
+  this run, and the only one measured against a deliberately broken derivation.
+
+It exists because the defect being closed was never a wording defect — it was that
+`unplacedByContest` reached no reader. A test of `describeUnplacedByContest` alone would pass
+just as happily with nothing calling it, which is the 2B defect wearing a new coat.
+
+### What the running app actually showed
+
+Driven in a browser against the real project rather than argued from the code:
+
+- The real project's ledger holds **exactly one event** — the `hierarchy-migrated` record of
+  1,012 legacy parent-child links becoming 999 unit subordinations and 13 corporate holdings.
+  "1 unread of 1 recorded".
+- **No absence notice appeared**, because the real corpus has no contest. That agrees with the
+  Slice 3 fingerprints, and it is why the notice's proof had to be a test and a story rather
+  than a screenshot: the state cannot be reached from the real data, and no UI can author a
+  contest, since `withActiveParent` replaces the previous edge by design.
+- On `ViewPage` the ledger is fully readable and the acknowledge affordance is **absent**.
+- On `EditPage` the whole write path worked end to end: name entered, note entered, "Mark read"
+  clicked, the card dimmed to a "Read by ... on ..." line carrying the note, and the counter
+  moved to "0 unread of **1 recorded**" — the event stays in the ledger, which is the behaviour
+  ADR 0013 requires.
+
+### Two decisions inside the acknowledgement that are not obvious
+
+- **A blank note is an absent field, never an empty string.** `decodeIntegrityEvent` drops any
+  string that trims to empty, so a blank acknowledgement would hold for the session and vanish
+  on reload, showing the event as outstanding again with nothing to say why. A blank `by` or
+  `at` is refused outright for the same reason. There is a round-trip test through the real
+  decoder.
+- **An acknowledgement cannot be overwritten.** The three fields are single-valued, so a second
+  one would replace the first attribution leaving no trace — structurally the same defect as
+  known defect 3, `withActiveParent` deleting rather than end-dating. Refusing loses nothing and
+  keeps a ledger-shaped acknowledgement available later.
+
+Refusals are signalled by **returning the same array**, which is how the store action knows not
+to notify subscribers. The precedent is `confirmCredibility`.
+
+### Deviations and things deliberately not done
+
+1. **The panel is a fixed core panel, not a module contribution.** Integrity events are minted by
+   the load and edit paths in `core/`, so no module owns them; it sits beside `LayersPanel` in
+   `MainLayout` rather than in a manifest's `leftPanels` (ADR 0007).
+2. **No component test, because the repo has no React Testing Library.** The panel's logic was
+   pushed into `integrityFeed.ts` and `unplacedNotice.ts` instead, and the panel is a
+   pass-through. Logic left in a component here is logic no test can reach.
+3. **`useProjectStore.ts` went 304 to 310 lines**, further over the 300-line cap it was already
+   over. Only the action's declaration had to land there; its body is in
+   `projectIntegrityActions.ts`, following `projectClaimActions.ts`. Recorded, not hidden.
+4. **The export gate is still not built.** `unacknowledgedIntegrityEvents` still gates nothing —
+   but it can now reach zero, which it never could before, since nothing could acknowledge.
+
+### Still owed after this run
+
+- **The push**, gated on running `npm run scan:names` with the real names.
+- **§10 steps 17-28** — the first write. Unrun, and the owner's.
+- **A gated export** (`ViewPage.tsx:37` and `projectIO.ts:81` both still serve the working file).
+- **The four standing defects**: `updateEntity` accepting a `parentId` patch, attachment modelled
+  but unauthorable, `withActiveParent` deleting rather than end-dating, and no UI resolving a
+  contest — the last of which stays deliberate, and ADR 0013 keeps it that way for the ledger too.

@@ -98,7 +98,12 @@ boundary, enforced by branded `LatLng` / `LngLat` types.
   migration — every migration must round-trip existing `.gpkg` files.
 - **Test runner**: Vitest only. No Jest.
 - **Storybook stories** required for: `EntityInspector`, `EnrichDrawer`, `OsmObjectInspector`,
-  `GeometryActionMenu`, `NetworkLinksLayer` (with 500-entity fixture for performance testing).
+  `GeometryActionMenu`, `NetworkLinksLayer` (with 500-entity fixture for performance testing),
+  `IntegrityPanel`. The last is on this list because it is the only reader of a ledger that
+  ships with the published data, and because the states worth reviewing — a contest, an
+  acknowledged record, an empty ledger — cannot be produced from the real project, which has
+  no contest in it. Its fixture builds the contest from **edges**, so `setProject` mints the
+  event through `commitRelationships` and the story depicts a state the app can actually reach.
 - No mocking of the GeoPackage library in integration tests — use real WASM execution.
 
 ## CI and local verification
@@ -138,7 +143,12 @@ boundary, enforced by branded `LatLng` / `LngLat` types.
 ## Performance Guidelines
 
 - `computeAllEntityPositions` (orbital BFS) must be called inside a `useMemo` keyed on
-  `[entities, drawnGeometries, hierarchyIndex]`. Never move it into render-time logic.
+  `[entities, drawnGeometries, hierarchyIndex]`. Never move it into render-time logic. Since
+  2026-08-04 that call has exactly one site, `useEntityPositions` (`src/hooks/`); read it from
+  there rather than calling it again. `usePositionMap` is a projection of the same hook, kept
+  for the four map layers that want only the positions — a second call site would recompute
+  the BFS *and* give a reader the chance to drop `unplacedByContest`, which is the defect
+  that hook exists to have closed.
 - `NetworkLinksLayer` BFS traversal must be inside
   `useMemo([entities, hierarchyIndex, selectedEntityId])`.
 - The hierarchy index itself is built once, by `useHierarchyIndex` (`src/hooks/`), and never
