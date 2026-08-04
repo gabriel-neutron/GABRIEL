@@ -85,14 +85,27 @@ const AUTHORED_TABLE: Record<RelationshipType, AuthoredRow> = {
  * docs/timelines/GABRIEL_V2_SLICE_0_1_BUILD.md:198-247, with the spec block's
  * line wraps joined by exactly one space. These ship verbatim in the CC-BY
  * dataset; drift here is a publication defect, not a refactor.
+ *
+ * Amended 2026-08-04 (owner ruling), with the spec block and EDGE_VOCABULARY_VERSION: four
+ * record-tier definitions had drifted off the PRD's legal posture, which requires the labels to
+ * describe documents and observations so that the answer to a challenge is "the filing exists".
+ * `subordinate_to`, `fields` and `produces` asserted facts about the world; `supplies` had lost
+ * the PRD's evidentiary threshold (a contract, or at least two transaction records) altogether.
  */
 const AUTHORED_DEFINITIONS: Record<RelationshipType, string> = {
   subordinate_to:
-    "The subject unit is a subordinate element of the named formation in its order of battle.",
+    "The subject unit is recorded in a cited source as a subordinate element of the named " +
+    "formation's order of battle. Where the attachment qualifier reads 'attached' the source " +
+    "records that subordination as temporary; absent or 'organic', it records the unit's standing place. " +
+    "This states what the cited record says, not a verified present chain of command.",
   fields:
-    "The subject unit is equipped with, and operates, the named class of equipment.",
+    "The subject unit was observed operating the named class of equipment on the recorded date. " +
+    "Where no date is recorded the observation is undated, and states nothing about what the unit " +
+    "operates now.",
   produces:
-    "The subject facility manufactures or assembles the named class of equipment.",
+    "The subject facility is documented as manufacturing, assembling or refurbishing the named " +
+    "class of equipment. This records what a cited source states about the facility's output; it " +
+    "is not, on its own, evidence of current production.",
   corporate_parent:
     "The subject organisation is recorded as part of the named parent organisation's corporate " +
     "structure. Where a shareholding is known it is given as a percentage; where no percentage " +
@@ -108,7 +121,10 @@ const AUTHORED_DEFINITIONS: Record<RelationshipType, string> = {
     "The subject party holds a named office in the organisation: director, secretary, or " +
     "registered agent.",
   supplies:
-    "The subject supplier provides goods or services to the named customer.",
+    "The subject supplier is documented as providing goods or services to the named customer on " +
+    "a recurring basis — a contract, or at least two recorded transactions. A single or " +
+    "undocumented delivery does not meet that threshold and is not recorded as a supply " +
+    "relationship.",
   shipped_to:
     "The subject consignor shipped goods to the named consignee on the recorded date.",
   operated_by:
@@ -177,8 +193,11 @@ describe("EDGE_TYPES", () => {
     for (const type of ASSESSMENT_TIER_TYPES) expect(EDGE_TYPES[type].tier).toBe("assessment")
   })
 
-  it("pins EDGE_VOCABULARY_VERSION at 1.0.0", () => {
-    expect(EDGE_VOCABULARY_VERSION).toBe("1.0.0")
+  it("pins EDGE_VOCABULARY_VERSION at 1.1.0", () => {
+    // Bumped from 1.0.0 with the four definition amendments of 2026-08-04. The pin is the gate
+    // ADR 0010 describes: the vocabulary and this test are edited together, so a definition
+    // cannot change without someone deciding what the new version number is.
+    expect(EDGE_VOCABULARY_VERSION).toBe("1.1.0")
   })
 
   it("matches the authored vocabulary table row for row", () => {

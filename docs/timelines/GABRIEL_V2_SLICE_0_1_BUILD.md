@@ -197,13 +197,20 @@ regenerate these from the PRD.
 
 ```
 subordinate_to
-The subject unit is a subordinate element of the named formation in its order of battle.
+The subject unit is recorded in a cited source as a subordinate element of the named
+formation's order of battle. Where the attachment qualifier reads 'attached' the source
+records that subordination as temporary; absent or 'organic', it records the unit's standing place.
+This states what the cited record says, not a verified present chain of command.
 
 fields
-The subject unit is equipped with, and operates, the named class of equipment.
+The subject unit was observed operating the named class of equipment on the recorded date.
+Where no date is recorded the observation is undated, and states nothing about what the unit
+operates now.
 
 produces
-The subject facility manufactures or assembles the named class of equipment.
+The subject facility is documented as manufacturing, assembling or refurbishing the named
+class of equipment. This records what a cited source states about the facility's output; it
+is not, on its own, evidence of current production.
 
 corporate_parent
 The subject organisation is recorded as part of the named parent organisation's corporate
@@ -224,7 +231,10 @@ The subject party holds a named office in the organisation: director, secretary,
 registered agent.
 
 supplies
-The subject supplier provides goods or services to the named customer.
+The subject supplier is documented as providing goods or services to the named customer on
+a recurring basis — a contract, or at least two recorded transactions. A single or
+undocumented delivery does not meet that threshold and is not recorded as a supply
+relationship.
 
 shipped_to
 The subject consignor shipped goods to the named consignee on the recorded date.

@@ -6,7 +6,16 @@ import type { RelationshipMetadata, RelationshipTier, RelationshipType } from ".
  * Adding to the *initial* list is authoring, not amendment — which is why the
  * thirteen entries below cost nothing here and would cost a version bump later.
  */
-export const EDGE_VOCABULARY_VERSION = "1.0.0"
+/**
+ * `1.1.0`, not `1.0.0`: four record-tier `publicDefinition` strings were amended on 2026-08-04 to
+ * restore the documentary phrasing the PRD's legal posture requires ("the answer to a challenge is
+ * 'the filing exists'"). `subordinate_to`, `fields`, `produces` and `supplies` had shipped asserting
+ * facts about the world rather than about records, and `supplies` had dropped its evidentiary
+ * threshold entirely. Minor, not major: no type was added, removed or renamed and no schema moved,
+ * so a reuser's code still compiles — but the published prose changed, which is a dataset change
+ * under ADR 0010 and must be visible to anyone who pinned the previous text.
+ */
+export const EDGE_VOCABULARY_VERSION = "1.1.0"
 
 export type EdgeLayer =
   | "orbat" | "military-industrial" | "industrial"
@@ -53,7 +62,7 @@ export const EDGE_TYPES: Record<RelationshipType, EdgeTypeDefinition> = {
     toLabel: "formation",
     fromKinds: ["unit"],
     toKinds: ["unit"],
-    publicDefinition: "The subject unit is a subordinate element of the named formation in its order of battle.",
+    publicDefinition: "The subject unit is recorded in a cited source as a subordinate element of the named formation's order of battle. Where the attachment qualifier reads 'attached' the source records that subordination as temporary; absent or 'organic', it records the unit's standing place. This states what the cited record says, not a verified present chain of command.",
     dateRequired: null,
     metadata: { attachment: ["organic", "attached"] },
   },
@@ -65,7 +74,7 @@ export const EDGE_TYPES: Record<RelationshipType, EdgeTypeDefinition> = {
     toLabel: "equipment class",
     fromKinds: ["unit"],
     toKinds: ["equipment_class"],
-    publicDefinition: "The subject unit is equipped with, and operates, the named class of equipment.",
+    publicDefinition: "The subject unit was observed operating the named class of equipment on the recorded date. Where no date is recorded the observation is undated, and states nothing about what the unit operates now.",
     dateRequired: null,
     metadata: {},
   },
@@ -77,7 +86,7 @@ export const EDGE_TYPES: Record<RelationshipType, EdgeTypeDefinition> = {
     toLabel: "equipment class",
     fromKinds: ["corporate"],
     toKinds: ["equipment_class"],
-    publicDefinition: "The subject facility manufactures or assembles the named class of equipment.",
+    publicDefinition: "The subject facility is documented as manufacturing, assembling or refurbishing the named class of equipment. This records what a cited source states about the facility's output; it is not, on its own, evidence of current production.",
     dateRequired: null,
     metadata: {},
   },
@@ -137,7 +146,7 @@ export const EDGE_TYPES: Record<RelationshipType, EdgeTypeDefinition> = {
     toLabel: "customer",
     fromKinds: ["corporate"],
     toKinds: ["corporate"],
-    publicDefinition: "The subject supplier provides goods or services to the named customer.",
+    publicDefinition: "The subject supplier is documented as providing goods or services to the named customer on a recurring basis — a contract, or at least two recorded transactions. A single or undocumented delivery does not meet that threshold and is not recorded as a supply relationship.",
     dateRequired: null,
     metadata: {},
   },
