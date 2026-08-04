@@ -12,6 +12,7 @@
     "hooks:install": "git config core.hooksPath .githooks",
     "scan:nul": "node scripts/scan-nul.mjs",
     "scan:names": "node scripts/scan-names.mjs",
+    "strip:cache": "node --no-warnings scripts/strip-research-cache.mjs",
     "verify": "npm run scan:nul && npm run lint && npm run test:coverage && npm run build",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",

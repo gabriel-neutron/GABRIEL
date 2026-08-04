@@ -1803,3 +1803,92 @@ to notify subscribers. The precedent is `confirmCredibility`.
 - **The four standing defects**: `updateEntity` accepting a `parentId` patch, attachment modelled
   but unauthorable, `withActiveParent` deleting rather than end-dating, and no UI resolving a
   contest — the last of which stays deliberate, and ADR 0013 keeps it that way for the ledger too.
+
+## Run 2026-08-04 — the export gate, and the first authorised write to the working file
+
+Owner ruled three things before any code: build the gate as a pure predicate plus strip the
+research cache (not the full export path); define "unsourced relationship" by the endpoint proxy;
+and keep `public/project.gpkg` in the repo, stripping the cache **in place**. That third ruling is
+an explicit authorisation to write to the working file, which is why this run has one.
+
+### What the file actually turned out to be
+
+The probe that preceded the write found the file is **still a pre-2B file**. It holds five tables —
+`units`, `organisations`, `layers`, `geometries`, `research_sources` — and no `relationships`,
+`provenance_sources`, `claims` or `integrity_events` table at all. Every one of the 1,012 edges,
+249 sources, 413 claims and the single integrity event is **derived in memory on every load** and
+has never been written down. That is exactly why §10 steps 17-28 are still owed, and it makes the
+`hierarchy-migrated` event the app displays a statement about a migration that has not yet been
+persisted. `LICENSE-DATA.md` asserted the file carried a `relationships` table; it did not, and
+that claim is now corrected there.
+
+### Where a person could be named, measured rather than assumed
+
+The PRD's rule is "no natural-person Entities, and no Relationship naming one". The first half was
+already satisfied by the data and nobody had checked: 1,027 entities are 1,010 units and 17
+corporate, and **no entity of kind `person` has ever existed** in this project. So the rule that
+mattered was the one nobody had written down — where else can a name live?
+
+Every free-text surface was probed. 151 notes (10,426 characters) yielded only places, formations
+and equipment. 1,027 entity names yielded 103 name-shaped candidates, all formations. Zero entities
+carry aliases. **The only surface naming a natural person was the `research_sources` fetch cache**:
+five entries, 5,701 characters, holding a head of state and several named foreign officers from a
+US Government publication. None of the five was cited by any unit or organisation — all were
+residue of research runs, one of them a Bellingcat *author feed* URL.
+
+A first pass using rank and patronymic markers ("general", "полковник", `-ович`) produced **four
+hits and zero true positives**: "Alt." matched `lt.`, "private majority" matched `major`, and the
+`api.army.mil` entry that looked worst is an acronym glossary ("CGS Chief of the General Staff").
+Recorded because the heuristic that found nothing was also the heuristic that could not have found
+"Vladimir Putin" — no rank, no patronymic. Capitalised-bigram matching found it immediately. **A
+negative from a weak detector is not evidence**, which is this repo's oldest lesson wearing new
+clothes.
+
+### The write, and why VACUUM is the whole job
+
+`scripts/strip-research-cache.mjs` deletes the rows and then **VACUUMs**, because a bare `DELETE`
+leaves the text in SQLite's free pages where `git grep -a` still finds it: the rows would be gone
+and the names would not be. The script verifies at the **byte** level before reporting done, and
+refuses to run at all unless the target is committed and unmodified, so `git checkout` is a
+guaranteed byte-identical revert path rather than a hope.
+
+Result: 4,984,832 → 4,972,544 bytes, 5 rows removed, 9 tables intact. Verified independently of the
+script: every probed name absent from the file's bytes; `units` 1010, `organisations` 17,
+`geometries` 291, `layers` 16 unchanged; **all three pinned hierarchy fingerprints still pass**,
+which is the evidence that the strip touched nothing but the cache. The two hosts still present in
+the bytes are legitimate — five Kremlin citation URLs in `units.sources`, and cached public OSM
+GeoJSON in `layers.geojson`.
+
+### Still true after the write, and the reason this is not finished
+
+**Every commit up to `9f0387e` still carries the pre-strip file, and it is pushed to a public
+repository.** Stripping the working file does not remove anything from history. The names remain
+retrievable by `git show` until the history is rewritten, and that is an owner decision this run
+deliberately did not take. `LICENSE-DATA.md` now says so in as many words rather than implying the
+problem is closed.
+
+### The gate, and the number that should worry a reader
+
+`applyExportGate` is one predicate for every format, per the PRD, with the order load-bearing and
+asserted: person-naming is checked before sourcing, and sourcing before tier, so an export override
+— which authorises publication of an *assessment* — can never be read as manufacturing a source or
+as consent to publish a person.
+
+The unsourced rule is a **proxy** and is labelled one everywhere it appears. Gabriel attaches
+sources to entities, not to edges, so the literal PRD rule ("unsourced Relationships never ship")
+would ship **zero** edges. The endpoint proxy ships an edge when both endpoints are cited, and over
+the real corpus that is **252 of 1,012** — 760 withheld. Pinned in
+`exportGate.corpus.test.ts`, because a proxy that silently published almost everything or almost
+nothing would be invisible from the unit tests, and loosening it must not pass unremarked.
+
+Also worth stating plainly: the two-person `ExportOverride` apparatus is fully built and currently
+applies to **0 rows**. There is not one assessment-tier edge in the project.
+
+### Still owed after this run
+
+- **§10 steps 17-28** — the first write of the *derived* model. Unrun, and the owner's. This run's
+  write was a targeted `DELETE` inside one table, deliberately not that.
+- **The history rewrite**, or an explicit decision not to.
+- **Nothing applies the gate.** `ViewPage.tsx:37` and `projectIO.ts:81` still serve the working
+  file, and no serializer (CSV, GeoJSON, JSON-LD) exists to apply the predicate to.
+- **The four standing defects**, unchanged.
