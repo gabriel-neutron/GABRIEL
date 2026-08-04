@@ -7,10 +7,10 @@ import { isHierarchyBearing } from "./isHierarchyBearing"
  *
  * This type is the whole point of the index. `Entity.parentId` is one nullable string,
  * so it collapses four different findings into `null`: no hierarchy-bearing edge, two
- * competing edges, an edge naming a parent that is not in the entity set, and an id the
- * index has never heard of. ADR 0011 rejected mapping a contest to `null` precisely
- * because `null` is what a legitimate root looks like — and then the retained `parentId`
- * field went on doing it anyway, which is how a contested child rendered as a top-level
+ * competing edges, an edge naming a parent that cannot be placed, and an id the index
+ * has never heard of. ADR 0011 rejected mapping a contest to `null` precisely because
+ * `null` is what a legitimate root looks like — and then the retained `parentId` field
+ * went on doing it anyway, which is how a contested child rendered as a top-level
  * formation and took its whole subtree off the map with it.
  *
  * `via` carries the edges that decided the link, so a caller can name them without a
@@ -25,6 +25,19 @@ export type ParentLink =
   | { state: "unresolvable"; parentId: string; via: readonly Relationship[] }
   | { state: "unknown" }
 
+export const ROOT_LINK: ParentLink = { state: "root" }
+export const UNKNOWN_LINK: ParentLink = { state: "unknown" }
+
+/**
+ * The id a link places a child under, or `null` for the four answers that place it
+ * nowhere. The one narrowing every consumer needs, written once: a contest, an
+ * unresolvable parent and a root all mean "no parent is derived", and a caller that
+ * spells the ternary out itself is a caller that can spell it differently.
+ */
+export function parentIdOf(link: ParentLink): string | null {
+  return link.state === "parent" ? link.parentId : null
+}
+
 /** The one method `buildOrbat` needs, so a test can hand it a two-line stand-in. */
 export type ParentLinkSource = {
   linkFor(id: string): ParentLink
@@ -36,16 +49,28 @@ export type HierarchyIndex = ParentLinkSource & {
   parents(): Map<string, string>
   /** child id -> the ids of every competing bearing edge. Fresh map. */
   contested(): Map<string, string[]>
+  /** child id -> the parent this index refused to place it under. Fresh map. The two
+   *  causes are told apart by the caller, which has the kinds: a parent absent from the
+   *  entity set (T15), and one that is present but of the other kind. */
+  unresolvable(): Map<string, string>
 }
+
+/** Only the id and the kind are read, so entities and any other kinded record fit. `kind`
+ *  is optional: a caller that does not know kinds gets presence-checking alone. */
+export type IndexedEntity = { id: string; kind?: string }
 
 export type HierarchyIndexOptions = {
   /**
-   * The entity set the hierarchy is being read over. Supplying it is what lets the
-   * index tell `"unresolvable"` from `"root"` and `"unknown"` from `"root"` — three
-   * answers `withDerivedParents` structurally cannot distinguish, because it sees the
-   * entity set and the derived map but never the edge that produced the value.
+   * The entity set the hierarchy is being read over. Supplying it is what lets the index
+   * tell `"unresolvable"` from `"root"` and `"unknown"` from `"root"` — three answers
+   * `withDerivedParents` structurally cannot distinguish, because it sees the entity set
+   * and the derived map but never the edge that produced the value.
+   *
+   * Pass entities rather than ids wherever the kinds are known. Without them the index
+   * cannot see a cross-kind pair, and would answer `"parent"` for an edge ADR 0011 says
+   * must derive nothing.
    */
-  entityIds?: ReadonlySet<string>
+  entities?: readonly IndexedEntity[]
   /**
    * Read the hierarchy as at this date rather than as at now. Plumbing only: no UI
    * reaches it. See `isHierarchyBearing`'s note on why a date control would be a
@@ -62,9 +87,6 @@ export type HierarchyIndexOptions = {
   bearing?: (rel: Relationship) => boolean
 }
 
-const ROOT: ParentLink = { state: "root" }
-const UNKNOWN: ParentLink = { state: "unknown" }
-
 /**
  * The edge-backed answer to "who is this entity under", for every entity at once.
  *
@@ -77,43 +99,56 @@ const UNKNOWN: ParentLink = { state: "unknown" }
  * The edge reads "A <type> B" with `fromId` always A, so the CHILD is `fromId` and the
  * PARENT is `toId` — the same keying `countActiveOrganicParents` uses.
  *
- * With `entityIds` supplied, an edge whose CHILD is outside the set contributes
- * nothing and that id reads `unknown`. Such an edge is a `dangling-endpoint`, which
+ * With `entities` supplied, an edge whose CHILD is outside the set contributes nothing
+ * and that id reads `unknown`. Such an edge is a `dangling-endpoint`, which
  * `validateRelationships` reports and `load.ts` treats as making the file unopenable,
  * so a second policy for it here would be a second answer to a settled question.
  *
- * `unresolvable` is Trap T15: a single bearing edge naming a parent that is not in the
- * entity set. Deriving it would write a `parent_id` that makes the NEXT load throw. The
- * neighbouring case — a parent that exists but is of the other kind — is decided by
- * `crossKindParentEvents`, which needs the kinds that neither the edge set nor this
- * index carries.
+ * `unresolvable` covers both cases where a single bearing edge names a parent this index
+ * will not place a child under. **T15**: the parent is not in the entity set, and
+ * deriving it would write a `parent_id` that makes the NEXT load throw. **Cross-kind**:
+ * the parent is there and is of the other kind, which ADR 0011 rules "a legitimate record
+ * that must not derive a parent" — the entity validation on load throws when a `parentId`
+ * does not resolve within its own kind, so deriving it breaks the next load just as surely.
+ * Both leave the derivation by OMISSION and neither throws.
  */
 export function hierarchyIndex(
   rels: readonly Relationship[],
   options?: HierarchyIndexOptions,
 ): HierarchyIndex {
-  const entityIds = options?.entityIds
+  const entities = options?.entities
   const onDate = options?.onDate
   const bearing = options?.bearing ?? ((rel: Relationship) => isHierarchyBearing(rel, onDate))
+  const kindById = entities == null ? null : new Map(entities.map((e) => [e.id, e.kind]))
+
+  /** Kinds decide only when BOTH are known: an index handed bare ids checks presence and
+   *  says nothing about kind, rather than inventing a mismatch out of two undefineds. */
+  function placeable(childId: string, parentId: string): boolean {
+    if (kindById == null) return true
+    if (!kindById.has(parentId)) return false
+    const childKind = kindById.get(childId)
+    const parentKind = kindById.get(parentId)
+    return childKind == null || parentKind == null || childKind === parentKind
+  }
 
   const edgesByChild = new Map<string, Relationship[]>()
   for (const rel of rels) {
     if (!bearing(rel)) continue
-    if (entityIds != null && !entityIds.has(rel.fromId)) continue
+    if (kindById != null && !kindById.has(rel.fromId)) continue
     const existing = edgesByChild.get(rel.fromId)
     if (existing == null) edgesByChild.set(rel.fromId, [rel])
     else existing.push(rel)
   }
 
   // Built in edge-scan order and read back in it, so the ledger rows a load mints from
-  // `contested()` land in the file in the order the edges sit in the table rather than
-  // in whatever order a rebuilt map happens to produce.
+  // `contested()` and `unresolvable()` land in the file in the order the edges sit in the
+  // table rather than in whatever order a rebuilt map happens to produce.
   const linkByChild = new Map<string, ParentLink>()
   for (const [childId, edges] of edgesByChild) {
     const only = edges.length === 1 ? edges[0] : undefined
     if (only == null) {
       linkByChild.set(childId, { state: "contested", via: edges })
-    } else if (entityIds != null && !entityIds.has(only.toId)) {
+    } else if (!placeable(childId, only.toId)) {
       linkByChild.set(childId, { state: "unresolvable", parentId: only.toId, via: edges })
     } else {
       linkByChild.set(childId, { state: "parent", parentId: only.toId, via: edges })
@@ -121,25 +156,28 @@ export function hierarchyIndex(
   }
 
   function linkFor(id: string): ParentLink {
-    if (entityIds != null && !entityIds.has(id)) return UNKNOWN
-    return linkByChild.get(id) ?? ROOT
+    if (kindById != null && !kindById.has(id)) return UNKNOWN_LINK
+    return linkByChild.get(id) ?? ROOT_LINK
   }
 
-  function parents(): Map<string, string> {
+  function collect(state: "parent" | "unresolvable"): Map<string, string> {
     const map = new Map<string, string>()
     for (const [childId, link] of linkByChild) {
-      if (link.state === "parent") map.set(childId, link.parentId)
+      if (link.state === state) map.set(childId, link.parentId)
     }
     return map
   }
 
-  function contested(): Map<string, string[]> {
-    const map = new Map<string, string[]>()
-    for (const [childId, link] of linkByChild) {
-      if (link.state === "contested") map.set(childId, link.via.map((edge) => edge.id))
-    }
-    return map
+  return {
+    linkFor,
+    parents: () => collect("parent"),
+    unresolvable: () => collect("unresolvable"),
+    contested: () => {
+      const map = new Map<string, string[]>()
+      for (const [childId, link] of linkByChild) {
+        if (link.state === "contested") map.set(childId, link.via.map((edge) => edge.id))
+      }
+      return map
+    },
   }
-
-  return { linkFor, parents, contested }
 }

@@ -2,7 +2,7 @@ import { useCallback, useMemo, useState } from "react"
 import { Button } from "@/ui/button"
 import { Separator } from "@/ui/separator"
 import { buildOrbat } from "@/core/entity/hierarchy"
-import { hierarchyIndex } from "@/core/relationship/hierarchyIndex"
+import { useHierarchyIndex } from "@/hooks/useHierarchyIndex"
 import {
   compareByName,
   EMPTY_PATH,
@@ -39,7 +39,6 @@ function HierarchyPanelHeader({ anyVisible, onToggleAllVisibility }: HierarchyPa
 
 export function HierarchyPanel({ hiddenEntityIds: hiddenEntityIdsProp, onToggleEntityVisible: onToggleEntityVisibleProp }: Props) {
   const entities = useProjectStore((s) => s.entities)
-  const relationships = useProjectStore((s) => s.relationships)
   const storeHiddenEntityIds = useEntityVisibilityStore((s) => s.hiddenEntityIds)
   const setEntityVisible = useEntityVisibilityStore((s) => s.setEntityVisible)
   const hiddenEntityIds = hiddenEntityIdsProp ?? storeHiddenEntityIds
@@ -53,12 +52,8 @@ export function HierarchyPanel({ hiddenEntityIds: hiddenEntityIdsProp, onToggleE
   const corporateEntities = useMemo(() => entities.filter((e) => e.kind === "corporate"), [entities])
   const nameById = useMemo(() => new Map(entities.map((e) => [e.id, e.name])), [entities])
   // The edge set, so this panel can tell a contested child from a root. Both trees read one
-  // index over ALL entities rather than one each: an edge is not a unit's or a corporation's,
-  // and a per-tree index would answer "root" for a child whose only edge crosses kinds.
-  const index = useMemo(
-    () => hierarchyIndex(relationships, { entityIds: new Set(entities.map((e) => e.id)) }),
-    [relationships, entities],
-  )
+  // index over ALL entities rather than one each — see `useHierarchyIndex`.
+  const index = useHierarchyIndex()
   const orbat = useMemo(() => buildOrbat(units, index), [units, index])
   const orgOrbat = useMemo(() => buildOrbat(corporateEntities, index), [corporateEntities, index])
   const anyVisible = units.some(

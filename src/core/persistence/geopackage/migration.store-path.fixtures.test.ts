@@ -3,7 +3,9 @@ import { resolve } from "node:path"
 import { GeoPackageAPI } from "@ngageoint/geopackage"
 import { afterEach, beforeAll, describe, expect, it } from "vitest"
 import type { EntityKind } from "@/core/entity/entity"
+import { buildOrbat } from "@/core/entity/hierarchy"
 import type { IntegrityEvent } from "@/core/integrity/integrityEvent"
+import { hierarchyIndex } from "@/core/relationship/hierarchyIndex"
 import type { Relationship } from "@/core/relationship/relationship"
 import type { Layer, MapEntity } from "@/types/domain.types"
 import { ensureOptionalColumns, insertRow } from "./columnDescriptor"
@@ -143,6 +145,16 @@ describe("relationship and integrity controls on the load path (synthetic fixtur
     expect(events[0]!.detail.childId).toBe("e-unit")
     expect(events[0]!.summary).toContain("e-unit")
     expect(reloaded.relationships).toEqual(relationships)
+
+    // Slice 3: the six consumers read the INDEX, so the index has to reach the same
+    // conclusion. It did not — it saw one bearing edge and answered "parent", while the
+    // field path had deleted the pair, so `usePositionMap` would ring a unit around a
+    // corporate "parent" that ADR 0011 says must derive nothing. The real corpus has no
+    // cross-kind pair, which is why all three fingerprints stayed green.
+    const index = hierarchyIndex(reloaded.relationships, { entities: reloaded.entities })
+    expect(index.linkFor("e-unit")).toMatchObject({ state: "unresolvable", parentId: "e-corp" })
+    expect(index.parents().has("e-unit")).toBe(false)
+    expect(buildOrbat(reloaded.entities, index).parentOf("e-unit").state).toBe("unresolvable")
   }, 60_000)
 
   it("Hierarchy migration message survives the load path unwrapped", async () => {

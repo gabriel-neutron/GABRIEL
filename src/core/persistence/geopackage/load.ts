@@ -182,8 +182,11 @@ export async function loadGeoPackage(buffer: ArrayBuffer): Promise<GeoPackageLoa
     // §7 step 5, last: the edge set is the sole authority for `parentId` once it is derived.
     // Never in place — the migration above needed the raw values, so this produces new
     // entity objects and leaves `entities` untouched.
-    const derived = activeParentMap(relationships)
-    const crossKindEvents = crossKindParentEvents(derived.parentById, entities, now)
+    // The entities, not just their ids: without the kinds the derivation cannot see a
+    // cross-kind pair, and would place a child under a parent ADR 0011 says must derive
+    // nothing — which is what every consumer reading the index would then render.
+    const derived = activeParentMap(relationships, { entities })
+    const crossKindEvents = crossKindParentEvents(derived.unresolvable, entities, now)
     const derivedEntities = withDerivedParents(entities, derived)
     // The contests this derivation has just decided, through the one minter the edit path uses
     // too. An empty ledger is passed rather than the persisted one because `mergeIntegrityEvents`

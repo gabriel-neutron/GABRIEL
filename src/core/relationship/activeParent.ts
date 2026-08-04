@@ -11,6 +11,10 @@ export type ActiveParentMap = {
    *  Returned here, at the point the conflict is decided, so the caller mints the
    *  integrity event without a second validation pass. */
   contested: Map<string, string[]>
+  /** child id -> the parent the derivation refused to place it under: absent from the
+   *  entity set, or present and of the other kind. Empty unless `entities` was supplied,
+   *  since neither case is decidable from the edges alone. */
+  unresolvable: Map<string, string>
 }
 
 /**
@@ -22,17 +26,22 @@ export type ActiveParentMap = {
  * express; `ParentLink` is that tri-state made a type, and anything that needs to
  * tell a contest from a root at the point of reading should take the index instead.
  *
- * The signature is unchanged, so `load.ts` and `useProjectStore` keep their shape.
- * Called with no options it is exactly what it was before Slice 3: no `entityIds`
- * means no link can be `unresolvable`, so every single-edge child lands in
- * `parentById` and Trap T15 stays where it was, in `withDerivedParents`.
+ * Called with no options it is exactly what it was before Slice 3: no `entities` means
+ * no link can be `unresolvable`, so every single-edge child lands in `parentById` and
+ * Trap T15 stays where it was, in `withDerivedParents`. Both callers now pass the
+ * entities, because that is what lets the derivation and the index agree about a
+ * cross-kind pair rather than one deriving a parent the other refuses.
  */
 export function activeParentMap(
   rels: Relationship[],
   options?: HierarchyIndexOptions,
 ): ActiveParentMap {
   const index = hierarchyIndex(rels, options)
-  return { parentById: index.parents(), contested: index.contested() }
+  return {
+    parentById: index.parents(),
+    contested: index.contested(),
+    unresolvable: index.unresolvable(),
+  }
 }
 
 /**

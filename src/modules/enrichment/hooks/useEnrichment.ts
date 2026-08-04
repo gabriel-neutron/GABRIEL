@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useRef, useState } from "react"
 import { buildDefaultEnrichmentPrompt, buildEnrichmentRequest, ENRICHMENT_MAX_DEPTH_DEFAULT, runEnrichment } from "@/modules/enrichment/services"
 import { toEnrichmentFeature, toEnrichmentContext } from "@/modules/enrichment/services/enrichmentAdapters"
-import { hierarchyIndex } from "@/core/relationship/hierarchyIndex"
+import { useHierarchyIndex } from "@/hooks/useHierarchyIndex"
 import {
   acceptProposalToOverlay,
   clearFeatureEnrichmentState,
@@ -50,7 +50,7 @@ export function useEnrichment({
   const claims = useProjectStore((s) => s.claims)
   const addClaims = useProjectStore((s) => s.addClaims)
   const entityMergeMap = useProjectStore((s) => s.entityMergeMap)
-  const relationships = useProjectStore((s) => s.relationships)
+  const hierarchy = useHierarchyIndex(entities)
 
   const selectedEntity = useMemo(
     () => (selectedEntityId ? entities.find((entity) => entity.id === selectedEntityId) ?? null : null),
@@ -64,11 +64,8 @@ export function useEnrichment({
   // The edge set, so a selected entity with two recorded parents is described to the model
   // as disputed rather than as independent (ADR 0011).
   const parentLink = useMemo(
-    () => (selectedEntity
-      ? hierarchyIndex(relationships, { entityIds: new Set(entities.map((e) => e.id)) })
-        .linkFor(selectedEntity.id)
-      : undefined),
-    [entities, relationships, selectedEntity],
+    () => (selectedEntity ? hierarchy.linkFor(selectedEntity.id) : undefined),
+    [hierarchy, selectedEntity],
   )
   const context = useMemo(
     () => (selectedEntity ? toEnrichmentContext(selectedEntity, entities, parentLink) : null),

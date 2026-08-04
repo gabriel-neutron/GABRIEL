@@ -25,11 +25,9 @@ const CONTEST = [
   edge("e-2", "disputed", "hq-2"),
   edge("e-3", "under", "disputed"),
 ]
-const IDS = new Set(ENTITIES.map((e) => e.id))
-
 describe("computeAllEntityPositions with a contest in the chain", () => {
   it("names the contested entity and everything under it, and invents no position", () => {
-    const index = hierarchyIndex(CONTEST, { entityIds: IDS })
+    const index = hierarchyIndex(CONTEST, { entities: ENTITIES })
     const { positioned, unplacedByContest } = computeAllEntityPositions(ENTITIES, [PIN], index)
 
     // No midpoint between the two competing parents, and no winner: only the anchored HQ
@@ -43,7 +41,7 @@ describe("computeAllEntityPositions with a contest in the chain", () => {
   it("says nothing about hq-2, which is unplaced for its own reason", () => {
     // It has no geometry and no parent. Naming it here would blame a contest for an
     // absence the contest did not cause.
-    const index = hierarchyIndex(CONTEST, { entityIds: IDS })
+    const index = hierarchyIndex(CONTEST, { entities: ENTITIES })
     expect(computeAllEntityPositions(ENTITIES, [PIN], index).unplacedByContest).not.toContain("hq-2")
   })
 
@@ -53,7 +51,7 @@ describe("computeAllEntityPositions with a contest in the chain", () => {
       PIN,
       { id: "geometry-2", layerId: "division", entityId: "disputed", type: "point", lat: 51, lng: 31 },
     ]
-    const index = hierarchyIndex(CONTEST, { entityIds: IDS })
+    const index = hierarchyIndex(CONTEST, { entities: ENTITIES })
     const { positioned, unplacedByContest } = computeAllEntityPositions(entities, geometries, index)
 
     expect(positioned.map((p) => p.entity.id).sort()).toEqual(["disputed", "hq-1", "under"])
@@ -67,7 +65,7 @@ describe("computeAllEntityPositions with a contest in the chain", () => {
     // miniature, and the reason the six consumers could be ported one at a time.
     const derived = ENTITIES.map((e) => ({ ...e, parentId: e.id === "under" ? "disputed" : null }))
     const withIndex = computeAllEntityPositions(
-      ENTITIES, [PIN], hierarchyIndex(CONTEST, { entityIds: IDS }),
+      ENTITIES, [PIN], hierarchyIndex(CONTEST, { entities: ENTITIES }),
     )
     const withField = computeAllEntityPositions(derived, [PIN])
 

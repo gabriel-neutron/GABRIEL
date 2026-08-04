@@ -1,4 +1,10 @@
-import type { ParentLink, ParentLinkSource } from "@/core/relationship/hierarchyIndex"
+import {
+  parentIdOf,
+  ROOT_LINK,
+  UNKNOWN_LINK,
+  type ParentLink,
+  type ParentLinkSource,
+} from "@/core/relationship/hierarchyIndex"
 
 export interface OrbatNode {
   id: string
@@ -33,9 +39,6 @@ export interface Orbat<T extends OrbatNode> {
   parentOf(id: string): ParentLink
 }
 
-const UNKNOWN: ParentLink = { state: "unknown" }
-const ROOT: ParentLink = { state: "root" }
-
 /**
  * Orphan policy: an item whose parent is a missing id is treated as a root — visible
  * in trees/hierarchy panels and eligible for enrichment, matching the one call site
@@ -62,9 +65,9 @@ export function buildOrbat<T extends OrbatNode>(items: T[], index?: ParentLinkSo
 
   function parentOf(id: string): ParentLink {
     const item = byId.get(id)
-    if (item == null) return UNKNOWN
+    if (item == null) return UNKNOWN_LINK
     if (index != null) return index.linkFor(id)
-    if (item.parentId == null) return ROOT
+    if (item.parentId == null) return ROOT_LINK
     return byId.has(item.parentId)
       ? { state: "parent", parentId: item.parentId, via: [] }
       : { state: "unresolvable", parentId: item.parentId, via: [] }
@@ -72,17 +75,13 @@ export function buildOrbat<T extends OrbatNode>(items: T[], index?: ParentLinkSo
 
   const parentIdById = new Map<string, string | null>()
   for (const item of items) {
-    const link = index == null ? null : index.linkFor(item.id)
-    parentIdById.set(
-      item.id,
-      link == null ? item.parentId : link.state === "parent" ? link.parentId : null,
-    )
+    parentIdById.set(item.id, index == null ? item.parentId : parentIdOf(index.linkFor(item.id)))
   }
-  const parentIdOf = (item: T): string | null => parentIdById.get(item.id) ?? null
+  const effectiveParent = (item: T): string | null => parentIdById.get(item.id) ?? null
 
   const childrenByParent = new Map<string, T[]>()
   for (const item of items) {
-    const parentId = parentIdOf(item)
+    const parentId = effectiveParent(item)
     if (parentId == null) continue
     const siblings = childrenByParent.get(parentId)
     if (siblings) siblings.push(item)
@@ -118,7 +117,7 @@ export function buildOrbat<T extends OrbatNode>(items: T[], index?: ParentLinkSo
   }
 
   const structuralRoots = items.filter((item) => {
-    const parentId = parentIdOf(item)
+    const parentId = effectiveParent(item)
     return parentId == null || !byId.has(parentId)
   })
   bfsFrom(structuralRoots)
@@ -143,7 +142,7 @@ export function buildOrbat<T extends OrbatNode>(items: T[], index?: ParentLinkSo
       if (!node) break
       result.push(node)
       seen.add(currentId)
-      currentId = parentIdOf(node)
+      currentId = effectiveParent(node)
     }
     return result
   }

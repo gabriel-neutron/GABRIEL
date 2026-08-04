@@ -5,7 +5,8 @@ import { useProjectStore } from "@/store/useProjectStore"
 import { selectEntity } from "@/core/map/selection"
 import { useShallow } from "zustand/shallow"
 import { buildOrbat } from "@/core/entity/hierarchy"
-import { hierarchyIndex } from "@/core/relationship/hierarchyIndex"
+import { parentIdOf } from "@/core/relationship/hierarchyIndex"
+import { useHierarchyIndex } from "@/hooks/useHierarchyIndex"
 import { computeTreeXIndex } from "@/modules/orbat/services/treeLayout"
 
 const nodeTypes = { militarySymbol: MilitarySymbolNode }
@@ -14,19 +15,12 @@ const H_SPACING = 110
 const V_SPACING = 130
 
 export function TreeView() {
-  const { entities: allEntities, relationships, selectedEntityId } = useProjectStore(
-    useShallow((s) => ({
-      entities: s.entities,
-      relationships: s.relationships,
-      selectedEntityId: s.selectedEntityId,
-    }))
+  const { entities: allEntities, selectedEntityId } = useProjectStore(
+    useShallow((s) => ({ entities: s.entities, selectedEntityId: s.selectedEntityId }))
   )
   /** Military only — this tab has never shown corporate entities (those live in HierarchyPanel's "Industry" section). */
   const entities = useMemo(() => allEntities.filter((e) => e.kind === "unit"), [allEntities])
-  const index = useMemo(
-    () => hierarchyIndex(relationships, { entityIds: new Set(allEntities.map((e) => e.id)) }),
-    [relationships, allEntities],
-  )
+  const index = useHierarchyIndex()
 
   const { nodes, edges } = useMemo(() => {
     const nodeList: Node[] = []
@@ -60,11 +54,11 @@ export function TreeView() {
       // A contested child draws no edge, in either direction: a line to one of two competing
       // parents would be this view electing the winner ADR 0011 forbids. It still renders as
       // a node, at depth 0, and HierarchyPanel is where the contest is named.
-      const link = orbat.parentOf(entity.id)
-      if (link.state === "parent" && xIndexById.has(link.parentId)) {
+      const parentId = parentIdOf(orbat.parentOf(entity.id))
+      if (parentId != null && xIndexById.has(parentId)) {
         edgeList.push({
-          id: `e-${link.parentId}-${nodeId}`,
-          source: String(link.parentId),
+          id: `e-${parentId}-${nodeId}`,
+          source: String(parentId),
           target: nodeId,
         })
       }

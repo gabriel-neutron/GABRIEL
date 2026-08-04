@@ -16,8 +16,9 @@ import type { GeoPackageLoadResult } from "./types"
  * failure mode is topological, not count-based: 741 of the 1010 units take their map position
  * from the parent chain, so the derivation can be subtly wrong while every count — 1012 edges,
  * 1012 parents, 1027 entities — reads perfect and 741 units silently move. A count of edges is
- * not evidence (ADR 0011). So this compares the whole mapping, BOTH WAYS, and pins the two
- * fingerprints measured on 2026-08-04 against the pre-Slice-3 code.
+ * not evidence (ADR 0011). So this compares the whole mapping, BOTH WAYS, and pins three
+ * fingerprints — two of them measured against the pre-Slice-3 code, which is where the force
+ * of this gate actually comes from (see `parentsFromIndex`).
  *
  * The file is read once with `readFileSync` and NEVER opened for writing. Everything after
  * that read is an in-memory buffer. `public/project.gpkg` is the analyst's irreplaceable
@@ -26,7 +27,7 @@ import type { GeoPackageLoadResult } from "./types"
 const HASH_A = "71cc3b332e6f50f3ce772f43d321ab6b6044b7abf6d06620508a5197804673a2"
 const HASH_B = "7e6570ef74b436336a76cd94965b7aca0f05bec2461cdbf945749bbcf49fac84"
 /**
- * Hash C is measured 2026-08-05, on THIS code, and is not a pre-Slice-3 baseline like A and B.
+ * Hash C is measured 2026-08-04, on THIS code, and is not a pre-Slice-3 baseline like A and B.
  * It is still evidence about the old tree rather than a tautology: the depth map is a pure
  * function of the entity ids and the parent map, and the parent map is pinned at A, which WAS
  * measured against the old code. What it adds is a hold on the shape of the tree — A pins who
@@ -65,8 +66,17 @@ function parentsFromField(entities: readonly MapEntity[]): Map<string, string> {
   return parents
 }
 
-/** The edge set's answer, read one entity at a time through the interface the six consumers
- *  now use — not through `index.parents()`, which would test the projection against itself. */
+/**
+ * The edge set's answer, read one entity at a time through `linkFor`, the interface the six
+ * consumers use.
+ *
+ * Be clear about what comparing this to the field does and does not prove. `withDerivedParents`
+ * is fed by `activeParentMap`, which is now a projection of this same index, so the two
+ * readings share one builder and a fault inside it corrupts both identically — measured, by
+ * injecting one. The comparison catches a consumer reading the wrong accessor; it does NOT
+ * catch a wrong derivation. The pinned hashes do, because they were measured against the code
+ * that came before.
+ */
 function parentsFromIndex(entities: readonly MapEntity[], index: HierarchyIndex): Map<string, string> {
   const parents = new Map<string, string>()
   for (const e of entities) {
@@ -103,9 +113,7 @@ describe("the hierarchy read two ways over public/project.gpkg (read-only)", () 
     // backing buffer, so `.buffer` alone can carry a nonzero byteOffset.
     const buffer = Uint8Array.from(readFileSync(resolve(process.cwd(), "public/project.gpkg"))).buffer
     loaded = await loadGeoPackage(buffer)
-    index = hierarchyIndex(loaded.relationships, {
-      entityIds: new Set(loaded.entities.map((e) => e.id)),
-    })
+    index = hierarchyIndex(loaded.relationships, { entities: loaded.entities })
   }, 180_000)
 
   it("derives the same parent for every entity through the field and through the index", () => {

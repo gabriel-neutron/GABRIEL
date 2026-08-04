@@ -204,7 +204,7 @@ export async function runLayeredResearch(
 
   const index = options.relationships == null
     ? undefined
-    : hierarchyIndex(options.relationships, { entityIds: new Set(entities.map((e) => e.id)) })
+    : hierarchyIndex(options.relationships, { entities })
   const bfsLayers = buildBfsLayers(entities, options.maxLayers, index)
   const allEntities = bfsLayers.flat()
   const totalEntities = allEntities.length

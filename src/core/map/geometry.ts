@@ -1,7 +1,7 @@
 import type { DrawnGeometry, MapEntity, PositionMode } from "@/types/domain.types"
 import { type LatLng, asLatLng } from "@/core/coordinates"
 import { buildOrbat, type Orbat } from "@/core/entity/hierarchy"
-import type { ParentLinkSource } from "@/core/relationship/hierarchyIndex"
+import { parentIdOf, type ParentLinkSource } from "@/core/relationship/hierarchyIndex"
 
 /**
  * Returns a representative point for symbol placement from the first geometry
@@ -110,14 +110,11 @@ function computePositions<T extends Positionable>(
   }
 
   const orbat = buildOrbat(items, index)
-  const parentIdOf = (item: T): string | null => {
-    const link = orbat.parentOf(item.id)
-    return link.state === "parent" ? link.parentId : null
-  }
+  const parentOf = (item: T): string | null => parentIdOf(orbat.parentOf(item.id))
 
   const siblingGroups = new Map<string, T[]>()
   for (const item of items) {
-    const parentId = parentIdOf(item)
+    const parentId = parentOf(item)
     if (parentId == null || siblingGroups.has(parentId)) continue
     siblingGroups.set(
       parentId,
@@ -126,7 +123,7 @@ function computePositions<T extends Positionable>(
   }
 
   let remaining = items.filter(
-    (item) => (item.positionMode ?? "own") !== "own" && parentIdOf(item) != null,
+    (item) => (item.positionMode ?? "own") !== "own" && parentOf(item) != null,
   )
 
   while (remaining.length > 0) {
@@ -134,7 +131,7 @@ function computePositions<T extends Positionable>(
     let progress = false
 
     for (const item of remaining) {
-      const parentId = parentIdOf(item)!
+      const parentId = parentOf(item)!
       const parentPos = positionById.get(parentId)
       if (parentPos == null) {
         nextRemaining.push(item)

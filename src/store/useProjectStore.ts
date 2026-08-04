@@ -99,8 +99,12 @@ function commitRelationships(
   rest?: Partial<ProjectState>,
   action = "commitRelationships",
 ): void {
-  const parents = activeParentMap(next)
-  const entities = withDerivedParents(rest?.entities ?? state.entities, parents)
+  const known = rest?.entities ?? state.entities
+  // Entities, not ids: the kinds are what let this refuse a cross-kind parent, which the
+  // load path has always refused. Passing less here would make one path derive a parent the
+  // other omits, on the same edge set.
+  const parents = activeParentMap(next, { entities: known })
+  const entities = withDerivedParents(known, parents)
   const integrityEvents = withContestedParentEvents(
     rest?.integrityEvents ?? state.integrityEvents,
     parents.contested,

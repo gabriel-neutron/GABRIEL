@@ -38,7 +38,7 @@ describe("buildOrbat over a hierarchy index", () => {
     const second = edge("e-2", "disputed", "hq-2")
     const index = hierarchyIndex(
       [first, second, edge("e-3", "under", "disputed")],
-      { entityIds: new Set(items.map((i) => i.id)) },
+      { entities: items },
     )
     const orbat = buildOrbat(items, index)
 
@@ -57,7 +57,7 @@ describe("buildOrbat over a hierarchy index", () => {
   })
 
   it("reports a parent the entity set cannot place as unresolvable", () => {
-    const index = hierarchyIndex([edge("e-1", "a", "gone")], { entityIds: new Set(["a"]) })
+    const index = hierarchyIndex([edge("e-1", "a", "gone")], { entities: [{ id: "a" }] })
     const orbat = buildOrbat([n("a", null)], index)
     expect(orbat.parentOf("a")).toMatchObject({ state: "unresolvable", parentId: "gone" })
     // The orphan policy is unchanged: it renders, at the top level.

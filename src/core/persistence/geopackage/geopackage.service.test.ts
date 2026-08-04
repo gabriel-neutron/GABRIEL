@@ -284,10 +284,11 @@ describe("coordinate round-trip", () => {
     }
   })
 
-  // The two `parent_id` column policies moved to `parentColumn.policy.test.ts` when this file
-  // crossed the 300-line cap (CONSTRAINTS.md:113). They are one concern of their own: what a
-  // load does with a stored parent it cannot resolve, which differs by whether the file has
-  // been migrated.
+  // The two `parent_id` column policies live in `parentColumn.policy.test.ts`: they are one
+  // concern of their own — what a load does with a stored parent it cannot resolve, which
+  // differs by whether the file has been migrated. Moving them took this file from 340 lines
+  // to 316; it is still over the 300-line cap (CONSTRAINTS.md:113) and wants a further split
+  // by concern, which is not this slice's.
 
   it("polygon ring coordinates survive write→read", () => {
     const ring = [

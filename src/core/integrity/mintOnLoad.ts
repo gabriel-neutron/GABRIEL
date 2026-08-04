@@ -31,21 +31,19 @@ function labeller(entities: readonly KindedRecord[]): (id: string) => string {
   return (id: string): string => quoted(nameById.get(id) ?? id)
 }
 
-/**
- * There is no `multipleActiveHierarchyEvents` here. It lived in this file until Slice 3 and
- * was a SECOND detection of a condition the derivation had already decided: it re-read
- * `validateRelationships`' output to rediscover which children had two parents, while
- * `hierarchyIndex` was handing the same answer back with the competing edges attached. ADR
- * 0011 ruled the competing ids are returned "at the point the conflict is decided, so the
- * caller mints the integrity event without running a second validation pass" — this was that
- * pass. `contestedParentEvents.ts` is now the only minter, on the load path and the edit path
- * alike, so a contest recorded while an analyst works and the same contest re-detected by the
- * next load cannot come out worded two ways.
- *
- * The `multiple-active-hierarchy` VIOLATION code stays in `validateRelationships`:
- * that function is documented as callable without an entity set, and deleting the code
- * would silence dual subordination for every caller that is not the loader.
- */
+// There is no `multipleActiveHierarchyEvents` here. It lived in this file until Slice 3 and
+// was a SECOND detection of a condition the derivation had already decided: it re-read
+// `validateRelationships`' output to rediscover which children had two parents, while
+// `hierarchyIndex` was handing the same answer back with the competing edges attached. ADR
+// 0011 ruled the competing ids are returned "at the point the conflict is decided, so the
+// caller mints the integrity event without running a second validation pass" — this was that
+// pass. `contestedParentEvents.ts` is now the only minter, on the load path and the edit path
+// alike, so a contest recorded while an analyst works and the same contest re-detected by the
+// next load cannot come out worded two ways.
+//
+// The `multiple-active-hierarchy` VIOLATION code stays in `validateRelationships`: that
+// function is documented as callable without an entity set, and deleting the code would
+// silence dual subordination for every caller that is not the loader.
 
 /**
  * T14/Slice 3. The persisted `parent_id` on a migrated file is a DERIVATION, rewritten from
@@ -102,25 +100,27 @@ export function stalePersistedParentEvents(
  * recorded instead. Nothing throws: the edge itself is a legitimate record, and throwing would
  * make a legitimate record unopenable.
  *
- * Mutates the map it is handed — the one the derivation built moments ago for this load, that
- * nobody else holds. Deleting during iteration is safe: each entry is examined once, and one
- * removed before it is reached is simply never visited.
+ * It reads `unresolvable` rather than deleting from `parentById`, which is what it used to do.
+ * Deleting made this function part of the derivation while looking like a reporter, and it
+ * corrected only the map: the index went on answering `"parent"` for the same pair, so once
+ * the six consumers began reading the index they saw a hierarchy the field denied. The
+ * derivation now refuses the pair itself and hands the refusals over to be named.
+ *
+ * A parent outside the entity set arrives here too, and is skipped: that is T15's case, with
+ * no second kind to compare against.
  */
 export function crossKindParentEvents(
-  parentById: Map<string, string>,
+  unresolvable: ReadonlyMap<string, string>,
   entities: readonly KindedRecord[],
   now: string,
 ): IntegrityEvent[] {
   const byId = new Map(entities.map((entity) => [entity.id, entity]))
   const events: IntegrityEvent[] = []
-  for (const [childId, parentId] of parentById) {
+  for (const [childId, parentId] of unresolvable) {
     const child = byId.get(childId)
     const parent = byId.get(parentId)
-    // A parent outside the entity set is T15's case and not this one: the derivation already
-    // omits it by the same rule, and there is no second kind to compare against.
     if (child == null || parent == null) continue
     if (child.kind === parent.kind) continue
-    parentById.delete(childId)
     events.push({
       id: CROSS_KIND_PREFIX + childId,
       kind: "cross-kind-parent",

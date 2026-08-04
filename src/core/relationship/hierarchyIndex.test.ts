@@ -54,18 +54,41 @@ describe("hierarchyIndex", () => {
 
     it("reads a parent outside the entity set as unresolvable, not as a root (T15)", () => {
       const edge = rel({ id: "e-1", fromId: "a", toId: "gone" })
-      const index = hierarchyIndex([edge], { entityIds: new Set(["a"]) })
+      const index = hierarchyIndex([edge], { entities: [{ id: "a" }] })
       expect(index.linkFor("a")).toEqual({
         state: "unresolvable", parentId: "gone", via: [edge],
       })
       // The distinction the field cannot express: it never reaches `parents()`, so nothing
       // writes a parent_id that would make the next load throw, and the reason survives.
       expect(index.parents().size).toBe(0)
+      expect(index.unresolvable().get("a")).toBe("gone")
       expect(hierarchyIndex([edge]).linkFor("a").state).toBe("parent")
     })
 
+    it("reads a parent of the other KIND as unresolvable too", () => {
+      // ADR 0011: "a cross-kind hierarchy edge is a legitimate record that must not derive a
+      // parent" -- the loader's entity validation throws on a parentId that does not resolve
+      // within its own kind, so deriving one breaks the next load. Before this, the index
+      // answered "parent" while the field path deleted the pair, and the six consumers read
+      // the index.
+      const edge = rel({ id: "e-1", fromId: "unit", toId: "corp" })
+      const index = hierarchyIndex([edge], {
+        entities: [{ id: "unit", kind: "unit" }, { id: "corp", kind: "corporate" }],
+      })
+      expect(index.linkFor("unit")).toMatchObject({ state: "unresolvable", parentId: "corp" })
+      expect(index.parents().size).toBe(0)
+      expect(index.unresolvable().get("unit")).toBe("corp")
+      // Same kind on both ends places it, and so does an index that was told no kinds at all.
+      expect(hierarchyIndex([edge], {
+        entities: [{ id: "unit", kind: "unit" }, { id: "corp", kind: "unit" }],
+      }).linkFor("unit").state).toBe("parent")
+      expect(hierarchyIndex([edge], {
+        entities: [{ id: "unit" }, { id: "corp" }],
+      }).linkFor("unit").state).toBe("parent")
+    })
+
     it("reads an id outside the entity set as unknown", () => {
-      const index = hierarchyIndex([], { entityIds: new Set(["a"]) })
+      const index = hierarchyIndex([], { entities: [{ id: "a" }] })
       expect(index.linkFor("a")).toEqual({ state: "root" })
       expect(index.linkFor("b")).toEqual({ state: "unknown" })
     })
@@ -74,7 +97,7 @@ describe("hierarchyIndex", () => {
       // A dangling endpoint, which load.ts treats as making the file unopenable. A second
       // policy here would be a second answer to a settled question.
       const index = hierarchyIndex([rel({ id: "e-1", fromId: "ghost", toId: "b" })], {
-        entityIds: new Set(["b"]),
+        entities: [{ id: "b" }],
       })
       expect(index.linkFor("ghost")).toEqual({ state: "unknown" })
       expect(index.parents().size).toBe(0)
