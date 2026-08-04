@@ -807,6 +807,16 @@ on 2026-07-31 because the planner reads this spec and does not read the 2A quest
    of `SLICE_2B_CRITERIA.md`; the criterion was not edited and its pass stands, because the failure
    is in what the loop can see, not in what it graded.
 
+9. **The byte layer needs its own check, because every layer above it reports success.** Added
+   2026-08-05 from the Slice 3 run. A source file rewritten through PowerShell 5.1's
+   `Set-Content -Encoding utf8` came back with a UTF-8 BOM prepended and 28 bytes longer, while the
+   edit it was supposed to apply had not matched at all (CRLF). A BOM compiles, lints, passes 691
+   tests and shows as a whole-file rewrite in the diff. It was caught by reading the first three
+   bytes, and by nothing else. This is the same family as lesson 7 one storey down: the NUL scan
+   (trap 1) and this share a shape, in that **a file can be wrong in a way no tool in the loop is
+   looking at**. Write source with the editor tools; if a shell must write a file, check
+   `[System.IO.File]::ReadAllBytes(path)[0..2]` afterwards.
+
 **And one that is not a lesson but a standing hazard:** this spec was frozen on 2026-07-29 and the
 tree moved under it on 2026-07-30. Any enumeration, count or line number in it is a measurement with
 a date on it. Re-measure before freezing a criterion on one — §4.7 is the worked example of what

@@ -36,6 +36,18 @@ _Cycle policy_: a fully disconnected cyclic component gets a synthetic root at i
 lexicographically smallest id, so it renders and ancestor/depth walks can't infinite-loop.
 `src/utils/treeLayout.ts` (`computeTreeXIndex`) builds on the Orbat module to give `TreeView` and
 `OrganisationTreeView` an identical horizontal-layout algorithm.
+_Since Slice 3_: `buildOrbat` takes an optional **Edge-backed hierarchy index**, and when it is
+given one the edges decide who sits under whom rather than the `parentId` field. All six
+production consumers pass one.
+
+**Parent link** (`ParentLink`, `core/relationship/hierarchyIndex.ts`):
+Where one Entity sits, as a value that can say every answer the edge set can give — `root`,
+`parent`, `contested`, `unresolvable`, `unknown` — carrying the edges that decided it. It exists
+because `parentId` is one nullable string and collapses four distinct findings into `null`. A
+**Contested** child (two competing active hierarchy-bearing edges) is the case that matters: it
+derives no parent, so before Slice 3 it rendered as a top-level formation, which asserts "this
+unit answers to no one" about the one entity that has two masters.
+_Avoid_: reading `parentId == null` as "root". Ask the index which of the five it is.
 
 ### Typed relationships (edges)
 

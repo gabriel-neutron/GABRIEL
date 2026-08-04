@@ -1503,3 +1503,130 @@ does not yet support: no export gate, named natural persons present, all 1,012 e
   onto `contestedParentEvents.ts`, and contested children made visible — all three design lenses
   independently found that ADR 0011's "contested children are visible but unresolved" is false.
   They are absent from the tree, indistinguishable from roots, and gone from the map for the 741.
+  **Built 2026-08-05, below.**
+
+
+---
+
+## Run 2026-08-05 — Slice 3, the consumer rewrite: the edges become the hierarchy the app reads
+
+`BASE` **`d3c7c2f`**. **§10 steps 17-28 were still NOT run.** `public/project.gpkg` is
+byte-identical throughout at md5 `7d0b0e592a1128a0d83e7575110bf2dc`, absent from `git status` at
+every checkpoint; the only access to it in this run is one `readFileSync`.
+
+`npm run verify` green: **92 test files / 691 tests / 0 failed / 0 skipped** (from 87/656),
+`scan:nul` clean at 354, repo-root files byte-scanned separately and clean, no BOM on any changed
+file, `tsc -b && vite build` clean.
+
+### What shipped
+
+| item | where |
+|---|---|
+| The tri-state, parameterised by the bearing predicate and an optional `onDate` | `src/core/relationship/hierarchyIndex.ts` |
+| `activeParentMap` reduced to a projection of it, signature unchanged | `src/core/relationship/activeParent.ts` |
+| `isHierarchyBearing` extracted into the file its test already named, with `isActive` | `src/core/relationship/isHierarchyBearing.ts` |
+| `Orbat.parentOf` and the optional index argument | `src/core/entity/hierarchy.ts` |
+| Six consumers ported; two changed behaviour | geometry, HierarchyPanel, TreeView, NetworkLinksLayer, layered-research, and the enrichment context downstream of it |
+| The two minters unified; `multipleActiveHierarchyEvents` deleted | `src/core/integrity/mintOnLoad.ts`, `load.ts` |
+| The persisted `parent_id` throw declawed on a migrated file | `src/core/persistence/geopackage/load.ts` |
+| Three fingerprints over the real project, read-only | `src/core/persistence/geopackage/hierarchy.fingerprint.test.ts` |
+
+### The fingerprints, and what each one actually catches
+
+**Hash A and Hash B reproduce the 2026-08-04 baselines exactly**, so the serialisation the last
+run left undocumented is now pinned in code:
+
+```
+A  71cc3b33…4673a2   1012 entries   sha256 of "<id>\t<parentId>" lines, sorted by id, joined "\n"
+B  7e6570ef…9fac84   1024 of 1027   sha256 of "<id>\t<lat>,<lng>" lines, nine decimals, same sort
+C  d55f6e48…5083b7   1027 entries   sha256 of "<id>\t<depth>" lines, same sort  (NEW, see below)
+```
+
+**The two-way comparison the handoff asked for is weaker than it looks, and measuring it proved
+that.** `withDerivedParents` and `parentOf` are now fed by the same `hierarchyIndex`, so on the
+load path they move together: a fault in the index corrupts both readings identically and the
+equality still passes. Measured, not reasoned — a one-edge fault injected into the index
+(`if (!injectedFault) { injectedFault = true; continue }`) left every two-way `toEqual` green.
+What caught it was the **pinned baseline**, because A and B were measured against the *old* code.
+
+That is also why **Hash C exists**. Against the same injected fault, A failed (1011 parents, not
+1012) and C failed, and **B passed** — the child of the dropped edge carries its own geometry, so
+the map did not move. One fingerprint is not three. C is measured on the new code and is honest
+about it in the test: it is not a pre-Slice-3 baseline, but it is not circular either, since the
+depth map is a pure function of the entity ids and the parent map, and the parent map is pinned
+at A, which was.
+
+### Two live consequences, found by building rather than by reading
+
+- **`setProject` had to be routed through `commitRelationships`.** It was the handoff's known
+  defect 2, filed as out of scope, and it stopped being optional the moment six consumers began
+  reading edges: a caller handing over entities and edges that disagree used to get a stale tree
+  and would now get a *flat* one. It is idempotent on a loaded project, since `load.ts` derives
+  from the same edges. The `HierarchyPanel` story was exactly such a caller — nine entities with
+  `parentId` set and `relationships: []` — and it now carries the edges, plus a deliberate
+  contest, so the story depicts a state the app can actually produce.
+- **The old cross-kind test was the red proof for the declaw.** `geopackage.service.test.ts`'s
+  "rejects a corporate entity whose parentId points at a unit" failed the moment the throw became
+  a record. It is now two tests: a migrated file records an `invalid-entry` row and opens, and a
+  file with **no relationships table** still throws, because there `parent_id` is the record the
+  migration is about to mint edges from. The second file is built by dropping the table from a
+  saved one — `saveGeoPackage` always creates it, so there was no other way to reach that path.
+
+### Every behaviour change was measured red first
+
+- geometry's `unplacedByContest`: four assertions, all failing against the unfixed source
+  (`git checkout` of that one file, restored from a copy afterwards).
+- the fingerprint gate: proven against an injected derivation fault, per above.
+- the declaw: the pre-existing test failed on the change, as recorded.
+
+The geometry red-proof is the weak kind and is worth naming as such: against the old code the
+value did not exist, so the failure is "cannot read properties of undefined", not a wrong answer.
+That is the defect — the information was not merely unrendered, it was unavailable — but it is
+weaker evidence than a wrong value would have been.
+
+### Deviations from the handoff's design, and why
+
+1. **`via` is `readonly Relationship[]`, not a single `Relationship`.** An `Orbat` built without
+   an index has no edges to show, and one array-valued field lets `parent`, `contested` and
+   `unresolvable` share one accessor rather than forcing an impossible singular value.
+2. **`unresolvable` covers T15 only, not cross-kind.** Cross-kind needs entity *kinds*, which
+   neither the edge set nor the index carries; `crossKindParentEvents` still decides it. Giving
+   the index a kind-aware resolver was the alternative and was rejected as a second policy for a
+   settled question.
+3. **`unplacedByContest` has no renderer.** It is returned, tested and documented, and nothing in
+   the UI reads it yet — the same gap as known defect 4 (nothing renders integrity events at
+   all). `HierarchyPanel`'s badge is the visibility fix the handoff named; a map notice belongs
+   with the slice that gives integrity events a reader. Recorded rather than quietly shipped,
+   because "a value nothing reads" is precisely the 2B defect the Spec review caught.
+
+### A trap for the file, worth §8b
+
+**`Set-Content -Encoding utf8` adds a BOM in Windows PowerShell 5.1.** Rewriting
+`hierarchyIndex.ts` through it to inject a test fault silently prepended `EF BB BF` and grew the
+file by 28 bytes while the intended edit did not even apply (CRLF made the match fail). Caught by
+checking the first three bytes, not by any test — a BOM compiles, lints and passes. Source files
+are written with the editor tools, never through `Set-Content`. This sits beside trap 1 (`rg -c
+$'\x00'` is vacuous) and trap 7 (heredocs mangle this content): **the byte layer needs its own
+check, because every layer above it will report success.**
+
+### The 300-line cap, honestly
+
+`HierarchyPanel.tsx` was split at the cap: the node component into `HierarchyEntityNode.tsx`, and
+the three React-free orderings into `modules/orbat/services/hierarchyOrdering.ts` — which the
+`react-refresh/only-export-components` rule forced anyway, since a component file may not export
+helpers. `geopackage.service.test.ts` came **down** from 340 to 316, its two new parent-column
+tests moved into `parentColumn.policy.test.ts`. Two files this run touched were already over the
+cap and are now further over: `layered-research.service.ts` 338 → 356 and `useEnrichment.ts`
+320 → 334, both from threading the edge set through. `useProjectStore.ts` sits exactly at 300.
+Nothing in `npm run verify` checks the cap, so it is recorded here rather than discovered later.
+
+### Still owed after this run
+
+- **§10 steps 17-28** — the first write. Unrun, and the owner's.
+- **Two files over the cap**, above.
+- **A gated export.** `ViewPage.tsx:37` still serves the working file.
+- **The six defects the handoff left standing**, minus the two this run had to take: defect 2
+  (`setProject`) is done, defect 3 (`contestedParentEvents` untested) is done. Still open:
+  `updateEntity` accepting a `parentId` patch (1), nothing rendering integrity events (4),
+  attachment modelled but unauthorable (5), `withActiveParent` deleting rather than end-dating
+  the previous subordination (6), the public map being the working file (7).

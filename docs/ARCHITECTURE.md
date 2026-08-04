@@ -113,14 +113,23 @@ export function asLatLng(lat: number, lng: number): LatLng
 
 ## Entity Positioning
 
-`computeAllEntityPositions` (in `src/core/map/geometry.ts`) derives a `Map<entityId, LatLng>`
-from `entities` and `drawnGeometries`:
+`computeAllEntityPositions` (in `src/core/map/geometry.ts`) derives
+`{ positioned, unplacedByContest }` from `entities`, `drawnGeometries` and an optional
+hierarchy index:
 
 1. **Pinned entities** (`positionMode === "own"`): position = first geometry's representative
    point (point coords, line first vertex, polygon first ring first vertex).
 2. **Orbiting entities** (`positionMode === "none"` or unset): BFS from pinned ancestors.
    Children circle their parent at `BASE_RADIUS × CHILD_SCALE^(depth-1)`, corrected for
    latitude distortion. Angle = `2π × siblingIndex / siblingCount`.
+3. **Contested entities** get no position and no invented one — electing a winner is
+   forbidden (ADR 0011) and a midpoint between two competing parents is fabricated data.
+   They and everything below them come back in `unplacedByContest` rather than disappearing:
+   one contest otherwise removes an arbitrarily large branch with nothing said.
+
+Passing the index is what makes step 3 possible; without it a contest is indistinguishable
+from a root and `unplacedByContest` is empty. `usePositionMap` builds it from the store's
+edge set.
 
 This function is always called inside `useMemo([entities, drawnGeometries])` in `MapView`.
 Never call it at render time.
