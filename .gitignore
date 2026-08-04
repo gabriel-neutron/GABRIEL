@@ -49,3 +49,8 @@ AGENTS.md
 
 # Local working documents
 *.pdf
+
+# The pre-push name scan's input (scripts/scan-names.mjs). Committing this file would
+# publish the exact strings the scan exists to keep out of the repo; the script refuses
+# to run if git ever starts tracking it.
+.scan-names
