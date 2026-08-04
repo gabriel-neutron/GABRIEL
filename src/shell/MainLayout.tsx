@@ -3,6 +3,7 @@ import { MapView } from "@/core/map/MapView"
 import { EnrichDrawer } from "@/modules/enrichment/ui/EnrichDrawer"
 import { ResearchDialog } from "@/components/shared/ResearchDialog"
 import { AppShell, type ProjectFileActions } from "./AppShell"
+import { IntegrityPanel } from "@/components/shared/IntegrityPanel"
 import { LayersPanel } from "@/components/shared/LayersPanel"
 import { ShowNetworksToggle } from "@/components/shared/ShowNetworksToggle"
 import { BaseMapSwitcher } from "@/components/shared/BaseMapSwitcher"
@@ -81,9 +82,12 @@ export function MainLayout({
 
   const flyToRef = useRef<FlyToFn | null>(null)
 
+  // Integrity is fixed core rather than a module contribution: its events are minted by the
+  // load and edit paths in `core/`, so no single module owns them (ADR 0007).
   const leftPanels = [
     { id: "layers", label: "Layers", content: <LayersPanel readOnly={readOnly} /> },
     ...modules.flatMap((m) => m.leftPanels ?? []),
+    { id: "integrity", label: "Integrity", content: <IntegrityPanel readOnly={readOnly} /> },
   ]
   const [leftPanelId, setLeftPanelId] = useState(leftPanels[0].id)
   const activeLeftPanel = leftPanels.find((p) => p.id === leftPanelId) ?? leftPanels[0]

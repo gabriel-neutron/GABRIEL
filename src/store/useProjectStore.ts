@@ -11,6 +11,7 @@ import { activeParentMap, withDerivedParents } from "@/core/relationship/activeP
 import { mergeEntities as mergeIdentityGraph } from "@/core/identity/merge"
 import type { CredibilityAssessmentResult } from "@/core/provenance/reviewQueue"
 import { createClaimActions } from "./projectClaimActions"
+import { createIntegrityActions } from "./projectIntegrityActions"
 import { createLayerActions } from "./projectLayerActions"
 
 // The two React-free readers over `ProjectState` live in a sibling module so this file stays
@@ -169,6 +170,10 @@ export interface ProjectActions {
    */
   applyCredibilityToClaims(claimIds: string[], result: CredibilityAssessmentResult | null): void
 
+  /** Annotates an integrity event with who read it. Not a confirmation ceremony, and a no-op on
+   *  an unknown id, a blank `by` or an already-read event — `core/integrity/acknowledge.ts`. */
+  acknowledgeIntegrityEvent(eventId: string, by: string, note?: string): void
+
   setSelectedEntityId(id: string | null): void
   closeDetail(): void
 }
@@ -187,6 +192,7 @@ export const useProjectStore = create<ProjectState & ProjectActions>()(
       // creator is a compile error here, not a runtime hole.
       ...createLayerActions(set, get),
       ...createClaimActions(set, get),
+      ...createIntegrityActions(set, get),
 
       setProject({ layers, entities, drawnGeometries, claims, relationships, integrityEvents, selectedEntityId }) {
         // Through the same derivation as every other write to the edge set, not around it.
