@@ -1,6 +1,7 @@
 import type { EntityKind } from "@/core/entity/entity"
 import { entityKindLabel } from "@/core/entity/entityKindLabels"
 import { normalizeForMatch } from "@/core/identity/transliterate"
+import { isIdentifierField, normalizeIdentifierForMatch } from "./identifierMatch"
 import type { IndexedField, SearchFieldKind, SearchIndex } from "./searchIndex"
 
 /**
@@ -27,6 +28,9 @@ export type SearchHit = {
 }
 
 export type SearchGroup = { kind: EntityKind; label: string; hits: SearchHit[] }
+
+/** One raw input, folded two ways, because prose and register strings do not compare alike. */
+type NormalizedQuery = { text: string; identifier: string }
 
 /**
  * Strength dominates field, and by a wide margin. An exact match on any field is a stronger
@@ -56,8 +60,31 @@ const FIELD_SCORE: Record<SearchFieldKind, number> = {
   "source": 10,
 }
 
+/**
+ * A Source URL is indexed as one long term, which makes it a magnet for the top tiers on
+ * queries that say nothing about the entity: "ru" prefix-matched `rusprofile.ru` at 210 and
+ * beat an entity actually *named* something containing "ru" at 150. The field weight alone
+ * could not fix that, because strength dominates field by design.
+ *
+ * Capping is the defensible fix rather than lowering `FIELD_SCORE.source`: the ceiling says
+ * what is actually true — a URL containing the query never asserts more than "the query
+ * appears somewhere in the evidence's address", which is what the substring tier means —
+ * and it keeps a Source hit findable at all, which a weight small enough to fix the ordering
+ * would not. Combined with stripping the URL's scheme and `www.` before indexing, a Ledger
+ * URL can no longer outrank any match on the entity itself.
+ */
+const STRENGTH_CEILING: Partial<Record<SearchFieldKind, MatchStrength>> = {
+  source: "substring",
+}
+
 /** One dropdown row is one line. Long enough to recognise a note, short enough not to wrap. */
 const SNIPPET_LENGTH = 80
+
+function capped(field: SearchFieldKind, strength: MatchStrength): MatchStrength {
+  const ceiling = STRENGTH_CEILING[field]
+  if (ceiling === undefined) return strength
+  return STRENGTH_SCORE[strength] > STRENGTH_SCORE[ceiling] ? ceiling : strength
+}
 
 function strengthOf(term: string, query: string): MatchStrength | null {
   if (term === query) return "exact"
@@ -69,14 +96,20 @@ function strengthOf(term: string, query: string): MatchStrength | null {
   return null
 }
 
-function bestStrength(field: IndexedField, query: string): MatchStrength | null {
+/**
+ * A field is compared against the query normalised the way that field's own terms were.
+ * Comparing a register string against the name fold is what let `1027-7001-32195` miss the
+ * OGRN it names and let two different LEIs answer one exact paste.
+ */
+function bestStrength(field: IndexedField, query: NormalizedQuery): MatchStrength | null {
+  const normalized = isIdentifierField(field.field) ? query.identifier : query.text
   let best: MatchStrength | null = null
   for (const term of field.terms) {
-    const strength = strengthOf(term, query)
+    const strength = strengthOf(term, normalized)
     if (strength === null) continue
     if (best === null || STRENGTH_SCORE[strength] > STRENGTH_SCORE[best]) best = strength
   }
-  return best
+  return best === null ? null : capped(field.field, best)
 }
 
 function toHit(field: IndexedField, strength: MatchStrength): SearchHit {
@@ -105,8 +138,13 @@ export function searchEntities(
   query: string,
   options: { limit?: number } = {},
 ): SearchHit[] {
-  const normalized = normalizeForMatch(query)
-  if (normalized === "") return []
+  const normalized: NormalizedQuery = {
+    text: normalizeForMatch(query),
+    identifier: normalizeIdentifierForMatch(query.trim()),
+  }
+  // A query of only separators normalises to "" under both folds; the identifier form can
+  // never be empty while the text form is not, since it removes strictly less.
+  if (normalized.text === "") return []
 
   const bestByEntity = new Map<string, SearchHit>()
   for (const field of index.fields) {
@@ -123,8 +161,10 @@ export function searchEntities(
       a.entityName.localeCompare(b.entityName) ||
       a.entityId.localeCompare(b.entityId),
   )
-  // Truncation happens here and nowhere earlier: the defect this module replaces was a
-  // `.slice(0, 6)` applied before anything had been ranked.
+  // On the entity path, truncation happens here and nowhere earlier: the defect this module
+  // replaces was a `.slice(0, 6)` applied before anything had been ranked. The OSM path is
+  // not yet converted — `searchLocalOsmFeatures` still stops collecting at its `limit` in
+  // traversal order, with no ranking at all — so the claim holds for entities only.
   return options.limit == null ? ranked : ranked.slice(0, options.limit)
 }
 

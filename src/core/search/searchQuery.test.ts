@@ -25,12 +25,26 @@ describe("searchEntities", () => {
     // six in array order, so an entity named exactly what was typed lost to one that
     // merely contained it earlier in the list.
     const hits = idsFor([
-      unit("substring", "Reinforced Fleetwood Yard"),
+      unit("substring", "Baltfleet Yard"),
       unit("word", "Northern Fleet Support"),
       unit("prefix", "Fleet Logistics Centre"),
       unit("exact", "Fleet"),
     ], "fleet")
     expect(hits).toEqual(["exact", "prefix", "word", "substring"])
+  })
+
+  it("ranks a word prefix above a bare substring, not merely alphabetically", () => {
+    // The previous fixture for this tier used "Fleetwood", which the phonetic fold turns
+    // into "fleetvood" — still a word prefix — so the ordering above was coming from the
+    // name tie-break and the substring tier was never exercised at all.
+    const hits = searchEntities(
+      index([unit("z-word", "Northern Fleet Support"), unit("a-substring", "Baltfleet Yard")]),
+      "fleet",
+    )
+    expect(hits.map((h) => [h.entityId, h.strength])).toEqual([
+      ["z-word", "word-prefix"],
+      ["a-substring", "substring"],
+    ])
   })
 
   it("ranks a name above notes at the same strength", () => {
@@ -98,6 +112,35 @@ describe("searchEntities", () => {
     expect(searchEntities(index(entities), "7736050003")[0].field).toBe("external-id")
   })
 
+  it("finds an identifier pasted with the separators its register prints", () => {
+    // `externalId.ts` documents these as being written "1027-7001-32195", and that is the
+    // form an analyst pastes. Routing the query through the name fold turned the separators
+    // into spaces while the index had removed them, so the correct paste found nothing.
+    const entities = [unit("c", "Concord Management", { kind: "corporate", externalIds: [{ scheme: "ogrn", value: "1027700132195" }] })]
+    expect(idsFor(entities, "1027-7001-32195")).toEqual(["c"])
+    expect(idsFor(entities, "9074-729")).toEqual([])
+    expect(idsFor([unit("v", "Hull", { externalIds: [{ scheme: "imo", value: "9074729" }] })], "9074-729")).toEqual(["v"])
+  })
+
+  it("does not fold identifier characters phonetically", () => {
+    // Two structurally valid LEIs differing only in W vs V. The name fold collapses them,
+    // so an exact paste of one returned both, both scored identically and both labelled an
+    // exact external-id match — a register's characters are literal, not phonetic.
+    const entities = [
+      unit("w", "Alpha Holdings", { kind: "corporate", externalIds: [{ scheme: "lei", value: "529900W3MOO00A18X956" }] }),
+      unit("v", "Beta Holdings", { kind: "corporate", externalIds: [{ scheme: "lei", value: "529900V3MOO00A18X956" }] }),
+    ]
+    expect(idsFor(entities, "529900W3MOO00A18X956")).toEqual(["w"])
+    expect(idsFor(entities, "529900V3MOO00A18X956")).toEqual(["v"])
+  })
+
+  it("finds an upper-case identifier from a lower-case query", () => {
+    // Deliberately weaker than the dedup rule in `externalId.ts`: matching is case-blind so
+    // an analyst need not reproduce a register's capitalisation.
+    const entities = [unit("c", "Alpha", { kind: "corporate", externalIds: [{ scheme: "lei", value: "529900W3MOO00A18X956" }] })]
+    expect(idsFor(entities, "529900w3moo00a18x956")).toEqual(["c"])
+  })
+
   it("finds an entity by a Claim value", () => {
     const built = index(
       [unit("a", "Concord Management")],
@@ -114,6 +157,28 @@ describe("searchEntities", () => {
       [{ id: "s1", url: "https://rusprofile.ru/id/12345" }],
     )
     expect(searchEntities(built, "rusprofile")[0].field).toBe("source")
+  })
+
+  it("never lets a Source URL outrank an entity actually named the query", () => {
+    // A URL is one long term, so "ru" used to word-prefix it and beat an entity whose own
+    // name contains the query. A Source says the entity is near the evidence, never that
+    // it is the answer, so it may not outscore any match on the entity itself.
+    const built = index(
+      [unit("named", "Brusilov Battalion"), unit("sourced", "Something Else")],
+      [{ entityId: "sourced", field: "sources", value: null, sourceId: "s1" }],
+      [{ id: "s1", url: "https://rusprofile.ru/id/12345" }],
+    )
+    expect(searchEntities(built, "ru").map((h) => h.entityId)).toEqual(["named", "sourced"])
+  })
+
+  it("does not match every sourced entity on the boilerplate of a URL", () => {
+    const built = index(
+      [unit("a", "Concord Management")],
+      [{ entityId: "a", field: "sources", value: null, sourceId: "s1" }],
+      [{ id: "s1", url: "https://www.rusprofile.ru/id/12345" }],
+    )
+    expect(searchEntities(built, "https")).toEqual([])
+    expect(searchEntities(built, "www")).toEqual([])
   })
 
   it("orders equally scored hits by name, so the list does not shuffle between keystrokes", () => {

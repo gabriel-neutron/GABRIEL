@@ -1,6 +1,7 @@
 import type { EntityKind } from "@/core/entity/entity"
 import { EXTERNAL_ID_LABELS, normalizeExternalId, type ExternalId } from "@/core/entity/externalId"
 import { normalizeForMatch } from "@/core/identity/transliterate"
+import { normalizeIdentifierForMatch } from "./identifierMatch"
 
 /**
  * Everything the project already knows, flattened into one searchable form.
@@ -73,12 +74,16 @@ export type SearchIndexInput = {
  * sanctions notice prints "IMO 9074729", and an analyst pastes whichever they were given —
  * `normalizeExternalId` already knows the two are the same identifier, so the index carries
  * both readings rather than making the query guess which one was stored.
+ *
+ * Normalised by the identifier fold, never the name fold: separators are removed here and
+ * must be removed on the query side too, and a register's characters are literal, so no
+ * transliteration or phonetic collapse may touch them.
  */
 function externalIdTerms(id: ExternalId): string[] {
   const normalized = normalizeExternalId(id.scheme, id.value)
-  const bare = normalizeForMatch(normalized)
+  const bare = normalizeIdentifierForMatch(normalized)
   if (bare === "") return []
-  return [...new Set([bare, normalizeForMatch(id.scheme + " " + normalized), normalizeForMatch(id.scheme + normalized)])]
+  return [...new Set([bare, normalizeIdentifierForMatch(id.scheme) + bare])]
 }
 
 function push(
@@ -107,6 +112,18 @@ function push(
 }
 
 /**
+ * Every URL in the Ledger begins the same way, so indexing that prefix makes "http", "https"
+ * and "www" match every entity that carries any source at all — the strongest tier, on the
+ * weakest field, for a query that distinguishes nothing. Only the display text keeps the
+ * full URL; what is matched is the part an analyst could plausibly be looking for.
+ */
+const URL_BOILERPLATE = /^[a-z][a-z0-9+.-]*:\/\/(?:www\.)?/i
+
+function stripUrlBoilerplate(url: string): string {
+  return url.replace(URL_BOILERPLATE, "")
+}
+
+/**
  * `Source` records are not entity-keyed — they live in the peripheral provenance store — so
  * a Claim is the only thing that says which entity a URL is evidence for. Joining through it
  * is what makes a Ledger hit selectable; an unclaimed Source stays unreachable, and that is
@@ -128,7 +145,7 @@ function indexSources(
     const url = sourceUrlById.get(claim.sourceId)
     if (url === undefined) continue
     seen.add(claim.sourceId)
-    push(fields, entity, "source", url, null)
+    push(fields, entity, "source", url, null, [normalizeForMatch(stripUrlBoilerplate(url))])
   }
 }
 

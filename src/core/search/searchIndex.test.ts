@@ -35,13 +35,34 @@ describe("buildSearchIndex", () => {
   it("matches an external id with or without its scheme prefix", () => {
     // "IMO 9074729" and "9074729" are the same identifier written two ways, and an analyst
     // pastes whichever the register gave them. `normalizeExternalId` already knows this;
-    // the index carries both forms so neither spelling of the query misses.
+    // the index carries both forms so neither spelling of the query misses. Separators are
+    // removed rather than collapsed to spaces, so the query fold has to remove them too.
     const index = buildSearchIndex({
       entities: [entity({ externalIds: [{ scheme: "imo", value: "9074729" }] })],
     })
     const terms = fieldsOf(index, "external-id")[0].terms
     expect(terms).toContain("9074729")
-    expect(terms).toContain("imo 9074729")
+    expect(terms).toContain("imo9074729")
+  })
+
+  it("indexes an identifier without transliterating or phonetically folding it", () => {
+    // A register's characters are literal: `w` is not `v` and `y` is not `i` in a LEI.
+    const index = buildSearchIndex({
+      entities: [entity({ externalIds: [{ scheme: "lei", value: "529900W3MOO00A18X956" }] })],
+    })
+    expect(fieldsOf(index, "external-id")[0].terms).toContain("529900w3moo00a18x956")
+  })
+
+  it("indexes a Source URL without its scheme and www, which every URL shares", () => {
+    // Otherwise "http" is a top-tier match on every entity carrying any source at all.
+    const index = buildSearchIndex({
+      entities: [entity()],
+      claims: [{ entityId: "e1", field: "sources", value: null, sourceId: "s1" }],
+      sources: [{ id: "s1", url: "https://www.rusprofile.ru/id/12345" }],
+    })
+    const source = fieldsOf(index, "source")[0]
+    expect(source.text).toBe("https://www.rusprofile.ru/id/12345")
+    expect(source.terms).toEqual(["rusprofile ru id 12345"])
   })
 
   it("indexes notes", () => {
