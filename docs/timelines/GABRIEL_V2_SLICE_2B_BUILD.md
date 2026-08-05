@@ -909,6 +909,15 @@ preview, and unlike a screenshot they compare bit for bit.
    cross-kind. They passed on 2026-07-29; they are cheap, and the fail-closed throws are only dead
    code for as long as they keep passing.
 
+   > **Corrected 2026-08-05 — three of these four were covered, and "zero cycles" was covered by
+   > nothing.** `dangling-endpoint` and `self-loop` are `validateRelationships` codes, asserted on
+   > the minted edges by `migration.store-path.test.ts`; `cross-kind-parent` is an integrity event
+   > minted on load, and the file carries none. **There is no `cycle` violation code and nothing in
+   > the repo counted one** — which matters more than the other three, because a cycle is the one
+   > topology that leaves every hash in step 19 agreeing with itself while the tree is not a tree.
+   > `topologyOf` now measures it, and the fingerprint command in step 8 prints all four with the
+   > root count. Measured 2026-08-05: **roots 15, dangling 0, self-loops 0, on a cycle 0.**
+
 ### Fingerprints, taken from the file and not from this document
 
 6. **Hash A** — sha256 of the sorted, serialised `entityId → parentId` map (1012 entries).

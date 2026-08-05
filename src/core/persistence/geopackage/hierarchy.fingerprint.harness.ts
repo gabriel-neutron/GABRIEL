@@ -105,6 +105,63 @@ const REPORTED_TABLES = [
 /** A row count, or `null` meaning the table is not in the file. */
 export type TableCount = { table: string; count: number | null; parented: number | null }
 
+/**
+ * §10 pre-flight step 5 — "zero dangling, zero self-loops, zero cycles". The first two are
+ * `validateRelationships` codes and are asserted on the minted edges by
+ * `migration.store-path.test.ts`. **Cycles are not**: there is no `cycle` violation code, and
+ * nothing in the repo counts them, so the pre-flight criterion had no tooling behind it. It is
+ * measured here, over the parent map the file actually derives, because a cycle is the one
+ * topology that makes every hash below still agree with itself while the tree is not a tree.
+ */
+export type Topology = {
+  roots: number
+  danglingParents: string[]
+  selfLoops: string[]
+  onCycle: string[]
+}
+
+export function topologyOf(parents: Map<string, string>, entityIds: Set<string>): Topology {
+  const danglingParents: string[] = []
+  const selfLoops: string[] = []
+  const onCycle = new Set<string>()
+  // Three-colour walk: an id still marked "walking" when the chain reaches it again is on a
+  // cycle, and every id from that point back is too. `settled` makes this O(n) over the map
+  // rather than O(n) per entity, which matters at 1012 chains.
+  const settled = new Set<string>()
+
+  for (const start of parents.keys()) {
+    if (settled.has(start)) continue
+    const path: string[] = []
+    const walking = new Map<string, number>()
+    let at: string | undefined = start
+    while (at != null && !settled.has(at)) {
+      const seenAt = walking.get(at)
+      if (seenAt !== undefined) {
+        for (const id of path.slice(seenAt)) onCycle.add(id)
+        break
+      }
+      walking.set(at, path.length)
+      path.push(at)
+      const parentId: string | undefined = parents.get(at)
+      if (parentId === undefined) break
+      if (parentId === at) selfLoops.push(at)
+      if (!entityIds.has(parentId)) {
+        danglingParents.push(at)
+        break
+      }
+      at = parentId
+    }
+    for (const id of path) settled.add(id)
+  }
+
+  return {
+    roots: [...entityIds].filter((id) => !parents.has(id)).length,
+    danglingParents: danglingParents.sort(),
+    selfLoops: selfLoops.sort(),
+    onCycle: [...onCycle].sort(),
+  }
+}
+
 export interface FingerprintReport {
   path: string
   fileSizeBytes: number
@@ -123,6 +180,7 @@ export interface FingerprintReport {
   relationshipCount: number
   contestedCount: number
   integrityEventKinds: string[]
+  topology: Topology
   tables: TableCount[]
 }
 
@@ -196,6 +254,7 @@ export async function fingerprintGeoPackageFile(path: string): Promise<Fingerpri
     relationshipCount: loaded.relationships.length,
     contestedCount: index.contested().size,
     integrityEventKinds: loaded.integrityEvents.map((e) => e.kind).sort(),
+    topology: topologyOf(parents, new Set(loaded.entities.map((e) => e.id))),
     tables,
   }
 }

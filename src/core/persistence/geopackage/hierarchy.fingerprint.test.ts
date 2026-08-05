@@ -119,6 +119,18 @@ describe(`the hierarchy read two ways over ${TARGET} (read-only)`, () => {
     expect(report.loaded.integrityEvents.filter((e) => e.kind === "multiple-active-hierarchy")).toEqual([])
   }, 60_000)
 
+  it("finds the parent map is a forest: no dangling parent, no self-loop, no cycle", () => {
+    // §10 pre-flight step 5. `dangling-endpoint` and `self-loop` are `validateRelationships`
+    // codes and are asserted on the MINTED edges by `migration.store-path.test.ts`; a cycle is
+    // not a violation code at all, and nothing else in the repo counts one. It is the topology
+    // that leaves every hash above agreeing with itself while the tree is not a tree, so the
+    // criterion is measured rather than inferred from the other three.
+    expect(report.topology.danglingParents).toEqual([])
+    expect(report.topology.selfLoops).toEqual([])
+    expect(report.topology.onCycle).toEqual([])
+    expect(report.topology.roots).toBe(15)
+  }, 60_000)
+
   it("reports the step-8 row counts, distinguishing an empty table from an absent one", () => {
     // §10 step 8 names `claims`, `sources` and `rating_events`, none of which exist in the
     // pre-migration file — `save.ts` creates them on the first write. An absent table and an

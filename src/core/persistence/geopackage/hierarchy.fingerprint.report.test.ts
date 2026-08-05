@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import type { FingerprintReport } from "./hierarchy.fingerprint.harness"
+import { topologyOf, type FingerprintReport } from "./hierarchy.fingerprint.harness"
 import {
   DERIVED_POSITION_UNITS,
   diffMaps,
@@ -11,11 +11,59 @@ import {
 } from "./hierarchy.fingerprint.report"
 
 /**
- * The diff and its diagnosis, tested off the real file. Step 19 reaches for these exactly when
- * something has gone wrong, which is the worst possible moment to discover the diagnosis is
- * itself wrong — and the fault it names (a broken parent derivation, bounded by the 741
- * derived-position units) cannot be produced by any file that is on disk today.
+ * The pure pieces of the step-19 tooling — the diff, its diagnosis, and the topology walk —
+ * tested off the real file. Every one of them is reached for exactly when something has gone
+ * wrong, which is the worst possible moment to discover the diagnosis is itself wrong, and not
+ * one of the faults they name (a broken parent derivation bounded by the 741 derived-position
+ * units; a dangling parent; a cycle) can be produced by any file that is on disk today.
  */
+
+function ids(...values: string[]): Set<string> {
+  return new Set(values)
+}
+
+describe("topologyOf", () => {
+  it("reads a forest as a forest and counts the roots", () => {
+    const parents = new Map([["a", "root"], ["b", "a"], ["c", "root"]])
+    expect(topologyOf(parents, ids("root", "a", "b", "c"))).toEqual({
+      roots: 1, danglingParents: [], selfLoops: [], onCycle: [],
+    })
+  })
+
+  it("names the child whose parent is not in the entity set", () => {
+    const topology = topologyOf(new Map([["a", "ghost"]]), ids("a"))
+    expect(topology.danglingParents).toEqual(["a"])
+    expect(topology.onCycle).toEqual([])
+  })
+
+  it("reads a self-loop as both a self-loop and a cycle, because it is both", () => {
+    const topology = topologyOf(new Map([["a", "a"]]), ids("a"))
+    expect(topology.selfLoops).toEqual(["a"])
+    expect(topology.onCycle).toEqual(["a"])
+  })
+
+  it("names every member of a cycle and nobody else", () => {
+    // The fault §10 pre-flight step 5 asks about and no violation code covers: three entities
+    // each claiming a parent, no root, and every count in the file still reading perfect.
+    const topology = topologyOf(new Map([["a", "b"], ["b", "c"], ["c", "a"]]), ids("a", "b", "c"))
+    expect(topology.onCycle).toEqual(["a", "b", "c"])
+    expect(topology.roots).toBe(0)
+  })
+
+  it("does not put a chain that merely leads into a cycle on the cycle", () => {
+    const parents = new Map([["lead", "b"], ["b", "c"], ["c", "b"]])
+    expect(topologyOf(parents, ids("lead", "b", "c")).onCycle).toEqual(["b", "c"])
+  })
+
+  it("finds the cycle whichever entity the walk happens to start from", () => {
+    // `settled` short-circuits a chain that reaches an already-walked id, so a cycle reached
+    // second must not be swallowed by the memo. Both insertion orders, same answer.
+    const forward = new Map([["lead", "b"], ["b", "c"], ["c", "b"]])
+    const reverse = new Map([["c", "b"], ["b", "c"], ["lead", "b"]])
+    expect(topologyOf(forward, ids("lead", "b", "c")).onCycle)
+      .toEqual(topologyOf(reverse, ids("lead", "b", "c")).onCycle)
+  })
+})
 
 function report(over: Partial<FingerprintReport>): FingerprintReport {
   return {
@@ -34,6 +82,7 @@ function report(over: Partial<FingerprintReport>): FingerprintReport {
     relationshipCount: 0,
     contestedCount: 0,
     integrityEventKinds: [],
+    topology: { roots: 0, danglingParents: [], selfLoops: [], onCycle: [] },
     tables: [],
     ...over,
   }

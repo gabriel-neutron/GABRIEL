@@ -242,6 +242,12 @@ describe("the hierarchy migration through the store path (public/project.gpkg, r
     // §10 step 14. Motovilikha -> Techmash -> Rostec is the only two-level chain, so both
     // hops are asserted: one hop alone passes on a hierarchy that was flattened by one level.
     const derived = activeParentMap(migration.relationships).parentById
+    // §10 step 13 taken literally, on the MINTED edges rather than on the reloaded field. (a)
+    // above compares the field after a full round-trip, which is a stronger claim about the
+    // FILE but a weaker one about the migration: it reads the parent back through the same
+    // derivation that wrote it. This is the migration's own answer against the file's own
+    // answer, deep-equal — 1012 entries, none extra, none missing, not "same size".
+    expect(derived).toEqual(rawParents)
     expect(derived.get(MOTOVILIKHA)).toBe(TECHMASH)
     expect(derived.get(TECHMASH)).toBe(ROSTEC)
     expect(derived.has(ROSTEC)).toBe(false)

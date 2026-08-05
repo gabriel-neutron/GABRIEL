@@ -19,6 +19,13 @@ function pad(label: string): string {
   return (label + "                        ").slice(0, 24)
 }
 
+/** A count AND the ids behind it: "0" is the whole answer when it is zero, and when it is not,
+ *  the number alone sends you back to the file to find out which entities. */
+function sample(ids: readonly string[]): string {
+  if (ids.length === 0) return "0"
+  return `${String(ids.length)}  ${ids.slice(0, 5).join(", ")}${ids.length > 5 ? ", …" : ""}`
+}
+
 function countLine(entry: { table: string; count: number | null; parented: number | null }): string {
   const value = entry.count === null ? "table absent" : String(entry.count)
   const parented = entry.parented === null ? "" : `  (parent_id not null: ${String(entry.parented)})`
@@ -42,6 +49,12 @@ export function formatReport(report: FingerprintReport): string {
     `  ${pad("relationships")}${String(report.relationshipCount)}`,
     `  ${pad("contested")}${String(report.contestedCount)}`,
     `  ${pad("integrity_events")}${report.integrityEventKinds.length === 0 ? "none" : report.integrityEventKinds.join(", ")}`,
+    "",
+    "  topology (pre-flight step 5):",
+    `  ${pad("roots")}${String(report.topology.roots)}`,
+    `  ${pad("dangling parents")}${sample(report.topology.danglingParents)}`,
+    `  ${pad("self-loops")}${sample(report.topology.selfLoops)}`,
+    `  ${pad("on a cycle")}${sample(report.topology.onCycle)}`,
     "",
     "  row counts (step 8):",
     ...report.tables.map(countLine),

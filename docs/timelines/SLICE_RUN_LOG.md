@@ -2382,3 +2382,71 @@ of a test that passed**, which is exactly the run whose numbers you need to copy
   runnable; the two days it needs have not been spent.
 - Everything else listed under the previous run stands, including the search dropdown never having
   been driven in a browser.
+
+---
+
+## Run 2026-08-05 — Phase B pre-flight, measured; and the criterion nothing was checking
+
+The read-only half of §10 Phase B, taken today rather than on the morning of the ceremony. Steps
+1-3, 5 and 8-16 are all read-only and all now measured. **Step 4 — the dated copy on a different
+volume, outside any synced folder — is still owed and is the owner's**; git is not a backup for a
+first irreversible write, and nothing below substitutes for it.
+
+### Pre-flight, measured at `9895ed1`
+
+Working tree clean. `md5sum public/project.gpkg` = `10525d42466c2f38b5d6c0cb4a0964a5`, **equal to**
+`git show be980a5:public/project.gpkg`. `npm run verify` green at **113 test files / 919 tests / 0
+failed**; `scan:nul` clean at 412.
+
+`geometries` **291**, `layers` **16**, `units` **1010** (999 parented), `organisations` **17** (13
+parented), `research_sources` **0**, file size **4,972,544**. Five tables absent, not the three §10
+step 8 names: `relationships`, `integrity_events`, `provenance_sources`, `provenance_claims`,
+`rating_events`. Hashes A, B and C all match their pins. `integrity_events` in the loaded file: one
+`hierarchy-migrated`, and nothing else — so **zero cross-kind, zero stale-parent, zero contest**,
+which is three of pre-flight step 5's four answered by reading the file rather than by inference.
+
+These numbers are re-measurable by one command and should be re-taken at the moment the ceremony
+starts. A pre-flight number that predates other work is not evidence about the run it precedes.
+
+### The fourth: "zero cycles" had no tooling, and it is the one that matters most
+
+Step 5 asks for zero dangling, zero self-loops, zero cycles, zero cross-kind. The first two are
+`validateRelationships` codes and the fourth is an integrity event. **There is no `cycle` violation
+code, and nothing in the repository counted one.** (`radialLayout.ts:55-56` says
+`validateRelationships` "reports cycles"; it does not — the nine codes do not include one. Left as
+found, noted here.)
+
+That is the wrong criterion to have unchecked. A cycle is the single topology that leaves every
+fingerprint in step 19 agreeing with itself while the tree is not a tree: the parent map is total,
+the position map is stable, the counts all read 1012, and the hierarchy has no root. `topologyOf`
+now walks the parent map three-colour and reports roots, dangling parents, self-loops and cycle
+members by id, printed with the fingerprints. Measured today: **roots 15, dangling 0, self-loops 0,
+on a cycle 0.** The fault cases cannot be produced by any file on disk, so they are covered
+synthetically — including a chain that merely *leads into* a cycle, which must not be counted as on
+it, and the same graph walked from both ends, because the memo that makes the walk O(n) is exactly
+what could swallow a cycle reached second.
+
+### The dry run, and one criterion that was weaker than it read
+
+Steps 9-16 are `migration.store-path.test.ts`, and every §6 Phase B number is asserted there:
+1012 = 999 + 13 with `acts_for` 0; nine violation codes each 0; 1012 distinct `hier:`-prefixed ids
+set-equal to the parented entity ids; exactly two `percent` edges, 49.9 → KAMAZ and 25 →
+Kalashnikov, the other 1010 `undefined`; Motovilikha → Techmash → Rostec at both hops with depth 2;
+Rostec 12 incoming `corporate_parent`; roots 15; the four organisation roots with zero outgoing;
+second pass 1012 not 2024 with `skippedAlreadyPresent` 1012; one `hierarchy-migrated` event
+surviving the save.
+
+One was weaker than §6 reads. §6 asks that `activeParentMap(minted).parentById` **deep-equal** the
+pre-migration map, and the test compared the reloaded *field* to the raw parents — a stronger claim
+about the file but a weaker one about the migration, since it reads the parent back through the
+same derivation that wrote it. The migration's own answer was only spot-checked at four entities.
+Now asserted deep-equal against the file's own raw parent map, 1012 entries, none extra, none
+missing.
+
+### Still owed after this run
+
+- **§10 pre-flight step 4** — the dated out-of-tree copy. Owner's, thirty seconds, and the reason
+  rollback option 2 exists.
+- **§10 steps 17-28** — unchanged, and still the owner's: a native save picker, an overnight gap,
+  and an irreversible public write.
+- Everything else listed under the previous two runs stands.
