@@ -37,23 +37,26 @@ Two of the PRD's six problems are answered in code: **"I cannot store what I am 
 **"I cannot publish what the proposal promised"** (a single gate feeding CSV, GeoJSON and JSON-LD,
 with attribution and a withheld-counts report).
 
-**But the v2 thesis is not yet demonstrable, and this is the one thing to fix next.** No UI can
-author any edge type. Every relationship write in the app goes through `withActiveParent` — the
-parent picker — so eleven of the twelve types are modelled, validated, persisted, exported and
-documented while being unreachable to an analyst. The real project file proves it: its 1,012 edges
-are 999 `subordinate_to` plus 13 `corporate_parent`, and those 13 arrived through the legacy
-migration, not through anyone recording them.
+**Amended 2026-08-05.** The paragraph that stood here said no UI could author any edge type. The
+Relationship editor shipped that day (`src/modules/orbat/ui/RelationshipSection.tsx`, via
+`core/relationship/authoring.ts`), so all thirteen types are now reachable from the entity
+inspector, with per-type metadata, end-dating, and refusal in the validator's own words.
 
-So the PRD's central sentence — *"I can catalogue the nodes of the backbone; I cannot record the
-backbone"* — remains literally true of the interface. A demo today shows a better v1 ORBAT tree.
+The PRD's central sentence — *"I can catalogue the nodes of the backbone; I cannot record the
+backbone"* — is no longer true of the interface. It remains true of the **file**: `project.gpkg`
+has no `relationships` table, its 1,012 edges are still 999 `subordinate_to` plus 13
+`corporate_parent` minted in memory from the legacy `parent_id` column, and an authored edge lives
+only in the session until §10 steps 17-28 are run. So a demo can now record a chain; it cannot yet
+hand someone a file containing one.
 
 **Shortest path to a demonstrable v2**, in dependency order and ahead of the stage order below,
 because a demo needs one recorded chain rather than a complete capability:
 
-1. **A Relationship editor.** A form over machinery that is already finished — `EDGE_TYPES` carries
-   per-type endpoint kinds and metadata rules, `validateRelationships` enforces them, the index
-   derives from the result and the export gate publishes it. Roughly twenty edges along one real
-   chain is enough to tell the investigative story.
+1. ~~**A Relationship editor.**~~ **Shipped 2026-08-05.** A form over machinery that was already
+   finished — `EDGE_TYPES` carries per-type endpoint kinds and metadata rules,
+   `validateRelationships` enforces them, the index derives from the result and the export gate
+   publishes it. What is left of this item is the **first write of the derived model**, without
+   which the twenty-edge chain does not survive a reload.
 2. **The entity graph view.** The Sigma/WebGL stack is built and perf-proven but wired to the
    sidecar's *channel* graph; `TelegramGraphView` already accepts a `SigmaGraphData` prop, so this
    is an adapter plus edge-type and tier filters. Highest visual payoff per hour.

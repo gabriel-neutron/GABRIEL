@@ -1960,3 +1960,74 @@ if it was not chosen to make the test pass.
   native dialog no test drives.
 - **The history rewrite**, ruled against on 2026-08-04 and documented instead.
 - **The four standing defects**, unchanged.
+
+## Run 2026-08-05 — the Relationship editor: eleven modelled types stop being unreachable
+
+Owner ruled four scope questions before any code, all four the recommended way: **no source field
+on an edge** (that is Slice 6, a model change, not a form), **authoring lives in the entity
+inspector** beside the parent picker, **create + delete + end-date** rather than create-only, and
+**`attachment` becomes authorable** as one metadata field.
+
+### What was built, and what was deliberately not
+
+A form over finished machinery. `EDGE_TYPES` already declared the endpoint labels, the required
+date and the metadata rules; `validateRelationships` already enforced them; `setRelationships`
+already re-derived the hierarchy. Nothing here restates any of that — `edgeForm.ts` *projects* the
+vocabulary into fields and orderings, and a test walks every type asserting that every declared
+metadata key is offered by exactly one field, so a form that falls behind the spec fails rather
+than silently omits.
+
+`publicDefinition` is rendered verbatim under the type picker. It ships in the CC-BY dataset, so
+what the analyst reads while recording an edge is what a reuser reads about it later.
+
+### The one rule that is genuinely new: refuse the difference, not the total
+
+`validateRelationships` reports on a corpus, and this corpus is 1,012 edges nobody has proved
+clean. Refusing a write because the whole set has violations would let one pre-existing fault make
+authoring impossible everywhere; refusing on a rising count would let a write that fixes one fault
+and introduces another pass unnoticed. `introducedViolations` compares the violation *sets* by
+(code, edge, detail) and refuses only what the edit adds.
+
+Proved by injection, not by assertion: replacing the diff with the raw total turns the
+already-dirty-corpus test red, which is the strong kind of red. The rest of the new modules could
+only be proved red the weak way — module not found — and that is stated rather than implied.
+
+### Authoring appends where the parent picker replaces
+
+`withActiveParent` replaces, because a picker that appended would manufacture a contest out of an
+interface gesture. Authoring appends, because an analyst adding a second `corporate_parent` is
+making a claim about the world, and a real conflict between two records is a finding worth
+blocking on (ADR 0011, Q40). They are told, in the validator's own words, and end-dating one of
+the two is how they resolve it — which is why end-dating had to be in this run rather than the
+next.
+
+One liberty is taken with those words. A corpus-wide rule reports once per offending edge, so that
+refusal arrives as the same sentence twice; the form deduplicates the *string* and reworded
+nothing. Found by driving the real app, not by a test.
+
+### Driven against the real project
+
+Dev server, real 1,027-entity project, read-only over HTTP — no save, and `public/project.gpkg` is
+byte-identical. A `shipped_to` edge from a military unit to a corporate entity was refused for a
+missing start date, then recorded once dated: a type no interface in Gabriel had ever been able to
+write. The advisory `toKinds` ordering was observed flipping with the type — corporates first for
+`shipped_to`, units first for `subordinate_to` — out of a list where units outnumber corporates
+roughly twenty to one.
+
+### Where the edges live
+
+In the session. `public/project.gpkg` has no `relationships` table; all 1,012 edges are minted in
+memory on every load, and the first write of the derived model is still §10 steps 17-28, still
+unrun, and still the owner's. The section says so on screen rather than letting an analyst assume
+otherwise.
+
+### Still owed after this run
+
+- **§10 steps 17-28** — the first write of the derived model. Unrun, and the owner's. Until it is,
+  authored edges do not survive a reload.
+- **The push**, still gated on `npm run scan:names` with the real names.
+- **The four standing defects, now three and a half.** Attachment is authorable (defect 2, closed).
+  Defect 3 is half-closed: general edges end-date, `withActiveParent` still replaces. `updateEntity`
+  still accepts a `parentId` patch, and no UI resolves a contest — the last stays deliberate.
+- **Provenance per edge** (Slice 6), which the owner ruled out of this run rather than deferred by
+  accident. Publication safety still rests on the export gate's endpoint proxy.

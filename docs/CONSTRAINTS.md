@@ -99,7 +99,10 @@ boundary, enforced by branded `LatLng` / `LngLat` types.
 - **Test runner**: Vitest only. No Jest.
 - **Storybook stories** required for: `EntityInspector`, `EnrichDrawer`, `OsmObjectInspector`,
   `GeometryActionMenu`, `NetworkLinksLayer` (with 500-entity fixture for performance testing),
-  `IntegrityPanel`. The last is on this list because it is the only reader of a ledger that
+  `IntegrityPanel`, `RelationshipSection`. `RelationshipSection` is on this list because the
+  states worth reviewing — a dated edge, an ended one, an assessment-tier edge, one carrying
+  metadata — do not exist in the real project, whose 1,012 edges are undated, unended and
+  metadata-free. `IntegrityPanel` is on it because it is the only reader of a ledger that
   ships with the published data, and because the states worth reviewing — a contest, an
   acknowledged record, an empty ledger — cannot be produced from the real project, which has
   no contest in it. Its fixture builds the contest from **edges**, so `setProject` mints the

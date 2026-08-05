@@ -33,6 +33,7 @@ import type { AdmiraltyCredibility, AdmiraltyReliability } from "@/core/provenan
 import type { CredibilityMeta, RatingMeta } from "@/core/provenance/ratingMeta"
 import { matchesForEntity } from "@/core/identity/matchCandidates"
 import { DuplicateMatchesSection } from "./DuplicateMatchesSection"
+import { RelationshipSection } from "./RelationshipSection"
 
 const POSITION_MODE_OPTIONS: { value: PositionMode; label: string }[] = [
   { value: "own", label: "Own geometry" },
@@ -201,6 +202,7 @@ function EntityInspectorReadOnlyView({
       <ReadOnlyField label="Parent">
         <span className="truncate">{parentName ?? "—"}</span>
       </ReadOnlyField>
+      <RelationshipSection readOnly />
       <div>
         <div className="text-xs font-medium text-muted-foreground">Linked geometries</div>
         <LinkedGeometriesList linkedGeometries={linkedGeometries} />
@@ -533,6 +535,11 @@ export function EntityInspector({ readOnly: readOnlyProp, enrichedOverlay: enric
             )}
           </Field>
         </div>
+        <Field>
+          {/* Below the parent picker, which writes the hierarchy-bearing edge, and above the rest:
+              the two are the same edge set seen at two grains (ADR 0011). */}
+          <RelationshipSection />
+        </Field>
         <Field>
           <FieldLabel>OSM relation</FieldLabel>
           <Input
