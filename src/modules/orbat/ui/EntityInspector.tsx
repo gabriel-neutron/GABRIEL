@@ -491,8 +491,13 @@ export function EntityInspector({ readOnly: readOnlyProp, enrichedOverlay: enric
         )}
         {/* Hoisted out of the unit branch: a corporate entity is pinned to the fixed
             industry layer, but a person or vessel sits on whichever layer it was drawn
-            on and is entitled to be moved off it. */}
-        {!isCorporate && !isEchelonLayerSelected && (
+            on and is entitled to be moved off it.
+
+            A unit on an echelon layer gets no picker because its layer follows its
+            echelon. A bare profile has no echelon, so that suppression would strand it
+            on whatever layer `getDefaultEntityLayerId` happened to pick — which for this
+            project is the Team/Crew echelon row, a military rank for a person. */}
+        {!isCorporate && (isBareProfile || !isEchelonLayerSelected) && (
           <Field>
             <FieldLabel>Layer</FieldLabel>
             <Select value={entity.layerId} onValueChange={(v) => updateEntity(entity.id, { layerId: v })}>

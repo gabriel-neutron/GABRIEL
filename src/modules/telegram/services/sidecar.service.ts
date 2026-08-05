@@ -3,6 +3,7 @@
  * the only place in the React app that talks to the sidecar — it never touches Telegram
  * or the .tgdb directly. No React; pure functions.
  */
+import type { GraphEdgeAttributes, GraphNodeAttributes } from "@/core/graph/graphData"
 
 const SIDECAR_BASE_URL = "http://localhost:8000"
 const SIDECAR_WS_URL = "ws://localhost:8000"
@@ -25,13 +26,20 @@ export async function fetchSidecarHealth(): Promise<SidecarHealth> {
   return res.json() as Promise<SidecarHealth>
 }
 
+/**
+ * The `/graph` wire format, expressed as the shared `GraphData` plus the two attributes
+ * the sidecar adds. Written as an intersection rather than as a standalone shape so it is
+ * assignable to `GraphData` and can be handed straight to `SigmaGraphCanvas` — a separate
+ * declaration of the same fields would drift, and TypeScript's weak-type check would
+ * reject the payload the moment the wire format gained a field of its own.
+ */
 export type SigmaGraphData = {
-  nodes: { key: string; attributes: { label: string; size: number; color: string } }[]
+  nodes: { key: string; attributes: GraphNodeAttributes }[]
   edges: {
     key: string
     source: string
     target: string
-    attributes: { edgeType: string; weight: number }
+    attributes: GraphEdgeAttributes & { edgeType: string; weight: number }
   }[]
 }
 
