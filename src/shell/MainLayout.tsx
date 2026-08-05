@@ -13,8 +13,10 @@ import { Button } from "@/ui/button"
 import { Tabs, TabsList, TabsTrigger } from "@/ui/tabs"
 import { SidebarGroup, SidebarGroupContent, SidebarTrigger } from "@/ui/sidebar"
 import { FlaskConical } from "lucide-react"
+import type { EntityKind } from "@/core/entity/entity"
 import type { MapEntity, DrawnGeometry } from "@/types/domain.types"
 import { getDefaultEntityLayerId } from "./entityLayer"
+import { newEntityForKind } from "./newEntity"
 import type { EnrichmentControls, LayeredResearchControls } from "@/types/layout.types"
 import { withActiveParent } from "@/core/relationship/activeParent"
 import { useProjectStore } from "@/store/useProjectStore"
@@ -26,20 +28,11 @@ import { CommandPalette } from "./CommandPalette"
 
 export type { EnrichmentControls, LayeredResearchControls }
 
-function entityFromGeometry(geom: DrawnGeometry, defaultLayerId: string): MapEntity {
-  const id = crypto.randomUUID()
-  const layerId = geom.layerId ?? defaultLayerId
-  return {
-    kind: "unit",
-    id,
-    name: "New entity",
-    layerId,
-    // Derived from the edge set on every load (ADR 0011): a parent written here would be
-    // erased at the next save. The caller commits the real parent as an edge instead.
-    parentId: null,
-    affiliation: "Hostile",
-    isExactPosition: false,
-  }
+function entityFromGeometry(geom: DrawnGeometry, kind: EntityKind, defaultLayerId: string): MapEntity {
+  return newEntityForKind(kind, {
+    id: crypto.randomUUID(),
+    defaultLayerId: geom.layerId ?? defaultLayerId,
+  })
 }
 
 export type MainLayoutProps = {
@@ -54,7 +47,6 @@ export type MainLayoutProps = {
   layeredResearch?: LayeredResearchControls
   restoredFromSession?: boolean
   onOverpassUnavailable?: () => void
-  onCreateNewOrganisation?: (geom: DrawnGeometry) => void
 }
 
 export function MainLayout({
@@ -69,7 +61,6 @@ export function MainLayout({
   layeredResearch,
   restoredFromSession = false,
   onOverpassUnavailable,
-  onCreateNewOrganisation,
 }: MainLayoutProps): React.ReactElement {
   const layers = useProjectStore((s) => s.layers)
   const entities = useProjectStore((s) => s.entities)
@@ -92,16 +83,24 @@ export function MainLayout({
   const [leftPanelId, setLeftPanelId] = useState(leftPanels[0].id)
   const activeLeftPanel = leftPanels.find((p) => p.id === leftPanelId) ?? leftPanels[0]
 
-  const handleCreateNewEntity = useCallback((geom: DrawnGeometry): void => {
+  const handleCreateNewEntity = useCallback((geom: DrawnGeometry, kind: EntityKind): void => {
     const s = useProjectStore.getState()
-    const defaultLayerId = getDefaultEntityLayerId(s.layers)
-    const entity = entityFromGeometry(geom, defaultLayerId)
+    const entity = entityFromGeometry(geom, kind, getDefaultEntityLayerId(s.layers))
     s.addEntity(entity)
-    s.addGeometry({ ...geom, entityId: entity.id })
+    s.addGeometry({ ...geom, layerId: entity.layerId, entityId: entity.id })
     // On the creation path, not deferred to a later save: the selected entity is the new
     // entity's parent, and an edge is the only place that survives a reload.
+    //
+    // Only when the kinds match. A hierarchy edge across kinds derives no parent
+    // (`hierarchyIndex` refuses to place one) and, once persisted, a `parent_id` that
+    // resolves outside its own kind is what `load.ts` calls a corrupt file. Minting one
+    // was harmless while the only pair was unit/corporate and the selection was almost
+    // always same-kind; with five kinds on the menu it would be the common case.
     if (s.selectedEntityId != null) {
-      s.setRelationships(withActiveParent(s.relationships, entity, s.selectedEntityId, crypto.randomUUID()))
+      const parent = s.entities.find((e) => e.id === s.selectedEntityId)
+      if (parent?.kind === entity.kind) {
+        s.setRelationships(withActiveParent(s.relationships, entity, parent.id, crypto.randomUUID()))
+      }
     }
     selectEntity(entity.id)
   }, [])
@@ -124,7 +123,6 @@ export function MainLayout({
         <MapView
           readOnly={readOnly}
           onCreateNewEntity={handleCreateNewEntity}
-          onCreateNewOrganisation={onCreateNewOrganisation}
           onLinkGeometryToEntity={handleLinkGeometryToEntity}
           defaultLayerId={defaultLayerId}
           onOverpassUnavailable={onOverpassUnavailable}

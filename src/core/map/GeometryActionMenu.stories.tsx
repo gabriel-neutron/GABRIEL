@@ -28,6 +28,7 @@ const meta: Meta<typeof GeometryActionMenu> = {
   },
   args: {
     entities,
+    organisations: [],
     onCreateNew: () => {},
     onLinkToExisting: () => {},
     onCancel: () => {},

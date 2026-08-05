@@ -7,6 +7,7 @@ import { GeometryActionMenu } from "./GeometryActionMenu"
 import { CenterOnSelection } from "./CenterOnSelection"
 import { useMapDrawing } from "./useMapDrawing"
 import { BASE_MAP_TILE_CONFIG, BASE_TILE_OPTIONS } from "./mapTileConfig"
+import type { EntityKind } from "@/core/entity/entity"
 import type { DrawnGeometry } from "@/types/domain.types"
 import { MapBoundsReporter } from "./MapBoundsReporter"
 import { useMapViewStore } from "./useMapViewStore"
@@ -129,8 +130,7 @@ function getOsmTypeAndId(
 
 type Props = {
   readOnly?: boolean
-  onCreateNewEntity: (geom: DrawnGeometry) => void
-  onCreateNewOrganisation?: (geom: DrawnGeometry) => void
+  onCreateNewEntity: (geom: DrawnGeometry, kind: EntityKind) => void
   onLinkGeometryToEntity: (geom: DrawnGeometry, entityId: string) => void
   defaultLayerId: string
   onOverpassUnavailable?: () => void
@@ -142,7 +142,6 @@ type Props = {
 export function MapView({
   readOnly = false,
   onCreateNewEntity,
-  onCreateNewOrganisation,
   onLinkGeometryToEntity,
   defaultLayerId,
   onOverpassUnavailable,
@@ -152,6 +151,9 @@ export function MapView({
   const layers = useProjectStore((s) => s.layers)
   const entities = useProjectStore((s) => s.entities)
   const unitEntities = useMemo(() => entities.filter((e) => e.kind === "unit"), [entities])
+  // Corporate only, not every non-unit kind: `FilterableSelect`'s grouping chip is a
+  // binary Military/Industry split, so a vessel offered here would file under "Industry".
+  // The three bare kinds get their geometry at creation instead.
   const organisations = useMemo(() => entities.filter((e) => e.kind === "corporate"), [entities])
   const drawnGeometries = useProjectStore((s) => s.drawnGeometries)
   const entityOsmGeometries = useOsmViewStore((s) => s.entityOsmGeometries)
@@ -168,10 +170,9 @@ export function MapView({
     isDrawing,
     handleGeometryCreated,
     handleCreateNew,
-    handleCreateNewOrganisation,
     handleLinkToExisting,
     handleCancel,
-  } = useMapDrawing({ onCreateNewEntity, onCreateNewOrganisation, onLinkGeometryToEntity })
+  } = useMapDrawing({ onCreateNewEntity, onLinkGeometryToEntity })
 
   const setMapBounds = useMapViewStore((s) => s.setMapBounds)
 
@@ -238,7 +239,6 @@ export function MapView({
           entities={unitEntities}
           organisations={organisations}
           onCreateNew={handleCreateNew}
-          onCreateNewOrganisation={handleCreateNewOrganisation}
           onLinkToExisting={handleLinkToExisting}
           onCancel={handleCancel}
         />

@@ -1,4 +1,5 @@
 import L from "leaflet"
+import type { EntityKind } from "@/core/entity/entity"
 import type { OrganisationType } from "@/types/organisation.types"
 
 type SvgAttr = Record<string, string | number>
@@ -71,15 +72,55 @@ const ICON_NODES: Record<OrganisationType, SvgNode[]> = {
   ],
 }
 
+/**
+ * One icon per bare Profile (ADR 0010). `corporate` is absent because a corporate entity
+ * is drawn from its `type`, which is a required field on that profile and a richer answer
+ * than its kind; `unit` is absent because a unit renders as a NATO symbol, never as one of
+ * these (see `SymbolsLayer`).
+ */
+const KIND_ICON_NODES: Record<"vessel" | "person" | "equipment_class", SvgNode[]> = {
+  person: [
+    ["path", { d: "M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" }],
+    ["circle", { cx: "12", cy: "7", r: "4" }],
+  ],
+  vessel: [
+    ["path", { d: "M22 18H2a4 4 0 0 0 4 4h12a4 4 0 0 0 4-4Z" }],
+    ["path", { d: "M21 14 10 2 3 14h18Z" }],
+    ["path", { d: "M10 2v16" }],
+  ],
+  equipment_class: [
+    ["path", { d: "m7.5 4.27 9 5.15" }],
+    ["path", { d: "M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" }],
+    ["path", { d: "m3.3 7 8.7 5 8.7-5" }],
+    ["path", { d: "M12 22V12" }],
+  ],
+}
+
+/**
+ * The cache key for an entity's marker, and the only place that decides whether a record
+ * is drawn from its organisation type or from its kind. Prefixed, because `OrganisationType`
+ * and `EntityKind` are two open string sets and an unprefixed key would collide the day
+ * they share a member.
+ */
+export function entityIconKey(entity: { kind: EntityKind; type?: string }): string {
+  if (entity.kind === "corporate") return `org:${(entity.type as OrganisationType | undefined) ?? "other"}`
+  return `kind:${entity.kind}`
+}
+
+function nodesForKey(key: string): SvgNode[] {
+  const [scope, value] = key.split(":", 2)
+  if (scope === "org") return ICON_NODES[value as OrganisationType] ?? ICON_NODES.other
+  return KIND_ICON_NODES[value as keyof typeof KIND_ICON_NODES] ?? ICON_NODES.other
+}
+
 function nodesToSvgElements(nodes: SvgNode[]): string {
   return nodes
     .map(([tag, attrs]) => `<${tag} ${Object.entries(attrs).map(([k, v]) => `${k}="${v}"`).join(" ")}/>`)
     .join("")
 }
 
-function makeOrganisationSvg(type: OrganisationType, markerFill: string, markerStroke: string): string {
-  const nodes = ICON_NODES[type] ?? ICON_NODES.other
-  const iconSvg = nodesToSvgElements(nodes)
+function makeEntitySvg(key: string, markerFill: string, markerStroke: string): string {
+  const iconSvg = nodesToSvgElements(nodesForKey(key))
   return (
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">` +
     `<circle cx="16" cy="16" r="16" fill="${markerFill}"/>` +
@@ -92,14 +133,15 @@ function makeOrganisationSvg(type: OrganisationType, markerFill: string, markerS
 
 const iconCache = new Map<string, L.Icon>()
 
-export function makeOrganisationIcon(type: OrganisationType): L.Icon {
+/** `key` comes from `entityIconKey`. */
+export function makeEntityIcon(key: string): L.Icon {
   const style = typeof window === "undefined" ? null : getComputedStyle(document.documentElement)
   const markerFill = style?.getPropertyValue("--primary").trim() || "#f59e0b"
   const markerStroke = style?.getPropertyValue("--primary-foreground").trim() || "#ffffff"
-  const cacheKey = `${type}|${markerFill}|${markerStroke}`
+  const cacheKey = `${key}|${markerFill}|${markerStroke}`
   const cached = iconCache.get(cacheKey)
   if (cached) return cached
-  const svg = makeOrganisationSvg(type, markerFill, markerStroke)
+  const svg = makeEntitySvg(key, markerFill, markerStroke)
   const uri = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`
   const icon = L.icon({ iconUrl: uri, iconSize: [32, 32], iconAnchor: [16, 16], popupAnchor: [0, -16] })
   iconCache.set(cacheKey, icon)

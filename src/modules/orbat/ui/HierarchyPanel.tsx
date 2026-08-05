@@ -49,13 +49,16 @@ export function HierarchyPanel({ hiddenEntityIds: hiddenEntityIdsProp, onToggleE
   const onToggleEntityVisible = onToggleEntityVisibleProp ?? fallbackToggleEntityVisible
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
   const units = useMemo(() => entities.filter((e) => e.kind === "unit"), [entities])
-  const corporateEntities = useMemo(() => entities.filter((e) => e.kind === "corporate"), [entities])
+  // Every non-unit kind, not corporate alone: a person or vessel appears in no other
+  // panel, and an entity that appears in no panel is one an analyst cannot select in
+  // order to record an edge about it.
+  const nonUnits = useMemo(() => entities.filter((e) => e.kind !== "unit"), [entities])
   const nameById = useMemo(() => new Map(entities.map((e) => [e.id, e.name])), [entities])
   // The edge set, so this panel can tell a contested child from a root. Both trees read one
   // index over ALL entities rather than one each — see `useHierarchyIndex`.
   const index = useHierarchyIndex()
   const orbat = useMemo(() => buildOrbat(units, index), [units, index])
-  const orgOrbat = useMemo(() => buildOrbat(corporateEntities, index), [corporateEntities, index])
+  const nonUnitOrbat = useMemo(() => buildOrbat(nonUnits, index), [nonUnits, index])
   const anyVisible = units.some(
     (e) => !hiddenEntityIds.has(e.id) && !isAncestorHidden(e, orbat, hiddenEntityIds),
   )
@@ -74,7 +77,7 @@ export function HierarchyPanel({ hiddenEntityIds: hiddenEntityIdsProp, onToggleE
   }
 
   const orderedRoots = getOrderedEntities(orbat.roots(), orbat)
-  const orgRoots = [...orgOrbat.roots()].sort(compareByName)
+  const nonUnitRoots = [...nonUnitOrbat.roots()].sort(compareByName)
 
   return (
     <div className="flex min-w-0 flex-col">
@@ -105,18 +108,18 @@ export function HierarchyPanel({ hiddenEntityIds: hiddenEntityIdsProp, onToggleE
           ))
         )}
 
-        {corporateEntities.length > 0 && (
+        {nonUnits.length > 0 && (
           <>
             <Separator className="my-2" />
             <div className="px-1 pb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              Industry
+              Industry &amp; other entities
             </div>
-            {orgRoots.map((root) => (
+            {nonUnitRoots.map((root) => (
               <HierarchyEntityNode
                 key={root.id}
                 entity={root}
                 depth={0}
-                orbat={orgOrbat}
+                orbat={nonUnitOrbat}
                 ancestorPath={EMPTY_PATH}
                 nameById={nameById}
                 hiddenEntityIds={hiddenEntityIds}

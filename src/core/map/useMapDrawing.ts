@@ -1,10 +1,10 @@
 import { useState } from "react"
+import type { EntityKind } from "@/core/entity/entity"
 import type { DrawnGeometry } from "@/types/domain.types"
 import { useMapViewStore, type MapTool } from "./useMapViewStore"
 
 type Options = {
-  onCreateNewEntity: (geom: DrawnGeometry) => void
-  onCreateNewOrganisation?: (geom: DrawnGeometry) => void
+  onCreateNewEntity: (geom: DrawnGeometry, kind: EntityKind) => void
   onLinkGeometryToEntity: (geom: DrawnGeometry, entityId: string) => void
 }
 
@@ -14,7 +14,7 @@ export type { MapTool }
  * `mapTool` is shared via `useMapViewStore` (ADR 0007) so self-contained map layers
  * (`SymbolsLayer` etc.) know whether to be interactive without a prop from `MapView`.
  */
-export function useMapDrawing({ onCreateNewEntity, onCreateNewOrganisation, onLinkGeometryToEntity }: Options) {
+export function useMapDrawing({ onCreateNewEntity, onLinkGeometryToEntity }: Options) {
   const mapTool = useMapViewStore((s) => s.mapTool)
   const setMapTool = useMapViewStore((s) => s.setMapTool)
   const [pendingGeometry, setPendingGeometry] = useState<DrawnGeometry | null>(null)
@@ -24,15 +24,9 @@ export function useMapDrawing({ onCreateNewEntity, onCreateNewOrganisation, onLi
     setMapTool("pan")
   }
 
-  function handleCreateNew() {
+  function handleCreateNew(kind: EntityKind) {
     if (!pendingGeometry) return
-    onCreateNewEntity(pendingGeometry)
-    setPendingGeometry(null)
-  }
-
-  function handleCreateNewOrganisation() {
-    if (!pendingGeometry || !onCreateNewOrganisation) return
-    onCreateNewOrganisation(pendingGeometry)
+    onCreateNewEntity(pendingGeometry, kind)
     setPendingGeometry(null)
   }
 
@@ -53,7 +47,6 @@ export function useMapDrawing({ onCreateNewEntity, onCreateNewOrganisation, onLi
     isDrawing: mapTool !== "pan",
     handleGeometryCreated,
     handleCreateNew,
-    handleCreateNewOrganisation,
     handleLinkToExisting,
     handleCancel,
   }

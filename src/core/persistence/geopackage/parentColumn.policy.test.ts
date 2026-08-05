@@ -27,12 +27,32 @@ const ENTITIES: MapEntity[] = [
   },
 ]
 
-async function saveFixture(): Promise<Uint8Array> {
+/**
+ * Two people, one under the other. Same-kind and perfectly resolvable — the pair exists
+ * because the kind is neither `unit` nor `corporate`, which is the case the load path
+ * had no id set for.
+ */
+const SAME_KIND_PERSONS: MapEntity[] = [
+  { kind: "person", id: "person-1", name: "The principal", layerId: "division", parentId: null },
+  { kind: "person", id: "person-2", name: "The associate", layerId: "division", parentId: "person-1" },
+]
+
+async function saveFixture(entities: MapEntity[] = ENTITIES): Promise<Uint8Array> {
   return saveGeoPackage({
-    layers: LAYERS, entities: ENTITIES, geometries: [],
+    layers: LAYERS, entities, geometries: [],
     researchSources: undefined, baseBuffer: undefined, sources: undefined, claims: undefined,
     ratingEvents: undefined, relationships: [], integrityEvents: [],
   })
+}
+
+async function withoutRelationshipsTable(bytes: Uint8Array): Promise<Uint8Array> {
+  const gpkg = await GeoPackageAPI.open(Uint8Array.from(bytes))
+  try {
+    gpkg.connection.run("DROP TABLE relationships")
+    return await gpkg.export()
+  } finally {
+    gpkg.close()
+  }
 }
 
 describe("the persisted parent_id column", () => {
@@ -80,19 +100,34 @@ describe("the persisted parent_id column", () => {
       // parented entity from this very column, so an unresolvable value would become an edge
       // with a dangling endpoint — fatal, found later, and diagnosed worse. The table is dropped
       // rather than never created because `saveGeoPackage` always creates it.
-      const bytes = await saveFixture()
-      const gpkg = await GeoPackageAPI.open(Uint8Array.from(bytes))
-      let unmigrated: Uint8Array
-      try {
-        gpkg.connection.run("DROP TABLE relationships")
-        unmigrated = await gpkg.export()
-      } finally {
-        gpkg.close()
-      }
+      const unmigrated = await withoutRelationshipsTable(await saveFixture())
 
       await expect(loadGeoPackage(Uint8Array.from(unmigrated).buffer)).rejects.toThrow(
         /Unsupported schema.*missing parent/,
       )
+    },
+    30_000,
+  )
+
+  it(
+    "resolves a parent within any kind, not just unit and corporate",
+    async () => {
+      // The check used to build exactly two id sets and read `kind === "corporate" ? corporate
+      // : unit`, so every one of the three bare profiles (ADR 0010) was validated against the
+      // UNIT set. A person under a person is same-kind and resolvable, and this refused it:
+      // saving two such entities produced a file the next load called corrupt. Nothing could
+      // create a person until this slice, which is why it stayed invisible.
+      const unmigrated = await withoutRelationshipsTable(await saveFixture(SAME_KIND_PERSONS))
+
+      const result = await loadGeoPackage(Uint8Array.from(unmigrated).buffer)
+
+      expect(result.entities.find((e) => e.id === "person-2")?.parentId).toBe("person-1")
+      expect(result.integrityEvents.filter((e) => e.detail.code === "stale-parent")).toHaveLength(0)
+      // And the migration minted the edge the column stood for, so the parent survives a reload.
+      expect(result.relationships).toHaveLength(1)
+      expect(result.relationships[0]).toMatchObject({
+        fromId: "person-2", toId: "person-1", type: "subordinate_to",
+      })
     },
     30_000,
   )

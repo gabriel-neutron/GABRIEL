@@ -136,13 +136,18 @@ function EntityInspectorReadOnlyView({
   credibilityMetas,
   enrichedOverlay,
 }: EntityInspectorReadOnlyViewProps) {
+  // Three-way, not `isCorporate`/else. The three bare profiles (ADR 0010) carry the
+  // discriminant and nothing else until Slice 5, so showing them an echelon, an
+  // affiliation and a battle dimension would offer a person fields their profile does not
+  // have — fields `Entity`'s D1-loose shape would happily let an analyst fill in.
   const isCorporate = entity.kind === "corporate"
+  const isUnit = entity.kind === "unit"
   return (
     <div className="space-y-3 p-4">
       <ReadOnlyField label="Name">
         <span className="truncate">{entity.name}</span>
       </ReadOnlyField>
-      {!isCorporate && entity.militaryUnitId != null && entity.militaryUnitId !== "" && (
+      {isUnit && entity.militaryUnitId != null && entity.militaryUnitId !== "" && (
         <ReadOnlyField label="Military unit ID">
           <span className="truncate">{entity.militaryUnitId}</span>
         </ReadOnlyField>
@@ -165,11 +170,12 @@ function EntityInspectorReadOnlyView({
         </ReadOnlyField>
       )}
       <EnrichedSessionBlock overlay={enrichedOverlay} variant="readonly" />
-      {isCorporate ? (
+      {isCorporate && (
         <ReadOnlyField label="Type">
           {entity.type ? ORGANISATION_TYPE_LABELS[entity.type as keyof typeof ORGANISATION_TYPE_LABELS] : "—"}
         </ReadOnlyField>
-      ) : (
+      )}
+      {isUnit && (
         <>
           <div className="grid grid-cols-2 gap-2">
             <ReadOnlyField label="Echelon">{entity.echelon ?? "—"}</ReadOnlyField>
@@ -310,6 +316,9 @@ export function EntityInspector({ readOnly: readOnlyProp, enrichedOverlay: enric
   }
 
   const isCorporate = entity.kind === "corporate"
+  const isUnit = entity.kind === "unit"
+  /** Vessel, person and equipment_class: the discriminant and nothing else (ADR 0010). */
+  const isBareProfile = !isCorporate && !isUnit
   const hasParent = entity.parentId != null
 
   return (
@@ -324,7 +333,7 @@ export function EntityInspector({ readOnly: readOnlyProp, enrichedOverlay: enric
             onBlur={() => handleNameChange(draft.name)}
           />
         </Field>
-        {!isCorporate && (
+        {isUnit && (
           <Field>
             <FieldLabel>Military unit ID</FieldLabel>
             <Input
@@ -386,7 +395,7 @@ export function EntityInspector({ readOnly: readOnlyProp, enrichedOverlay: enric
             </Button>
           </div>
         </Field>
-        {isCorporate ? (
+        {isCorporate && (
           <Field>
             <FieldLabel>Type</FieldLabel>
             <Select value={typeValue} onValueChange={handleTypeChange}>
@@ -400,7 +409,8 @@ export function EntityInspector({ readOnly: readOnlyProp, enrichedOverlay: enric
               </SelectContent>
             </Select>
           </Field>
-        ) : (
+        )}
+        {isUnit && (
           <>
             <div className="grid grid-cols-2 gap-2">
               <Field>
@@ -477,24 +487,27 @@ export function EntityInspector({ readOnly: readOnlyProp, enrichedOverlay: enric
                 </Select>
               </Field>
             </div>
-            {!isEchelonLayerSelected && (
-              <Field>
-                <FieldLabel>Layer</FieldLabel>
-                <Select value={entity.layerId} onValueChange={(v) => updateEntity(entity.id, { layerId: v })}>
-                  <SelectTrigger className="h-8 text-sm">
-                    <SelectValue placeholder="Select layer" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {assignableLayers.map((layer) => (
-                      <SelectItem key={layer.id} value={layer.id}>
-                        {layer.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </Field>
-            )}
           </>
+        )}
+        {/* Hoisted out of the unit branch: a corporate entity is pinned to the fixed
+            industry layer, but a person or vessel sits on whichever layer it was drawn
+            on and is entitled to be moved off it. */}
+        {!isCorporate && !isEchelonLayerSelected && (
+          <Field>
+            <FieldLabel>Layer</FieldLabel>
+            <Select value={entity.layerId} onValueChange={(v) => updateEntity(entity.id, { layerId: v })}>
+              <SelectTrigger className="h-8 text-sm">
+                <SelectValue placeholder="Select layer" />
+              </SelectTrigger>
+              <SelectContent>
+                {assignableLayers.map((layer) => (
+                  <SelectItem key={layer.id} value={layer.id}>
+                    {layer.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </Field>
         )}
         <div className="grid grid-cols-2 gap-2">
           <Field>
@@ -540,6 +553,9 @@ export function EntityInspector({ readOnly: readOnlyProp, enrichedOverlay: enric
               the two are the same edge set seen at two grains (ADR 0011). */}
           <RelationshipSection />
         </Field>
+        {/* `osmRelationId` is declared by UnitProfile and CorporateProfile only — the OSM
+            relation that bounds a base or an industrial site. A person has no footprint. */}
+        {!isBareProfile && (
         <Field>
           <FieldLabel>OSM relation</FieldLabel>
           <Input
@@ -580,6 +596,7 @@ export function EntityInspector({ readOnly: readOnlyProp, enrichedOverlay: enric
             </p>
           )}
         </Field>
+        )}
         {positionModeValue === "own" && (
           <Field>
             <FieldLabel className="text-muted-foreground">Linked geometries</FieldLabel>

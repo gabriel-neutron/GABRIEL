@@ -1,6 +1,4 @@
 import { useState, useCallback, useEffect, useLayoutEffect, useMemo, useRef } from "react"
-import type { DrawnGeometry, MapEntity } from "@/types/domain.types"
-import { INDUSTRY_LAYER_ID } from "@/types/organisation.types"
 import { MainLayout } from "@/shell/MainLayout"
 import { ToastStack, type ToastItem } from "@/components/shared/ToastStack"
 import { useProjectStore } from "@/store/useProjectStore"
@@ -16,29 +14,10 @@ export type EditPageProps = {
 }
 
 export function EditPage({ onViewMode, onOpenAbout }: EditPageProps): React.ReactElement {
-  const { entities, drawnGeometries, selectedEntityId, updateEntity, addEntity, addGeometry } =
-    useProjectStore()
+  const { entities, drawnGeometries, selectedEntityId, updateEntity } = useProjectStore()
   const { sourceCache, mergeSourceCache } = useSourceCacheStore()
 
   const { busy, error, restoredFromSession, handleNew, handleOpen, handleSave, handleExportRelease } = useProjectIO()
-
-  const handleCreateNewOrganisation = useCallback((geom: DrawnGeometry) => {
-    const org: MapEntity = {
-      kind: "corporate",
-      id: crypto.randomUUID(),
-      name: "New organisation",
-      type: "company",
-      layerId: INDUSTRY_LAYER_ID,
-      parentId: null,
-      notes: null,
-      osmRelationId: null,
-      positionMode: "own",
-      isExactPosition: false,
-    }
-    addEntity(org)
-    addGeometry({ ...geom, layerId: INDUSTRY_LAYER_ID, entityId: org.id })
-    selectEntity(org.id)
-  }, [addEntity, addGeometry])
 
   const [toasts, setToasts] = useState<ToastItem[]>([])
 
@@ -163,7 +142,6 @@ export function EditPage({ onViewMode, onOpenAbout }: EditPageProps): React.Reac
           onSaveProject: handleSave,
           onExportRelease: handleExportRelease,
         }}
-        onCreateNewOrganisation={handleCreateNewOrganisation}
         onOverpassUnavailable={() =>
           setToasts((prev) =>
             [

@@ -3,20 +3,23 @@ import { EntityInspector } from "@/modules/orbat/ui/EntityInspector"
 import { HierarchyPanel } from "@/modules/orbat/ui/HierarchyPanel"
 import { ReviewQueue } from "@/modules/orbat/ui/ReviewQueue"
 import { SymbolsLayer } from "@/modules/orbat/ui/SymbolsLayer"
-import { OrganisationsLayer } from "@/modules/orbat/ui/OrganisationsLayer"
+import { NonUnitEntitiesLayer } from "@/modules/orbat/ui/NonUnitEntitiesLayer"
 import { NetworkLinksLayer } from "@/modules/orbat/ui/NetworkLinksLayer"
+import { ENTITY_KINDS } from "@/core/entity/entity"
 import { useMapPrefsStore } from "@/store/useMapPrefsStore"
 import { useViewStore } from "@/shell/useViewStore"
 import type { ModuleManifest } from "@/types/module.types"
 
-/** orbat's shell contribution (ADR 0007) — military units + corporate entities. */
+/** orbat's shell contribution (ADR 0007) — every Entity kind, whatever its Profile. */
 export const orbatModule: ModuleManifest = {
   views: [{ id: "tree", label: "Hierarchy", content: <TreeView /> }],
 
-  detailRenderer: {
-    unit: (id) => <EntityInspector key={id} />,
-    corporate: (id) => <EntityInspector key={id} />,
-  },
+  // Every kind, built from ENTITY_KINDS rather than listed. A kind absent from this map
+  // is a kind whose selection opens an empty detail panel — which is where the three bare
+  // profiles sat, and with them the only route to the relationship editor.
+  detailRenderer: Object.fromEntries(
+    ENTITY_KINDS.map((kind) => [kind, (id: string) => <EntityInspector key={id} />]),
+  ),
 
   leftPanels: [
     { id: "hierarchy", label: "Army", content: <HierarchyPanel /> },
@@ -25,7 +28,7 @@ export const orbatModule: ModuleManifest = {
 
   mapLayers: [
     <SymbolsLayer key="symbols" />,
-    <OrganisationsLayer key="organisations" />,
+    <NonUnitEntitiesLayer key="non-unit-entities" />,
     <NetworkLinksLayer key="network-links" />,
   ],
 

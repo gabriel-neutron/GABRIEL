@@ -13,6 +13,7 @@ import { migrateHierarchyToRelationships } from "./migrateHierarchy"
 import { validateRelationships, type RelationshipViolation } from "@/core/relationship/validate"
 import { activeParentMap, withDerivedParents } from "@/core/relationship/activeParent"
 import { deriveProvenanceFromEntities, type EntityLedgerInput } from "@/core/provenance/deriveFromEntities"
+import type { EntityKind } from "@/core/entity/entity"
 import type { Relationship } from "@/core/relationship/relationship"
 import type { IntegrityEvent } from "@/core/integrity/integrityEvent"
 import { withContestedParentEvents } from "@/core/integrity/contestedParentEvents"
@@ -114,11 +115,22 @@ export async function loadGeoPackage(buffer: ArrayBuffer): Promise<GeoPackageLoa
 
     const layerIds = new Set(layers.map((l) => l.id))
     const entityIds = new Set(entities.map((e) => e.id))
-    // Units and corporate entities form separate hierarchies — a parentId is only
-    // valid within its own kind, so validate against a same-kind id set, not the
-    // pooled one (which would silently accept a cross-kind parent reference).
-    const unitIds = new Set(entities.filter((e) => e.kind === "unit").map((e) => e.id))
-    const corporateIds = new Set(entities.filter((e) => e.kind === "corporate").map((e) => e.id))
+    // Each kind forms its own hierarchy — a parentId is only valid within its own kind,
+    // so validate against a same-kind id set, not the pooled one (which would silently
+    // accept a cross-kind parent reference).
+    //
+    // Built per kind rather than as the two sets this used to hold. A `kind === "corporate"
+    // ? corporate : unit` ternary reads as exhaustive and is not: every one of the three
+    // bare profiles (ADR 0010) fell through to the UNIT set, so a person legitimately
+    // parented to a person resolved against ids that could not contain it and the file was
+    // called corrupt. That is the same failure mode `decodeEntityKind` documents one file
+    // over — a narrower answer that keeps typechecking after the union widens.
+    const idsByKind = new Map<EntityKind, Set<string>>()
+    for (const e of entities) {
+      const known = idsByKind.get(e.kind)
+      if (known == null) idsByKind.set(e.kind, new Set([e.id]))
+      else known.add(e.id)
+    }
     // The parent check throws only on a file that has NOT been migrated. There, the raw
     // `parent_id` values are the record and `migrateHierarchyToRelationships` is about to mint
     // an edge from each, so an unresolvable one would become an edge with a dangling endpoint —
@@ -132,8 +144,7 @@ export async function loadGeoPackage(buffer: ArrayBuffer): Promise<GeoPackageLoa
         throw new Error("Unsupported schema: entity references missing layer.")
       }
       if (e.parentId == null) continue
-      const sameKindIds = e.kind === "corporate" ? corporateIds : unitIds
-      if (sameKindIds.has(e.parentId)) continue
+      if (idsByKind.get(e.kind)?.has(e.parentId) === true) continue
       if (persisted === null) {
         throw new Error("Unsupported schema: entity references missing parent.")
       }

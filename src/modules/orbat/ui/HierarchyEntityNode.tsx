@@ -49,10 +49,11 @@ function ContestedBadge({ parentNames }: { parentNames: string[] }): React.React
 }
 
 /**
- * Shared by the unit tree and the "Industry" (corporate) tree. Corporate entities never had a
- * per-item visibility toggle (only units did, driven by `MainLayout`'s `hiddenEntityIds`), so the
- * toggle and hidden-state are suppressed for `kind === "corporate"` — same behaviour as the two
- * formerly-separate `EntityNode`/`OrgNode` components, just one component now.
+ * Shared by the unit tree and the non-unit tree. Only units have a per-item visibility
+ * toggle: `hiddenEntityIds` is read by `SymbolsLayer` and by nothing else, so offering the
+ * control on any other kind would be offering a switch wired to nothing. Suppressed for
+ * every non-unit kind rather than for `corporate` alone, which is the same rule stated
+ * from the side that stays true as the union widens.
  */
 export const HierarchyEntityNode = memo(function HierarchyEntityNode({
   entity,
@@ -67,6 +68,7 @@ export const HierarchyEntityNode = memo(function HierarchyEntityNode({
 }: HierarchyNodeProps) {
   const isRoot = depth === 0
   const isCorporate = entity.kind === "corporate"
+  const isUnit = entity.kind === "unit"
   const childPath = new Set(ancestorPath).add(entity.id)
   const children = getOrderedEntities(
     orbat.childrenOf(entity.id).filter((child) => !childPath.has(child.id)),
@@ -74,8 +76,8 @@ export const HierarchyEntityNode = memo(function HierarchyEntityNode({
   )
   const hasKids = children.length > 0
   const expanded = expandedIds.has(entity.id)
-  const isHidden = !isCorporate && hiddenEntityIds.has(entity.id)
-  const ancestorHidden = !isCorporate && isAncestorHidden(entity, orbat, hiddenEntityIds)
+  const isHidden = isUnit && hiddenEntityIds.has(entity.id)
+  const ancestorHidden = isUnit && isAncestorHidden(entity, orbat, hiddenEntityIds)
   const effectivelyHidden = isHidden || ancestorHidden
   const isSelected = useProjectStore((s) => s.selectedEntityId === entity.id)
   const parentLink = orbat.parentOf(entity.id)
@@ -123,7 +125,7 @@ export const HierarchyEntityNode = memo(function HierarchyEntityNode({
           )}
         </div>
 
-        {!isCorporate && (
+        {isUnit && (
           <Button
             type="button"
             variant="ghost"

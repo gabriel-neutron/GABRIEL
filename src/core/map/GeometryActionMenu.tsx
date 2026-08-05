@@ -9,13 +9,14 @@ import {
 } from "@/ui/card"
 import { Separator } from "@/ui/separator"
 import { FilterableSelect } from "@/components/shared/FilterableSelect"
+import { ENTITY_KINDS, type EntityKind } from "@/core/entity/entity"
+import { entityKindLabel } from "@/core/entity/entityKindLabels"
 import type { MapEntity } from "@/types/domain.types"
 
 type Props = {
   entities: MapEntity[]
   organisations: MapEntity[]
-  onCreateNew: () => void
-  onCreateNewOrganisation: () => void
+  onCreateNew: (kind: EntityKind) => void
   onLinkToExisting: (entityId: string) => void
   onCancel: () => void
 }
@@ -24,7 +25,6 @@ export function GeometryActionMenu({
   entities,
   organisations,
   onCreateNew,
-  onCreateNewOrganisation,
   onLinkToExisting,
   onCancel,
 }: Props) {
@@ -55,13 +55,19 @@ export function GeometryActionMenu({
       </CardHeader>
 
       <CardContent className="space-y-4 pb-4">
+        {/* Driven off ENTITY_KINDS rather than a hand-written pair, so a kind the edge
+            vocabulary can name as an endpoint is a kind an analyst can create. */}
         <div className="flex flex-col gap-2">
-          <Button className="w-full" onClick={onCreateNew}>
-            + Military unit
-          </Button>
-          <Button className="w-full" variant="outline" onClick={onCreateNewOrganisation}>
-            + Industrial entity
-          </Button>
+          {ENTITY_KINDS.map((kind: EntityKind, index) => (
+            <Button
+              key={kind}
+              className="w-full"
+              variant={index === 0 ? "default" : "outline"}
+              onClick={() => onCreateNew(kind)}
+            >
+              + {entityKindLabel(kind)}
+            </Button>
+          ))}
         </div>
 
         <div className="flex items-center gap-2">
