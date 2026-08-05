@@ -17,12 +17,49 @@ everything else.
 | # | Stage | Covers (PRD §) | Spec | Status |
 |---|---|---|---|---|
 | 0 | Wall-clock & continuous | Further Notes, §13 | — | **Running** |
-| 1 | Foundation — model + Proposal spine | §1–5 | per-slice: [`GABRIEL_V2_SLICE_0_1_BUILD.md`](GABRIEL_V2_SLICE_0_1_BUILD.md), [`SLICE_2A_CRITERIA.md`](SLICE_2A_CRITERIA.md), [`GABRIEL_V2_SLICE_2B_BUILD.md`](GABRIEL_V2_SLICE_2B_BUILD.md) | **Slices 0–1 shipped; 2A next** |
+| 1 | Foundation — model + Proposal spine | §1–5 | per-slice: [`GABRIEL_V2_SLICE_0_1_BUILD.md`](GABRIEL_V2_SLICE_0_1_BUILD.md), [`SLICE_2A_CRITERIA.md`](SLICE_2A_CRITERIA.md), [`GABRIEL_V2_SLICE_2B_BUILD.md`](GABRIEL_V2_SLICE_2B_BUILD.md) | **Model shipped (slices 0–3, 5); Proposal spine and Claims-on-Relationships not started** |
 | 2 | Search & table | §8, §10 (table) | not written | Not started |
 | 3 | Connectors & sync | §6, §7 | not written | Not started |
 | 4 | Documents & weak signals | §9 | not written | Not started |
 | 5 | Visualisation | §10 | not written | Not started |
-| 6 | Publication | §11 | not written | Not started |
+| 6 | Publication | §11 | not written | **Gate and serialisers shipped 2026-08-04; preflight and versioned releases not** |
+
+### Where this actually stands — read before planning anything
+
+**Corrected 2026-08-04**, against the code rather than against this file. Every status above had
+drifted: Stage 1 read "slices 0–1 shipped, 2A next" when 0–3 and 5 had shipped, and Stage 6 read
+"Not started" when its gate and three serialisers were in `src/core/export/`. This file's own
+warning applies to itself — *a stage gate that contradicts the shipped decision is the kind of
+line an agent builds against.*
+
+Two of the PRD's six problems are answered in code: **"I cannot store what I am investigating"**
+(the twelve-type vocabulary, tiers, dates, validation, persistence and the hierarchy index) and
+**"I cannot publish what the proposal promised"** (a single gate feeding CSV, GeoJSON and JSON-LD,
+with attribution and a withheld-counts report).
+
+**But the v2 thesis is not yet demonstrable, and this is the one thing to fix next.** No UI can
+author any edge type. Every relationship write in the app goes through `withActiveParent` — the
+parent picker — so eleven of the twelve types are modelled, validated, persisted, exported and
+documented while being unreachable to an analyst. The real project file proves it: its 1,012 edges
+are 999 `subordinate_to` plus 13 `corporate_parent`, and those 13 arrived through the legacy
+migration, not through anyone recording them.
+
+So the PRD's central sentence — *"I can catalogue the nodes of the backbone; I cannot record the
+backbone"* — remains literally true of the interface. A demo today shows a better v1 ORBAT tree.
+
+**Shortest path to a demonstrable v2**, in dependency order and ahead of the stage order below,
+because a demo needs one recorded chain rather than a complete capability:
+
+1. **A Relationship editor.** A form over machinery that is already finished — `EDGE_TYPES` carries
+   per-type endpoint kinds and metadata rules, `validateRelationships` enforces them, the index
+   derives from the result and the export gate publishes it. Roughly twenty edges along one real
+   chain is enough to tell the investigative story.
+2. **The entity graph view.** The Sigma/WebGL stack is built and perf-proven but wired to the
+   sidecar's *channel* graph; `TelegramGraphView` already accepts a `SigmaGraphData` prop, so this
+   is an adapter plus edge-type and tier filters. Highest visual payoff per hour.
+3. **Search (Stage 2).** Still `name.toLowerCase().includes(q)` in `UnifiedSearch.tsx:69` — the
+   "six results" failure the PRD calls the most humiliating in the project. Partly needed by (1)
+   anyway, since authoring an edge means finding both endpoints.
 
 Collaboration and continuity (§12 — baton pass, private repo backup) is a **protocol, not a
 stage**: it starts before Stage 1 and runs forever. See [Standing obligations](#standing-obligations).
@@ -60,12 +97,25 @@ every other stage.
 **Specs, per slice.** The single eight-slice Foundation Spec was deleted on 2026-07-29 (superseded,
 and wrong in six measured places). Slices 0–1: [`GABRIEL_V2_SLICE_0_1_BUILD.md`](GABRIEL_V2_SLICE_0_1_BUILD.md)
 — **shipped** (`507f425`, `cfaf80b`). Slice 2A: [`SLICE_2A_CRITERIA.md`](SLICE_2A_CRITERIA.md),
-frozen, **next to build**. Slice 2B: [`GABRIEL_V2_SLICE_2B_BUILD.md`](GABRIEL_V2_SLICE_2B_BUILD.md).
+frozen, **shipped** (`65ddc11`). Slice 2B: [`GABRIEL_V2_SLICE_2B_BUILD.md`](GABRIEL_V2_SLICE_2B_BUILD.md),
+**shipped** (`8527d44`). Slice 3 has no frozen criteria file; its record is the
+[`SLICE_RUN_LOG.md`](SLICE_RUN_LOG.md) entry for 2026-08-04.
 
 **Gate for the whole stage:** the real demo project opens, its parent-child links become
 `subordinate_to` and `corporate_parent` Relationships, it saves, and it reopens with an identical
 hierarchy — **1,012 edges, not 2,024** — and an identical *rendered position map*. Every existing
 view behaves as before.
+
+**Met, 2026-08-04**, and held by test rather than by inspection: `hierarchy.fingerprint.test.ts`
+pins the parent map, the rendered position map and the tree shape over the real 1,027-entity file,
+two of the three hashes measured against pre-Slice-3 code. The migration produces exactly 1,012
+edges — 999 `subordinate_to` and 13 `corporate_parent`.
+
+One caveat the gate's wording hides: the migration still runs **in memory on every load**. The
+file on disk carries no `relationships` table — it holds `units`, `organisations`, `layers`,
+`geometries` and `research_sources`, and records the hierarchy in the legacy `parent_id` column.
+Nothing has been persisted because §10 steps 17–28, the first write of the derived model, are
+unrun and are the owner's call.
 
 **`parentId` is kept**, as a derived, non-authoritative field, and is never deleted; the
 `relationships` table is the source of truth on disk. This paragraph previously stated the
@@ -75,14 +125,14 @@ the shipped decision is the kind of line an agent builds against.
 
 | Slice | Status |
 |---|---|
-| 0 — Vocabulary and Relationship type (+ ADR 0010) | Not started |
-| 1 — External Ids | Not started |
-| 2 — Relationships table, load/save, parentId migration | Not started |
-| 3 — Hierarchy index seam | Not started |
-| 4 — Write path, `parentId` deleted | Not started |
-| 5 — New entity kinds | Not started |
-| 6 — Claims on Relationships | Not started |
-| 7 — Proposal spine core | Not started |
+| 0 — Vocabulary and Relationship type (+ ADR 0010) | **Shipped** — `EDGE_TYPES`, twelve record + one assessment tier, `EDGE_VOCABULARY_VERSION` now `1.1.0` |
+| 1 — External Ids | **Shipped** — `core/entity/externalId.ts`, round-tripped in `units.table` |
+| 2 — Relationships table, load/save, parentId migration | **Shipped** — 2A `65ddc11`, 2B `8527d44` |
+| 3 — Hierarchy index seam | **Shipped** — `df40b61`, plus the cross-kind fix `52e3b19` the code review caught |
+| 4 — Write path, `parentId` deleted | **Superseded, not skipped.** `parentId` is kept as a derived non-authoritative field (see the correction above). The write path did move onto edges; what remains is that `updateEntity` still accepts a `parentId` patch (`useProjectStore.ts`), which should be closed structurally with `Omit<MapEntity, "parentId">` |
+| 5 — New entity kinds | **Shipped** — `vessel`, `person`, `equipment_class` declared as field-less profiles |
+| 6 — Claims on Relationships | **Not started.** Load-bearing beyond its slice: because an edge carries no provenance, the export gate cannot ask whether a relationship is sourced and falls back to a documented **endpoint proxy** — both endpoint entities must carry a claim. On the real corpus that publishes 252 of 1,012 edges. Closing this slice is what would let the PRD's literal rule ("unsourced Relationships never ship") be applied as written |
+| 7 — Proposal spine core | **Not started.** Only the enrichment-specific `ProposalDecision` exists; there is no generic `Proposal` type, so connectors and document extraction have nothing to emit into |
 
 ---
 
@@ -106,8 +156,16 @@ here only as scope reminders:
   (see [ADR 0009](../adr/0009-machine-never-confirms.md)).
 - **5 — Visualisation.** Entity graph on the existing WebGL stack, filtered by edge type, tier and
   time window; per-entity timeline; criticality badge; the inspector becomes the entity dossier.
-- **6 — Publication.** CSV / GeoJSON / JSON-LD through a single export gate, preflight report,
-  versioned releases with changelogs assembled from sync diffs.
+- **6 — Publication.** **Partly shipped 2026-08-04, out of stage order**, because the working file
+  was being served publicly and the gate was the thing that made a release describable. Done:
+  `applyExportGate` as a single pure predicate feeding all three formats, CSV / GeoJSON / JSON-LD
+  serialisers, attribution and licence, the edge-type definitions travelling with the edges, and a
+  README reporting what was withheld *in numbers*. Two rules are worth knowing before building on
+  it: relationships are gated by the **endpoint proxy** (Slice 6 above), and GeoJSON publishes
+  **recorded geometry only** — 275 of 1,027 entities have one, and the other 752 are exported with
+  `"geometry": null` rather than the position Gabriel derives for the map, because a derived
+  position is a rendering and not an observation. Still owed: the preflight report, versioned
+  releases with changelogs, and applying the gate to what `ViewPage` serves.
 
 ---
 
@@ -139,7 +197,7 @@ Running from now, not gated on any stage.
 | Review queue outgrows two analysts | 3 → 4 | Pending proposals rise faster than they are decided | Narrow anchored expansion; batch regime for reference data; never relax per-item review for signal |
 | Registry access never granted | 0 → 3 | No response weeks after filing | Connectors 4 and 5 are dropped; OpenSanctions + KSE + paste-parser carry the corporate layer |
 | Vocabulary proves too narrow mid-investigation | 1 → 4 | Analysts want a label that does not exist | Versioned file + two-person amendment; `associate_of` is the identified first candidate |
-| Person data leaks into the CC-BY release | 6 | Preflight shows person entities in the export set | Gate is a single pure predicate applied to every format; no natural persons in v1 by policy |
+| Person data leaks into the CC-BY release | 6 | Preflight shows person entities in the export set | Gate is a single pure predicate applied to every format; no natural persons in v1 by policy. **Fired 2026-08-04, and not where this row was watching.** The project holds no `person` entity at all, so the watched signal could never trigger — the names were in the `research_sources` fetch cache, five uncited entries naming a head of state and several foreign officers, published in every commit since February. Stripped from the working file (`scripts/strip-research-cache.mjs`); still in git history by owner ruling, and disclosed in `LICENSE-DATA.md`. Lesson for this register: watch the surfaces nobody modelled, not only the ones the model names |
 | Telegram corpus too sparse to corroborate | 0 | Collection plateaus well below useful volume | Already fired once at depth 3 — see the owed Stage 0 item |
 
 ---
