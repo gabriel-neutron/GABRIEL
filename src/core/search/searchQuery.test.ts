@@ -181,6 +181,68 @@ describe("searchEntities", () => {
     expect(searchEntities(built, "www")).toEqual([])
   })
 
+  it("does not match a schemeless stored URL on its www", () => {
+    // The strip used to require "://", so a URL recorded without a scheme kept "www" as a
+    // term prefix and the query "www" returned every entity carrying one.
+    const built = index(
+      [unit("a", "Concord Management")],
+      [{ entityId: "a", field: "sources", value: null, sourceId: "s1" }],
+      [{ id: "s1", url: "www.example.com/x" }],
+    )
+    expect(searchEntities(built, "www")).toEqual([])
+    expect(searchEntities(built, "example.com/x").map((h) => h.entityId)).toEqual(["a"])
+  })
+
+  it("finds a Source from the whole URL, the form an analyst actually pastes", () => {
+    // The index strips scheme and "www." from a Source term. Stripping on one side only is
+    // the same index/query asymmetry that made a correctly pasted identifier miss: copying
+    // the URL out of the Ledger or the address bar is the most natural way to search for it,
+    // and it folded to "https vvv rusprofile ru id 12345" against a term without either.
+    const built = index(
+      [unit("a", "Concord Management")],
+      [{ entityId: "a", field: "sources", value: null, sourceId: "s1" }],
+      [{ id: "s1", url: "https://www.rusprofile.ru/id/12345" }],
+    )
+    const ids = (query: string) => searchEntities(built, query).map((h) => h.entityId)
+    expect(ids("https://www.rusprofile.ru/id/12345")).toEqual(["a"])
+    expect(ids("www.rusprofile.ru/id/12345")).toEqual(["a"])
+    expect(ids("rusprofile.ru/id/12345")).toEqual(["a"])
+  })
+
+  it("reports a Source match's true strength while still ranking it below the entity", () => {
+    // The ceiling exists to keep a URL from outranking the entity itself; it is a scoring
+    // rule, so it may not rewrite what the hit says it was.
+    const built = index(
+      [unit("named", "Brusilov Battalion"), unit("sourced", "Something Else")],
+      [{ entityId: "sourced", field: "sources", value: null, sourceId: "s1" }],
+      [{ id: "s1", url: "https://rusprofile.ru/id/12345" }],
+    )
+    const exact = searchEntities(built, "rusprofile.ru/id/12345")[0]
+    expect(exact.strength).toBe("exact")
+    expect(exact.score).toBe(110)
+    expect(searchEntities(built, "ru").map((h) => h.entityId)).toEqual(["named", "sourced"])
+  })
+
+  it("searches a query the text fold empties but the identifier fold keeps", () => {
+    // Free-form schemes preserve arbitrary characters by design, so a registry id can be
+    // written entirely outside [a-z0-9]. The empty-text gate made every such id unsearchable.
+    const entities = [
+      unit("c", "Kabushiki Holdings", {
+        kind: "corporate",
+        externalIds: [{ scheme: "registry", value: "株式会社12345" }],
+      }),
+    ]
+    expect(idsFor(entities, "株式会社12345")).toEqual(["c"])
+    expect(idsFor(entities, "株式会社")).toEqual(["c"])
+  })
+
+  it("does not let a query the text fold empties match every prose field", () => {
+    // The other half of relaxing the gate: an empty query form is a prefix of every term,
+    // so a field whose fold the query has no form for must match nothing, not everything.
+    const entities = [unit("a", "Wagner Group", { notes: "a note", aliases: ["PMC Wagner"] })]
+    expect(idsFor(entities, "株式会社")).toEqual([])
+  })
+
   it("orders equally scored hits by name, so the list does not shuffle between keystrokes", () => {
     const hits = idsFor([unit("b", "Fleet Bravo"), unit("a", "Fleet Alpha")], "fleet ")
     expect(hits).toEqual(["a", "b"])

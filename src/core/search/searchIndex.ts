@@ -116,10 +116,18 @@ function push(
  * and "www" match every entity that carries any source at all — the strongest tier, on the
  * weakest field, for a query that distinguishes nothing. Only the display text keeps the
  * full URL; what is matched is the part an analyst could plausibly be looking for.
+ *
+ * The two halves are independently optional: a URL recorded as `www.example.com/x`, with no
+ * scheme, is still a URL whose `www` says nothing, and requiring `://` before stripping it
+ * left that host prefixed by the one token every such host shares.
+ *
+ * Exported because the query side must strip the same way — a Source term is compared against
+ * the query, so anything removed here and not there makes the whole URL, the form an analyst
+ * copies out of the Ledger or the address bar, match nothing.
  */
-const URL_BOILERPLATE = /^[a-z][a-z0-9+.-]*:\/\/(?:www\.)?/i
+const URL_BOILERPLATE = /^(?:[a-z][a-z0-9+.-]*:\/\/)?(?:www\.)?/i
 
-function stripUrlBoilerplate(url: string): string {
+export function stripUrlBoilerplate(url: string): string {
   return url.replace(URL_BOILERPLATE, "")
 }
 

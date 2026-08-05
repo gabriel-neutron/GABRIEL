@@ -65,6 +65,19 @@ describe("buildSearchIndex", () => {
     expect(source.terms).toEqual(["rusprofile ru id 12345"])
   })
 
+  it("strips www from a Source URL recorded without a scheme", () => {
+    // The strip keyed off "://", so a bare host kept "www" — a term prefix shared by every
+    // such URL, and the phonetic fold spells it "vvv", which matches nothing an analyst types.
+    const index = buildSearchIndex({
+      entities: [entity()],
+      claims: [{ entityId: "e1", field: "sources", value: null, sourceId: "s1" }],
+      sources: [{ id: "s1", url: "www.example.com/x" }],
+    })
+    const source = fieldsOf(index, "source")[0]
+    expect(source.text).toBe("www.example.com/x")
+    expect(source.terms).toEqual(["example com x"])
+  })
+
   it("indexes notes", () => {
     const index = buildSearchIndex({ entities: [entity({ notes: "Registered at 12 Ostozhenka" })] })
     expect(fieldsOf(index, "notes")[0].text).toBe("Registered at 12 Ostozhenka")

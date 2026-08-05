@@ -2,7 +2,7 @@ import type { EntityKind } from "@/core/entity/entity"
 import { entityKindLabel } from "@/core/entity/entityKindLabels"
 import { normalizeForMatch } from "@/core/identity/transliterate"
 import { isIdentifierField, normalizeIdentifierForMatch } from "./identifierMatch"
-import type { IndexedField, SearchFieldKind, SearchIndex } from "./searchIndex"
+import { stripUrlBoilerplate, type IndexedField, type SearchFieldKind, type SearchIndex } from "./searchIndex"
 
 /**
  * Ranking over the instant index.
@@ -29,8 +29,12 @@ export type SearchHit = {
 
 export type SearchGroup = { kind: EntityKind; label: string; hits: SearchHit[] }
 
-/** One raw input, folded two ways, because prose and register strings do not compare alike. */
-type NormalizedQuery = { text: string; identifier: string }
+/**
+ * One raw input, folded once per way the index builds terms. Prose, register strings and
+ * URLs do not compare alike, and a form the index has that the query lacks is a field that
+ * can only be missed. Every member here must correspond to a branch of `queryFormFor`.
+ */
+type NormalizedQuery = { text: string; identifier: string; source: string }
 
 /**
  * Strength dominates field, and by a wide margin. An exact match on any field is a stronger
@@ -72,6 +76,12 @@ const FIELD_SCORE: Record<SearchFieldKind, number> = {
  * and it keeps a Source hit findable at all, which a weight small enough to fix the ordering
  * would not. Combined with stripping the URL's scheme and `www.` before indexing, a Ledger
  * URL can no longer outrank any match on the entity itself.
+ *
+ * The ceiling applies to the **score only**, never to `hit.strength`. It is a statement about
+ * how much a Source hit is worth, not about what happened: pasting a Ledger URL verbatim is
+ * an exact match by any reading, and reporting it as "substring" would make a field named
+ * `strength` mean "capped strength" — a distinction no reader of the type could see, and the
+ * kind a future consumer would be right to trust and wrong to believe.
  */
 const STRENGTH_CEILING: Partial<Record<SearchFieldKind, MatchStrength>> = {
   source: "substring",
@@ -99,17 +109,30 @@ function strengthOf(term: string, query: string): MatchStrength | null {
 /**
  * A field is compared against the query normalised the way that field's own terms were.
  * Comparing a register string against the name fold is what let `1027-7001-32195` miss the
- * OGRN it names and let two different LEIs answer one exact paste.
+ * OGRN it names and let two different LEIs answer one exact paste; comparing a URL against
+ * the plain name fold is the same defect one field over, and made a pasted Source URL — the
+ * most natural way to search for one — fold to `https vvv rusprofile ru id 12345` against a
+ * term the index had already stripped to `rusprofile ru id 12345`.
  */
+function queryFormFor(field: SearchFieldKind, query: NormalizedQuery): string {
+  if (isIdentifierField(field)) return query.identifier
+  if (field === "source") return query.source
+  return query.text
+}
+
 function bestStrength(field: IndexedField, query: NormalizedQuery): MatchStrength | null {
-  const normalized = isIdentifierField(field.field) ? query.identifier : query.text
+  const normalized = queryFormFor(field.field, query)
+  // An empty query form is a prefix of every term, so a query with no content under *this*
+  // field's fold must match nothing here rather than everything. Only a query that is empty
+  // under every fold is rejected outright, so the other folds can still answer it.
+  if (normalized === "") return null
   let best: MatchStrength | null = null
   for (const term of field.terms) {
     const strength = strengthOf(term, normalized)
     if (strength === null) continue
     if (best === null || STRENGTH_SCORE[strength] > STRENGTH_SCORE[best]) best = strength
   }
-  return best === null ? null : capped(field.field, best)
+  return best
 }
 
 function toHit(field: IndexedField, strength: MatchStrength): SearchHit {
@@ -121,7 +144,7 @@ function toHit(field: IndexedField, strength: MatchStrength): SearchHit {
     label: field.label,
     text: field.text,
     strength,
-    score: STRENGTH_SCORE[strength] + FIELD_SCORE[field.field],
+    score: STRENGTH_SCORE[capped(field.field, strength)] + FIELD_SCORE[field.field],
   }
 }
 
@@ -141,10 +164,14 @@ export function searchEntities(
   const normalized: NormalizedQuery = {
     text: normalizeForMatch(query),
     identifier: normalizeIdentifierForMatch(query.trim()),
+    source: normalizeForMatch(stripUrlBoilerplate(query.trim())),
   }
-  // A query of only separators normalises to "" under both folds; the identifier form can
-  // never be empty while the text form is not, since it removes strictly less.
-  if (normalized.text === "") return []
+  // The text fold removes strictly *more* than the identifier one — it collapses everything
+  // outside [a-z0-9], where the identifier fold removes only [\s.-] — so a query can be empty
+  // under the text fold and still name something: `株式会社12345` is a legal `registry` id,
+  // and free-form schemes preserve arbitrary characters by design. Only a query with no
+  // content under any fold has nothing to compare against anything.
+  if (normalized.text === "" && normalized.identifier === "" && normalized.source === "") return []
 
   const bestByEntity = new Map<string, SearchHit>()
   for (const field of index.fields) {
