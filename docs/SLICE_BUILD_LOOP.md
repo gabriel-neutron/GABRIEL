@@ -23,7 +23,9 @@
 >
 > **Do not run §10, the rehearsal.** It writes to `public/project.gpkg` and it is the owner's, not
 > an agent's. Stop when 2B is committed and the file is still
-> md5 `7d0b0e592a1128a0d83e7575110bf2dc`.
+> md5 `10525d42466c2f38b5d6c0cb4a0964a5` (**corrected 2026-08-05**; this read
+> `7d0b0e592a1128a0d83e7575110bf2dc` until `be980a5` legitimately rewrote the file to strip the
+> research cache it was publishing).
 
 This file is the prompt. Read it fully before acting. It defines a six-phase loop with a
 hard iteration cap and a set of prohibitions that exist because each one describes a real

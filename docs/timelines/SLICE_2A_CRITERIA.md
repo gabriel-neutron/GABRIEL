@@ -15,6 +15,15 @@ record it and STOP. That judgement is the owner's.
 All commands are run from the repo root in Git Bash unless stated otherwise.
 `BASE` below means the commit `c8483b5`.
 
+> **Annotation, 2026-08-05 — not an edit. No criterion below is changed.**
+> Every occurrence of `public/project.gpkg` md5 `7d0b0e592a1128a0d83e7575110bf2dc` in this file
+> (§0, criterion 44 and the closing statement) was true when measured and is now **superseded**:
+> `be980a5` legitimately rewrote the file to strip the research cache it was publishing, so the
+> current value is **`10525d42466c2f38b5d6c0cb4a0964a5`**, 4,972,544 bytes. The criteria
+> themselves — "this slice does not write to the file" — are unaffected and still hold. If you
+> are re-running any hash check from this file, compare against the new value; do **not** restore
+> the old blob, which still contains the named natural persons `be980a5` removed.
+
 > **Amendment, 2026-07-29 — owner-authorised. `BASE` is re-pinned to the commit at which the
 > Slice 2A run starts**, not `c8483b5`. Documentation commits landed after this file was frozen
 > (the handoff, and the preparation session that produced the amendments below), so `c8483b5` is

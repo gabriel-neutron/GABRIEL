@@ -25,6 +25,16 @@ a wrong count during the P1 run. Test commands are `npx vitest run <file>` or
 
 **`BASE` in a `git diff` command below means the commit `44994ef`.**
 
+> **Annotation, 2026-08-05 — not an edit. No criterion below is changed.**
+> The `public/project.gpkg` pin used throughout this file — `5b0d2ed` / md5
+> `7d0b0e59…` / 4,984,832 bytes (see the §0 backup argument and criterion 3) — was true when
+> measured and is now **superseded**. `be980a5` legitimately rewrote the file to strip the
+> research cache it was publishing; the current value is **`10525d42466c2f38b5d6c0cb4a0964a5`**,
+> 4,972,544 bytes, and the revert point is **`be980a5`**. The §0 backup *argument* survives
+> unchanged — a pushed commit still holds a byte-identical copy of the file on disk — only the
+> SHA and hash it names have moved. Do **not** restore `5b0d2ed`'s blob to "repair" a mismatch:
+> it still contains the named natural persons that commit exists to remove.
+
 > **This run does NOT execute §10, the rehearsal.** §10 steps 1-5 and 17-28 are the owner's, in a
 > separate session with an off-machine backup. `public/project.gpkg` must be byte-identical at the
 > end of this build (criterion 3). Steps 6-16 are covered by criteria 66-75 as read-only, in-memory

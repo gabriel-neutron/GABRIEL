@@ -2205,3 +2205,46 @@ disagree about whether two spellings are the same name.
   is indexed.
 - Deep scan over cached page text, the Claim-value pivot and the facetted table are later slices
   and were not touched.
+
+---
+
+## Correction 2026-08-05 — the §10 pin was stale, and restoring it would have re-published names
+
+Found by an audit of §10 readiness, not by a test. Recorded here because it is the most dangerous
+thing this session turned up, and it was in the documents rather than in the code.
+
+**§10's pre-flight step 2 said:** `md5sum public/project.gpkg` must equal
+`7d0b0e592a1128a0d83e7575110bf2dc` **and** equal `git show 5b0d2ed:public/project.gpkg` — *"If
+those two differ, STOP."*
+
+They differ, and legitimately. `be980a5` ("empty the research cache the working file was
+publishing") rewrote the file on purpose. Disk and HEAD are now
+`10525d42466c2f38b5d6c0cb4a0964a5` / 4,972,544 bytes; `5b0d2ed`'s blob is
+`7d0b0e592a1128a0d83e7575110bf2dc` / 4,984,832 bytes. Both measured, not assumed.
+
+Two failure modes, the second much worse than the first:
+
+1. A reader who obeys the STOP loses the day to a false alarm at step 2 of a two-day ceremony.
+2. A reader who "repairs" the mismatch by restoring `5b0d2ed`'s blob **re-publishes the research
+   cache `be980a5` stripped, including the named natural persons that commit exists to remove from
+   a public repository.** The instruction that was meant to protect the file was pointing at the
+   one action nobody must take.
+
+**Corrected:** `GABRIEL_V2_SLICE_2B_BUILD.md` §10 pre-flight (a correction block plus step 2 and
+step 28 repinned to `be980a5`), its §0 preamble and criterion 14, and `docs/SLICE_BUILD_LOOP.md`.
+The two frozen criteria files carry **annotations, not edits** — no criterion in either was
+changed, in keeping with the rule that a frozen file is annotated and never rewritten. Historical
+entries in this log record what was true on the day and are left exactly as written.
+
+### A second hazard, in the environment rather than the documents
+
+Two agents independently hit it: `npx vitest` on this machine dies perhaps half the time with
+`Assertion failed: new_time >= loop->time, file src\win\core.c, line 327` — a libuv monotonic-clock
+abort. One run printed **`Test Files 2 passed (3) / Tests 17 passed`**: a green word next to a file
+count that does not match, because a worker died after the reporter had begun flushing. **A false
+green.**
+
+`SLICE_2B_CRITERIA.md` already documents the workaround (`start /affinity 1 /wait /min`, exit code
+read from `$LASTEXITCODE` and never through a pipe); `--pool=threads` was also reported stable.
+Step 27 of §10 asks for a green `npm run verify` on a cold checkout, so this matters: **read the
+file count, not the word "passed"**, or that step becomes a coin flip that looks like a failure.

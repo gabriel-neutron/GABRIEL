@@ -47,6 +47,11 @@ Slice 2B"*.
 `origin/telegram-osint-sidecar`. Pin that SHA in the commit message. Read the rehearsal procedure
 (§10) before writing a line.
 
+> **Corrected 2026-08-05.** The size and pin above are as measured on 2026-07-29. The file was
+> legitimately rewritten by `be980a5`; it is now **4,972,544 bytes** and the revert point is
+> **`be980a5`**. See the correction under §10 Pre-flight, which explains why restoring `5b0d2ed`'s
+> blob would re-publish data that commit deliberately stripped.
+
 ---
 
 ## 1. Measured ground truth
@@ -850,8 +855,10 @@ happens otherwise.
     `parent_id` column is not a backup; why the migration has no `kind` heuristic; why contested
     children derive `null` rather than an arbitrary winner; and why the two percentages are frozen
     literals rather than parsed.
-14. `public/project.gpkg` is byte-identical to `7d0b0e592a1128a0d83e7575110bf2dc` **at the end of
+14. `public/project.gpkg` is byte-identical to `10525d42466c2f38b5d6c0cb4a0964a5` **at the end of
     the build**. The migration ships; running it against the real file is §10, deliberately after.
+    *(Corrected 2026-08-05 from `7d0b0e592a1128a0d83e7575110bf2dc`; `be980a5` legitimately rewrote
+    the file. The criterion — "this build does not touch it" — is unchanged.)*
 
 **Not machine-checkable — a human reads these:** ADR 0011's prose; the `CONTEXT.md` glossary
 entries; and the `summary` sentence of the `hierarchy-migrated` event, which must read as
@@ -867,10 +874,29 @@ preview, and unlike a screenshot they compare bit for bit.
 
 ### Pre-flight — before any write
 
+> **CORRECTION 2026-08-05 — the pin below moved, and acting on the old one is dangerous.**
+>
+> Step 2 and step 28 were written against pin `5b0d2ed` / md5 `7d0b0e592a1128a0d83e7575110bf2dc`
+> / 4,984,832 bytes. That is **no longer the file on disk**, and the difference is legitimate:
+> commit **`be980a5`** ("empty the research cache the working file was publishing") rewrote it on
+> purpose. The current file is **md5 `10525d42466c2f38b5d6c0cb4a0964a5`, 4,972,544 bytes**, and
+> `be980a5` is the revert point.
+>
+> Read literally, step 2 says **STOP** — the two values differ, so a reader who obeys it loses the
+> day to a false alarm. The worse outcome is a reader who "repairs" the mismatch by restoring
+> `5b0d2ed`'s blob: that blob still contains the research cache `be980a5` stripped, **including
+> the named natural persons that commit exists to remove from a public repository**. Do not
+> restore it. Verify against `be980a5` instead.
+>
+> The stale values also appear at lines 46, 55 and 853 of this file, in `docs/SLICE_BUILD_LOOP.md`,
+> and in the two frozen criteria files (annotated in their §0, not edited). Historical entries in
+> `SLICE_RUN_LOG.md` record what was true on the day and are left alone.
+
 1. Working tree clean; the starting SHA recorded in `SLICE_RUN_LOG.md`.
-2. `md5sum public/project.gpkg` equals `7d0b0e592a1128a0d83e7575110bf2dc` **and** equals the md5 of
-   `git show 5b0d2ed:public/project.gpkg`. **If those two differ, STOP** — the pinned revert point
+2. `md5sum public/project.gpkg` equals `10525d42466c2f38b5d6c0cb4a0964a5` **and** equals the md5 of
+   `git show be980a5:public/project.gpkg`. **If those two differ, STOP** — the pinned revert point
    is not the file on disk, and the backup the whole plan rests on does not exist.
+   *(Superseded values, for the record: `7d0b0e592a1128a0d83e7575110bf2dc` at pin `5b0d2ed`.)*
 3. `npm run verify` green.
 4. **A dated copy outside the repo**, on a different volume, outside any synced folder. The docs
    say git is the only backup; for the first irreversible write that is not good enough, and it
@@ -934,7 +960,9 @@ preview, and unlike a screenshot they compare bit for bit.
 26. Spot-check **10** units chosen by name across depths 1 to 5: identical hierarchy path.
 27. `npm run verify` on a cold checkout.
 28. Only then replace `public/project.gpkg`, keep the out-of-tree copy for at least one more
-    session, and state the pin `5b0d2ed` in the commit message.
+    session, and state the pin **`be980a5`** in the commit message (corrected 2026-08-05; this
+    step read `5b0d2ed`, which stopped being the revert point when `be980a5` stripped the
+    research cache — see the correction under Pre-flight).
 
 **Not accepted as evidence:** an edge count alone (it catches 1012-vs-2024 and nothing else); a
 screenshot of the map (it cannot show an entity that is absent); a synthetic fixture; or an
