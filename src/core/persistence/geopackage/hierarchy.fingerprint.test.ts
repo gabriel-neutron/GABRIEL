@@ -22,7 +22,8 @@ import type { GeoPackageLoadResult } from "./types"
  *
  * The file is read once with `readFileSync` and NEVER opened for writing. Everything after
  * that read is an in-memory buffer. `public/project.gpkg` is the analyst's irreplaceable
- * working project; the revert point is `5b0d2ed`.
+ * working project; the revert point is `be980a5` (corrected 2026-08-05 from `5b0d2ed`, whose blob
+ * predates the research-cache strip — see ADR 0011).
  */
 const HASH_A = "71cc3b332e6f50f3ce772f43d321ab6b6044b7abf6d06620508a5197804673a2"
 const HASH_B = "7e6570ef74b436336a76cd94965b7aca0f05bec2461cdbf945749bbcf49fac84"

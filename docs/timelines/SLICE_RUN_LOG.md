@@ -2248,3 +2248,78 @@ green.**
 read from `$LASTEXITCODE` and never through a pipe); `--pool=threads` was also reported stable.
 Step 27 of §10 asks for a green `npm run verify` on a cold checkout, so this matters: **read the
 file count, not the word "passed"**, or that step becomes a coin flip that looks like a failure.
+
+---
+
+## Run 2026-08-05 — instant search, and three rounds of review before it was right
+
+Owner ruling: build search with an agent, then review it with other agents until the code is ready
+for §10. Five commits: `9be09d8` (the index), `fccc03d` and `03f591b` (two rounds of review fixes),
+`18e2d76` (a pre-ceremony round-trip test), `3c92261` and this entry (the §10 repin).
+
+### What was built
+
+`UnifiedSearch.tsx:69` was `entities.filter(e => e.name.toLowerCase().includes(q)).slice(0, 6)` —
+what the PRD calls "the most humiliating failure mode in this project". `core/search/` replaces it
+with an index over names, aliases, external ids, notes, Claim values and Ledger URLs, ranked rather
+than truncated, grouped by kind, each hit carrying the field it matched so the dropdown can say
+*why*. **The limit was never the defect; discarding better results it had already found was.**
+
+No dependency taken, though the PRD sanctions one. Normalisation is the expensive half and runs
+once per corpus rather than once per keystroke, and the substring tier has to scan every field
+regardless, so a postings map would buy nothing back at this size. `core/identity/transliterate.ts`
+was reused, not reimplemented — Cyrillic↔Latin was already solved here.
+
+### The lesson: every fix round introduced the next defect
+
+Worth recording as a pattern rather than as three incidents, because the same shape recurred:
+
+1. **Round 1** shipped an **index/query normalisation asymmetry**. Index terms for an external id
+   were built by `normalizeExternalId` (which strips `[\s.-]`); the query went through
+   `normalizeForMatch` (which turns them into spaces). Pasting `1027-7001-32195` — the exact form
+   `externalId.ts` documents these as being written in — found nothing. Story 32, the slice's own
+   headline, silently broken.
+2. **Round 1 also folded identifiers phonetically.** `w→v` and `y→i` are right for names and wrong
+   for register strings: two valid, different LEIs collapsed onto one term and *both* answered an
+   exact paste, each labelled an exact match. Confidently wrong is worse than not found.
+3. **Round 2 fixed both — and reintroduced the identical asymmetry one field over.** It stripped
+   `scheme://` and `www.` from Source URLs on the *index* side only, so pasting a URL copied out of
+   the Ledger matched nothing. The bug class was understood, fixed, and then rebuilt from scratch
+   in the same commit that fixed it.
+4. **Round 3 fixed that**, and its author noted that fixing the query-gate defect *alone* would
+   have been worse than the bug: with the gate relaxed and no per-field guard, an empty query form
+   prefix-matches every term, so `+` would have returned the entire corpus.
+
+The structural fix is the one that should outlive the incidents: `queryFormFor(field, query)` now
+dispatches per field kind, so **every field is compared against the query folded exactly the way
+its own terms were built**, and the pairing is enumerable rather than coincidental. A test that
+passes by coincidence was also found and replaced — the substring tier had never been exercised,
+because its fixture phonetically folded into the tier above.
+
+### The §10 test, and what it proves that the ceremony cannot
+
+`newKinds.store-path.test.ts` runs the store path the ceremony runs — load the real file, create a
+person and a vessel through `newEntityForKind`, author an `officer_of` edge with a date and
+metadata and a cross-kind `subordinate_to`, then save→load twice. It was proved against three
+injected faults, one of which (a time-varying integrity-event id, growing the ledger by a row per
+open) **no other test in the repo caught**.
+
+It also established a limit on §10 itself, which the owner should know before spending two days:
+**steps 17-28 compare cycle N against cycle N+1, and that cannot detect a lossy encoder that loses
+the same thing every time.** An injected fault writing a person's absent `type` as `"other"` is
+idempotent — `"other"` in both cycles, identical bytes, matching hashes, green ceremony, wrong
+data. Only a comparison against the pre-save *in-memory* state catches it, which is what this
+test's per-field assertions do and what a hash comparison structurally cannot.
+
+### Still owed after this run
+
+- **§10 steps 17-28** — the first write of the derived model. Unrun, and the owner's.
+- **The push.** No longer gated on anything in this repository: **ten commits unpushed.**
+- **Deep scan (story 31) and the Claim-value pivot (story 30)** — the rest of Stage 2. The PRD
+  reads as though all three land together, so this is a real shortfall against the written plan,
+  not merely a scope call.
+- **Story 29's grouping** asks for Entity/Claim/Source groups; the dropdown groups by entity kind
+  and explains the matched field per row. Narrower than the story reads standalone.
+- **No React-level test of the search wiring**, and the dropdown was never driven in a browser this
+  session — the Playwright MCP server was unavailable. Two defects earlier today were found by
+  driving the app and by nothing else, so this is the gap most likely to be hiding something.

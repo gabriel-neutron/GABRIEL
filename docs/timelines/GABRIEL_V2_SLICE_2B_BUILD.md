@@ -888,9 +888,13 @@ preview, and unlike a screenshot they compare bit for bit.
 > the named natural persons that commit exists to remove from a public repository**. Do not
 > restore it. Verify against `be980a5` instead.
 >
-> The stale values also appear at lines 46, 55 and 853 of this file, in `docs/SLICE_BUILD_LOOP.md`,
-> and in the two frozen criteria files (annotated in their §0, not edited). Historical entries in
-> `SLICE_RUN_LOG.md` record what was true on the day and are left alone.
+> The stale values also appeared in this file's §0 preamble and criterion 14, in
+> `docs/SLICE_BUILD_LOOP.md`, in `hierarchy.fingerprint.test.ts`, and — most importantly — in
+> **ADR 0011**, whose "Why" section called `5b0d2ed` "the revert point, and it is the only one".
+> That ADR is the authoritative statement of the backup argument and the one a reader is most
+> likely to consult mid-ceremony; it now carries a dated correction. The two frozen criteria files
+> are annotated in their §0, never edited. Historical entries in `SLICE_RUN_LOG.md` record what was
+> true on the day and are left alone.
 
 1. Working tree clean; the starting SHA recorded in `SLICE_RUN_LOG.md`.
 2. `md5sum public/project.gpkg` equals `10525d42466c2f38b5d6c0cb4a0964a5` **and** equals the md5 of
