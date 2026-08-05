@@ -1,53 +1,46 @@
 import { useState, useRef, useEffect, useMemo } from "react"
-import { createPortal } from "react-dom"
 import { Search } from "lucide-react"
 import { useProjectStore } from "@/store/useProjectStore"
+import { useProvenanceStore } from "@/store/useProvenanceStore"
 import { useOsmViewStore } from "@/store/useOsmViewStore"
 import { selectEntity } from "@/core/map/selection"
+import { parseCoordinateQuery } from "@/core/search/coordinateQuery"
+import { buildSearchIndex } from "@/core/search/searchIndex"
+import { groupHitsByKind, searchEntities } from "@/core/search/searchQuery"
 import { Input } from "@/ui/input"
 import { Button } from "@/ui/button"
-import { searchPlace, type NominatimResult } from "@/modules/osm/services/nominatim.service"
-import { searchLocalOsmFeatures, type LocalOsmSearchHit } from "@/modules/osm/services/osmLocalSearch"
-import { cn } from "@/lib/utils"
+import { searchPlace } from "@/modules/osm/services/nominatim.service"
+import { searchLocalOsmFeatures } from "@/modules/osm/services/osmLocalSearch"
+import {
+  UnifiedSearchDropdown,
+  type CoordinateHit,
+  type DropdownPos,
+  type NominatimHit,
+  type SearchResult,
+} from "./UnifiedSearchDropdown"
 
 export type FlyToFn = (lat: number, lng: number, zoom?: number) => void
 
-type EntityHit = { source: "entity"; id: string; name: string }
-type CoordinateHit = { source: "coordinates"; lat: number; lng: number; display_name: string }
-type SearchResult =
-  | EntityHit
-  | CoordinateHit
-  | LocalOsmSearchHit
-  | (NominatimResult & { source: "nominatim" })
-
-type DropdownPos = { top: number; left: number; width: number }
-
 type Props = { flyToRef: React.RefObject<FlyToFn | null> }
 
-function parseLatLngPair(query: string): { lat: number; lng: number } | null {
-  const m = /^\s*(-?\d+(?:\.\d+)?)\s*[,;\s]+\s*(-?\d+(?:\.\d+)?)\s*$/.exec(query.trim())
-  if (!m) return null
-  const a = Number(m[1])
-  const b = Number(m[2])
-  if (!Number.isFinite(a) || !Number.isFinite(b)) return null
-  let lat = a
-  let lng = b
-  if (Math.abs(lat) > 90 || Math.abs(lng) > 180) {
-    if (Math.abs(b) <= 90 && Math.abs(a) <= 180) { lat = b; lng = a } else return null
-  }
-  if (Math.abs(lat) > 90 || Math.abs(lng) > 180) return null
-  return { lat, lng }
-}
+/**
+ * How many entity hits reach the dropdown. A cap still exists — the list is a dropdown, not
+ * a report — but it is applied after ranking, which is the whole difference from the six
+ * results this component used to take in array order.
+ */
+const ENTITY_HIT_LIMIT = 10
 
 export function UnifiedSearch({ flyToRef }: Props) {
   const entities = useProjectStore((s) => s.entities)
+  const claims = useProjectStore((s) => s.claims)
   const layers = useProjectStore((s) => s.layers)
+  const sources = useProvenanceStore((s) => s.sources)
   const entityOsmGeometries = useOsmViewStore((s) => s.entityOsmGeometries)
 
   const [query, setQuery] = useState("")
   const [open, setOpen] = useState(false)
   const [dropdownPos, setDropdownPos] = useState<DropdownPos | null>(null)
-  const [nominatimResults, setNominatimResults] = useState<(NominatimResult & { source: "nominatim" })[]>([])
+  const [nominatimResults, setNominatimResults] = useState<NominatimHit[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -61,24 +54,36 @@ export function UnifiedSearch({ flyToRef }: Props) {
     return m
   }, [entities])
 
-  const instantResults = useMemo((): SearchResult[] => {
-    const q = query.trim().toLowerCase()
-    if (!q) return []
+  // Normalising several thousand strings is the expensive half of the search, so it is done
+  // once per corpus rather than once per keystroke.
+  const index = useMemo(
+    () => buildSearchIndex({ entities, claims, sources }),
+    [entities, claims, sources],
+  )
 
-    const entityHits: EntityHit[] = entities
-      .filter((e) => e.name.toLowerCase().includes(q))
-      .slice(0, 6)
-      .map((e) => ({ source: "entity" as const, id: e.id, name: e.name }))
+  const entityGroups = useMemo(
+    () => groupHitsByKind(searchEntities(index, query, { limit: ENTITY_HIT_LIMIT })),
+    [index, query],
+  )
 
-    const coord = parseLatLngPair(query)
-    const coordHit: CoordinateHit | null = coord
-      ? { source: "coordinates", lat: coord.lat, lng: coord.lng, display_name: `${coord.lat.toFixed(5)}, ${coord.lng.toFixed(5)}` }
-      : null
+  const coordinateHit = useMemo((): CoordinateHit | null => {
+    const coord = parseCoordinateQuery(query)
+    if (!coord) return null
+    return {
+      source: "coordinates",
+      lat: coord.lat,
+      lng: coord.lng,
+      display_name: coord.lat.toFixed(5) + ", " + coord.lng.toFixed(5),
+    }
+  }, [query])
 
-    const osmHits = searchLocalOsmFeatures(layers, query, { entityOsmGeometries, entityNameById, limit: 6 })
-
-    return [...entityHits, ...(coordHit ? [coordHit] : []), ...osmHits]
-  }, [query, entities, layers, entityOsmGeometries, entityNameById])
+  const osmHits = useMemo(
+    () =>
+      query.trim()
+        ? searchLocalOsmFeatures(layers, query, { entityOsmGeometries, entityNameById, limit: 6 })
+        : [],
+    [query, layers, entityOsmGeometries, entityNameById],
+  )
 
   useEffect(() => {
     function onGlobalKey(e: KeyboardEvent) {
@@ -125,7 +130,7 @@ export function UnifiedSearch({ flyToRef }: Props) {
 
   async function triggerNominatim() {
     const trimmed = query.trim()
-    if (!trimmed || parseLatLngPair(trimmed)) return
+    if (!trimmed || parseCoordinateQuery(trimmed)) return
     setError(null)
     setLoading(true)
     computeDropdownPos()
@@ -159,7 +164,7 @@ export function UnifiedSearch({ flyToRef }: Props) {
 
   function handleSelect(result: SearchResult) {
     if (result.source === "entity") {
-      selectEntity(result.id)
+      selectEntity(result.hit.entityId)
     } else if (result.source === "coordinates" || result.source === "local-osm") {
       flyToRef.current?.(result.lat, result.lng, 14)
     } else {
@@ -173,90 +178,6 @@ export function UnifiedSearch({ flyToRef }: Props) {
     inputRef.current?.blur()
   }
 
-  const hasInstant = instantResults.length > 0
-  const hasNominatim = nominatimResults.length > 0
-
-  const dropdown = open && dropdownPos
-    ? createPortal(
-        <div
-          ref={dropdownRef}
-          role="listbox"
-          style={{ position: "fixed", top: dropdownPos.top, left: dropdownPos.left, width: dropdownPos.width }}
-          className="z-[9999] max-h-72 overflow-auto rounded-md border bg-background shadow-md"
-        >
-          {!hasInstant && !hasNominatim && !loading && query.trim() && (
-            <p className="px-3 py-4 text-center text-sm text-muted-foreground">
-              No results — press Enter to search online
-            </p>
-          )}
-
-          {instantResults.map((r, i) => {
-            const isEntity = r.source === "entity"
-            const isCoord = r.source === "coordinates"
-            const isOsm = r.source === "local-osm"
-            const key = isEntity ? `ent-${r.id}` : isCoord ? `coord-${r.lat}-${r.lng}` : `osm-${i}`
-            return (
-              <button
-                key={key}
-                type="button"
-                role="option"
-                aria-selected={false}
-                className={cn(
-                  "w-full px-3 py-2 text-left text-sm hover:bg-accent focus:bg-accent focus:outline-none",
-                  isEntity && "border-l-2 border-l-violet-500 bg-violet-500/5 hover:bg-violet-500/10",
-                  isCoord && "border-l-2 border-l-sky-500 bg-sky-500/5 hover:bg-sky-500/10",
-                  isOsm && "border-l-2 border-l-amber-500 bg-amber-500/5 hover:bg-amber-500/10",
-                )}
-                onMouseDown={(e) => e.preventDefault()}
-                onClick={() => handleSelect(r)}
-              >
-                <span className="line-clamp-1 font-medium">{isEntity ? r.name : r.display_name}</span>
-                <span className="mt-0.5 block text-xs text-muted-foreground">
-                  {isEntity ? "Entity" : isCoord ? "Coordinates" : (isOsm ? (r.detail ?? r.layerLabel) : "")}
-                </span>
-              </button>
-            )
-          })}
-
-          {hasInstant && hasNominatim && <div className="mx-3 my-1 border-t border-border" />}
-
-          {nominatimResults.map((r, i) => (
-            <button
-              key={`nom-${r.osm_type ?? ""}-${r.osm_id ?? i}`}
-              type="button"
-              role="option"
-              aria-selected={false}
-              className="w-full px-3 py-2 text-left text-sm hover:bg-accent focus:bg-accent focus:outline-none"
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => handleSelect(r)}
-            >
-              <span className="line-clamp-2">{r.display_name}</span>
-              {(r.type ?? r.class) && (
-                <span className="mt-0.5 block text-xs text-muted-foreground">
-                  {[r.type, r.class].filter(Boolean).join(" · ")}
-                </span>
-              )}
-            </button>
-          ))}
-
-          {loading && (
-            <p className={cn("px-3 py-2 text-xs text-muted-foreground", (hasInstant || hasNominatim) && "border-t")}>
-              {hasInstant || hasNominatim ? "Loading online results…" : "Searching…"}
-            </p>
-          )}
-
-          {error && <p className="border-t px-3 py-2 text-sm text-destructive">{error}</p>}
-
-          {hasInstant && !hasNominatim && !loading && (
-            <p className="border-t px-3 py-2 text-xs text-muted-foreground">
-              Press Enter to search online places
-            </p>
-          )}
-        </div>,
-        document.body,
-      )
-    : null
-
   return (
     <>
       <div className="flex w-full items-center gap-1">
@@ -266,7 +187,7 @@ export function UnifiedSearch({ flyToRef }: Props) {
           value={query}
           onChange={handleChange}
           onKeyDown={handleKeyDown}
-          placeholder="Search entities or places… (Ctrl+K)"
+          placeholder="Search entities, ids, notes or places… (Ctrl+K)"
           className="h-8 flex-1 text-xs"
           aria-label="Search entities or places"
           aria-expanded={open}
@@ -284,7 +205,20 @@ export function UnifiedSearch({ flyToRef }: Props) {
           <Search className="h-3.5 w-3.5 text-foreground" />
         </Button>
       </div>
-      {dropdown}
+      {open && dropdownPos && (
+        <UnifiedSearchDropdown
+          pos={dropdownPos}
+          query={query}
+          entityGroups={entityGroups}
+          coordinateHit={coordinateHit}
+          osmHits={osmHits}
+          nominatimResults={nominatimResults}
+          loading={loading}
+          error={error}
+          dropdownRef={dropdownRef}
+          onSelect={handleSelect}
+        />
+      )}
     </>
   )
 }

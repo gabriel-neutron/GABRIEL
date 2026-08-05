@@ -2161,3 +2161,47 @@ The push is no longer gated on anything in this repository.
 
 `.scan-names` stays in `.gitignore`. The scan is gone, but a leftover input file on any machine
 would still hold the exact strings that must not be committed, and the ignore costs nothing.
+
+---
+
+## Run 2026-08-05 — Stage 2, first slice: the instant index
+
+Not a `SLICE_BUILD_LOOP` run; a single directed slice, recorded here because it closes the
+"Search (Stage 2)" item the 2026-08-05 entry above lists as still owed. PRD stories 28 and 32.
+
+`src/core/search/` now holds the index (`searchIndex.ts`), the ranking (`searchQuery.ts`) and the
+coordinate-pair reader lifted out of the component (`coordinateQuery.ts`). `UnifiedSearch` is
+wiring over them; its dropdown moved to `UnifiedSearchDropdown.tsx` so both stay inside the line
+cap. 37 new tests, `npm run verify` green at 877 tests over 111 files.
+
+### A third dependency not taken
+
+No client-side search index library, though the PRD sanctions one. The corpus is 1,027 entities
+and their claims and sources; the expensive half of the work is normalisation, and doing that once
+per corpus instead of once per keystroke is the entire win — a token postings map would buy nothing
+back, because the substring tier has to scan every field regardless. What a library would have
+added is a supply-chain surface and a second, unowned answer to a ranking question this project has
+opinions about. If the corpus grows an order of magnitude, `searchIndex.ts` says where the change
+goes.
+
+### What the ranking says, and why it is not the old behaviour
+
+Strength (exact → prefix → word-prefix → substring) dominates field (name → external id → alias →
+claim → notes → source), and truncation happens after ranking rather than before. The defect being
+replaced was never the six-result limit: it was `.slice(0, 6)` throwing away better results the
+filter had already found. The test that pins it is `keeps a better result the old six-result cut
+would have thrown away`, and it was run against the old behaviour first and observed to fail.
+
+Every hit carries the field it matched and the text that matched, because a result an analyst
+cannot explain is a result they cannot trust. Cyrillic↔Latin folding is `core/identity`'s
+`normalizeForMatch`, reused rather than restated, so search and duplicate detection can never
+disagree about whether two spellings are the same name.
+
+### Known gaps, deliberately left
+
+- A `Source` no `Claim` cites is unreachable, because a Claim is the only thing tying a URL to an
+  entity. Indexing it would produce a row that resolves to nothing.
+- The PRD asks for Source *titles*; the `Source` shape has a URL and no title, so the URL is what
+  is indexed.
+- Deep scan over cached page text, the Claim-value pivot and the facetted table are later slices
+  and were not touched.
