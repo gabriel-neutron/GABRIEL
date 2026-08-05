@@ -2325,3 +2325,60 @@ test's per-field assertions do and what a hash comparison structurally cannot.
 - **No React-level test of the search wiring**, and the dropdown was never driven in a browser this
   session — the Playwright MCP server was unavailable. Two defects earlier today were found by
   driving the app and by nothing else, so this is the gap most likely to be hiding something.
+
+---
+
+## Run 2026-08-05 — §10 step 19 gets tooling, and the ceremony becomes runnable
+
+Phase A of the §10 handoff, and the only part of it an agent can do. Steps 17-28 remain the
+owner's: a native save picker, an overnight gap, and an irreversible public write.
+
+**The blocker.** Steps 6-7 define Hash A (the parent map) and Hash B (the *rendered* position map,
+the one that catches the 741 units whose position comes from the parent chain). Step 19 takes both
+again from `project-migrated-<date>.gpkg` and compares with zero tolerance. The hashing existed and
+was pinned — `hierarchy.fingerprint.test.ts` — but was **hardcoded to `public/project.gpkg`**, so
+step 19 was a hand-rolled sha256 to be written mid-ceremony, which is the worst moment to write
+code.
+
+**What landed.** The computation moved to `hierarchy.fingerprint.harness.ts` and the rendering and
+diffing to `hierarchy.fingerprint.report.ts`; the pinned test now drives the harness and reads
+`GABRIEL_FINGERPRINT_GPKG`, defaulting to `public/project.gpkg`. Unset, nothing about that test has
+changed and the three hashes still pin. Set, **every assertion in it becomes a step-19 criterion
+read against the migrated file** — same hashes, same code, zero tolerance. There is no second
+encoding to disagree with the first, which is the point of sharing the functions rather than
+copying them.
+
+`GABRIEL_FINGERPRINT_BASELINE` loads a second file and prints the per-entity diff. That is step
+19's *diagnosis*, not its verdict: a bare "DIFFER" leaves the analyst to count moved entities by
+hand, and the count is the whole diagnosis — at or below 741 says the derivation is broken rather
+than the coordinates edited, and the harness now says that sentence itself.
+
+**Proved, not assumed.** A copy of the real file fingerprints MATCH/MATCH/MATCH against its
+original. A copy with **one** `units.parent_id` re-pointed moves all three hashes, names the
+re-pointed entity and both ends of the move, and reports 3 moved positions — the unit and the two
+children that re-orbited with it — under the "broken parent derivation, ABORT" diagnosis. Both
+runs left `public/project.gpkg` md5 `10525d42466c2f38b5d6c0cb4a0964a5`, which still equals
+`git show be980a5:public/project.gpkg`.
+
+**A correction to §10 step 8, measured rather than assumed.** The harness reports an absent table
+and an empty one as different facts, because they are. `relationships`, `integrity_events`,
+`provenance_sources`, `provenance_claims` and `rating_events` are **all absent** from the file
+today — the handoff named three, and the true count is five; `save.ts` creates them on the first
+write. Step 22's "counts unchanged" therefore applies only to `geometries` (291) and `layers` (16).
+Their appearing is the expected outcome; what must hold is that they do not grow on a second save,
+which `project-gpkg-fixture.test.ts` already round-trips three times.
+
+**Read the file count, not the word "passed."** `npm run verify` green at **113 test files / 912
+tests / 0 failed** — 112→113 is the new `hierarchy.fingerprint.report.test.ts`, 898→912 is its 13
+pure diff/diagnosis tests plus one step-8 row-count assertion. `scan:nul` clean at 412.
+
+One trap worth carrying into the ceremony: **vitest 4's default reporter hides the console output
+of a test that passed**, which is exactly the run whose numbers you need to copy out. Use
+`--reporter=verbose`. The invocation is written at the top of the test file.
+
+### Still owed after this run
+
+- **§10 steps 17-28** — unchanged, and still the owner's. Phase A is now done, so the ceremony is
+  runnable; the two days it needs have not been spent.
+- Everything else listed under the previous run stands, including the search dropdown never having
+  been driven in a browser.

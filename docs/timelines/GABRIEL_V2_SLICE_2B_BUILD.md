@@ -917,6 +917,26 @@ preview, and unlike a screenshot they compare bit for bit.
    the only one that catches the 741.
 8. Row counts for `claims`, `sources`, `rating_events`, `geometries`, `layers`; file size in bytes.
 
+> **Corrected 2026-08-05 — steps 6-8 now have tooling, and step 8 asks for three tables that do
+> not exist.** `hierarchy.fingerprint.test.ts` takes all three hashes from a file named by
+> `GABRIEL_FINGERPRINT_GPKG` (default `public/project.gpkg`) and **prints** them with the step-8
+> row counts and the file size, read-only. Steps 6-8 are that one command:
+>
+> ```
+> npx vitest run --pool=threads --no-file-parallelism --reporter=verbose \
+>   src/core/persistence/geopackage/hierarchy.fingerprint.test.ts
+> ```
+>
+> `--reporter=verbose` is not optional — vitest 4's default reporter hides the console output of a
+> test that **passed**, which is exactly the run whose numbers you need.
+>
+> Step 8 names `claims`, `sources` and `rating_events`. **Five tables are absent from the file, not
+> three**: those, plus `relationships` and `integrity_events`. `save.ts` creates all five on the
+> first write, so record **"table absent"** — the true pre-write state — and read step 22's "counts
+> from step 8 unchanged" as applying only to `geometries` (291) and `layers` (16). The five
+> appearing is the expected outcome. What must hold instead is that they do **not grow on a second
+> save**, which `project-gpkg-fixture.test.ts` already round-trips three times.
+
 ### Dry run, in memory, nothing written
 
 9. Minted edges **1012**: `subordinate_to` **999**, `corporate_parent` **13**, no third type,
@@ -945,6 +965,24 @@ preview, and unlike a screenshot they compare bit for bit.
 19. **Hash A after reload equals Hash A before.** **Hash B after reload equals Hash B before**,
     with zero tolerance. If B differs, count the moved entities — a number at or below 741 says
     the derivation is broken, and that is the diagnosis on the spot.
+
+    > **Corrected 2026-08-05 — this no longer means writing a sha256 by hand.** Point the same
+    > test at the migrated file and every assertion in it becomes a step-19 criterion, taken by
+    > the same code that took the pre-write hashes, so there is no second encoding to disagree
+    > with the first:
+    >
+    > ```
+    > GABRIEL_FINGERPRINT_GPKG=project-migrated-<date>.gpkg \
+    > GABRIEL_FINGERPRINT_BASELINE=public/project.gpkg \
+    > npx vitest run --pool=threads --no-file-parallelism --reporter=verbose \
+    >   src/core/persistence/geopackage/hierarchy.fingerprint.test.ts
+    > ```
+    >
+    > The baseline is what makes this a diagnosis and not just a verdict: it prints the moved
+    > entities by id with both positions, the re-pointed parents with both ends, and the
+    > at-or-below-741 sentence itself. Verified against an injected fault — **one** re-pointed
+    > `units.parent_id` moves all three hashes and reports three moved positions, the unit and the
+    > two children that re-orbited with it.
 20. `units.parent_id` still non-null on **999** rows, organisations on **13**. The column is
     rewritten, not nulled.
 21. The 17 `organisations.notes` are byte-identical, `c.49.9%` and `95%` compared verbatim.

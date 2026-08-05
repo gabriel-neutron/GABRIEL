@@ -1,13 +1,17 @@
-import { createHash } from "node:crypto"
-import { readFileSync } from "node:fs"
 import { resolve } from "node:path"
 import { beforeAll, describe, expect, it } from "vitest"
-import { buildOrbat } from "@/core/entity/hierarchy"
-import { computeAllEntityPositions } from "@/core/map/geometry"
-import { hierarchyIndex, type HierarchyIndex } from "@/core/relationship/hierarchyIndex"
-import type { MapEntity } from "@/types/domain.types"
-import { loadGeoPackage } from "./index"
-import type { GeoPackageLoadResult } from "./types"
+import {
+  depthMap,
+  fingerprintDepths,
+  fingerprintParents,
+  fingerprintPositions,
+  fingerprintGeoPackageFile,
+  parentsFromField,
+  parentsFromIndex,
+  positionMap,
+  type FingerprintReport,
+} from "./hierarchy.fingerprint.harness"
+import { formatComparison, formatReport } from "./hierarchy.fingerprint.report"
 
 /**
  * The gate for the Slice 3 consumer rewrite, over the real 1,027-entity project.
@@ -19,6 +23,21 @@ import type { GeoPackageLoadResult } from "./types"
  * not evidence (ADR 0011). So this compares the whole mapping, BOTH WAYS, and pins three
  * fingerprints — two of them measured against the pre-Slice-3 code, which is where the force
  * of this gate actually comes from (see `parentsFromIndex`).
+ *
+ * It is ALSO §10 step 19. `GABRIEL_FINGERPRINT_GPKG` points the whole file at
+ * `project-migrated-<date>.gpkg` instead, and then every assertion below is a step-19 criterion
+ * read against the migrated file — the same three hashes, from the same code, with zero
+ * tolerance. Unset, it is `public/project.gpkg` and nothing about this test has changed.
+ * `GABRIEL_FINGERPRINT_BASELINE` additionally loads a second file and prints the per-entity
+ * diff, which is step 19's diagnosis rather than its verdict.
+ *
+ *   GABRIEL_FINGERPRINT_GPKG=project-migrated-2026-08-06.gpkg \
+ *   GABRIEL_FINGERPRINT_BASELINE=public/project.gpkg \
+ *   npx vitest run --pool=threads --no-file-parallelism --reporter=verbose \
+ *     src/core/persistence/geopackage/hierarchy.fingerprint.test.ts
+ *
+ * `--reporter=verbose` is not optional: vitest 4's default reporter hides the console output of
+ * a test that PASSED, which is precisely the run whose numbers you need to copy out.
  *
  * The file is read once with `readFileSync` and NEVER opened for writing. Everything after
  * that read is an in-memory buffer. `public/project.gpkg` is the analyst's irreplaceable
@@ -37,99 +56,37 @@ const HASH_B = "7e6570ef74b436336a76cd94965b7aca0f05bec2461cdbf945749bbcf49fac84
  */
 const HASH_C = "d55f6e4813541e1a3a2aebf65be515afd233c08e1883c34d8df01783a85083b7"
 
-/** Hash A: one `<id>\t<parentId>` line per parented entity, sorted by id, joined with "\n". */
-function fingerprintParents(parents: Map<string, string>): string {
-  const lines = [...parents].sort(byId).map(([id, parentId]) => id + "\t" + parentId)
-  return createHash("sha256").update(lines.join("\n")).digest("hex")
-}
+const TARGET = process.env.GABRIEL_FINGERPRINT_GPKG ?? "public/project.gpkg"
+const BASELINE = process.env.GABRIEL_FINGERPRINT_BASELINE
 
-/** Hash B: one `<id>\t<lat>,<lng>` line per rendered entity, nine decimals, sorted by id. */
-function fingerprintPositions(positions: Map<string, [number, number]>): string {
-  const lines = [...positions].sort(byId)
-    .map(([id, pos]) => id + "\t" + pos[0].toFixed(9) + "," + pos[1].toFixed(9))
-  return createHash("sha256").update(lines.join("\n")).digest("hex")
-}
+let report: FingerprintReport
 
-/** Hash C: one `<id>\t<depth>` line per entity, sorted by id. */
-function fingerprintDepths(depths: Map<string, number>): string {
-  const lines = [...depths].sort(byId).map(([id, depth]) => id + "\t" + String(depth))
-  return createHash("sha256").update(lines.join("\n")).digest("hex")
-}
-
-function byId(a: [string, unknown], b: [string, unknown]): number {
-  return a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0
-}
-
-/** The field's answer: what `withDerivedParents` wrote onto every entity. */
-function parentsFromField(entities: readonly MapEntity[]): Map<string, string> {
-  const parents = new Map<string, string>()
-  for (const e of entities) if (e.parentId != null) parents.set(e.id, e.parentId)
-  return parents
-}
-
-/**
- * The edge set's answer, read one entity at a time through `linkFor`, the interface the six
- * consumers use.
- *
- * Be clear about what comparing this to the field does and does not prove. `withDerivedParents`
- * is fed by `activeParentMap`, which is now a projection of this same index, so the two
- * readings share one builder and a fault inside it corrupts both identically — measured, by
- * injecting one. The comparison catches a consumer reading the wrong accessor; it does NOT
- * catch a wrong derivation. The pinned hashes do, because they were measured against the code
- * that came before.
- */
-function parentsFromIndex(entities: readonly MapEntity[], index: HierarchyIndex): Map<string, string> {
-  const parents = new Map<string, string>()
-  for (const e of entities) {
-    const link = index.linkFor(e.id)
-    if (link.state === "parent") parents.set(e.id, link.parentId)
-  }
-  return parents
-}
-
-function positionMap(
-  loaded: GeoPackageLoadResult,
-  index?: HierarchyIndex,
-): { rendered: Map<string, [number, number]>; unplacedByContest: string[] } {
-  const result = computeAllEntityPositions(loaded.entities, loaded.geometries, index)
-  return {
-    rendered: new Map(result.positioned.map((p) => [p.entity.id, [p.position[0], p.position[1]]])),
-    unplacedByContest: result.unplacedByContest,
-  }
-}
-
-/** id -> depth, over the whole entity set. The position map alone would miss a reshuffle among
- *  entities that carry their own geometry, since those are placed whatever their parent is. */
-function depthMap(entities: MapEntity[], index?: HierarchyIndex): Map<string, number> {
-  const orbat = buildOrbat(entities, index)
-  return new Map(entities.map((e) => [e.id, orbat.depthOf(e.id)]))
-}
-
-let loaded: GeoPackageLoadResult
-let index: HierarchyIndex
-
-describe("the hierarchy read two ways over public/project.gpkg (read-only)", () => {
+describe(`the hierarchy read two ways over ${TARGET} (read-only)`, () => {
   beforeAll(async () => {
-    // Copy into a fresh ArrayBuffer: Node pools small readFileSync results into a shared
-    // backing buffer, so `.buffer` alone can carry a nonzero byteOffset.
-    const buffer = Uint8Array.from(readFileSync(resolve(process.cwd(), "public/project.gpkg"))).buffer
-    loaded = await loadGeoPackage(buffer)
-    index = hierarchyIndex(loaded.relationships, { entities: loaded.entities })
-  }, 180_000)
+    report = await fingerprintGeoPackageFile(resolve(process.cwd(), TARGET))
+    // Printed, not merely asserted: step 19 compares VALUES taken from two files, and a test
+    // that only says "passed" leaves the analyst to hand-roll a sha256 mid-ceremony.
+    console.log(formatReport(report))
+    if (BASELINE !== undefined && BASELINE !== TARGET) {
+      const before = await fingerprintGeoPackageFile(resolve(process.cwd(), BASELINE))
+      console.log(formatComparison(before, report))
+    }
+  }, 300_000)
 
   it("derives the same parent for every entity through the field and through the index", () => {
-    const field = parentsFromField(loaded.entities)
-    const edges = parentsFromIndex(loaded.entities, index)
+    const field = parentsFromField(report.loaded.entities)
+    const edges = parentsFromIndex(report.loaded.entities, report.index)
 
     expect(field.size).toBe(1012)
     expect(edges).toEqual(field)
     expect(fingerprintParents(field)).toBe(HASH_A)
     expect(fingerprintParents(edges)).toBe(HASH_A)
+    expect(report.hashA).toBe(HASH_A)
   }, 60_000)
 
   it("renders every entity in the same place through the field and through the index", () => {
-    const field = positionMap(loaded)
-    const edges = positionMap(loaded, index)
+    const field = positionMap(report.loaded)
+    const edges = positionMap(report.loaded, report.index)
 
     // Pinned, not "> 0": two identical EMPTY maps deep-equal each other, so this count is what
     // stops the gate passing on a project that renders nothing. Measured: 1024 of 1027.
@@ -137,14 +94,16 @@ describe("the hierarchy read two ways over public/project.gpkg (read-only)", () 
     expect(edges.rendered).toEqual(field.rendered)
     expect(fingerprintPositions(field.rendered)).toBe(HASH_B)
     expect(fingerprintPositions(edges.rendered)).toBe(HASH_B)
+    expect(report.hashB).toBe(HASH_B)
   }, 60_000)
 
   it("puts every entity at the same depth through the field and through the index", () => {
-    const field = depthMap(loaded.entities)
-    const edges = depthMap(loaded.entities, index)
+    const field = depthMap(report.loaded.entities)
+    const edges = depthMap(report.loaded.entities, report.index)
     expect(edges).toEqual(field)
     expect(fingerprintDepths(field)).toBe(HASH_C)
     expect(fingerprintDepths(edges)).toBe(HASH_C)
+    expect(report.hashC).toBe(HASH_C)
     // Not all one number: a flattened tree would deep-equal itself both ways and pass the
     // equality above on any entity that carries its own geometry.
     expect(new Set(field.values()).size).toBeGreaterThan(3)
@@ -155,8 +114,21 @@ describe("the hierarchy read two ways over public/project.gpkg (read-only)", () 
     // disagree is exactly a contested child — the field says null, the index says which two
     // edges compete — and there are none here. If this ever fails, the three assertions above
     // are no longer expected to hold and the fingerprints must be re-measured, not forced.
-    expect(index.contested().size).toBe(0)
-    expect(positionMap(loaded, index).unplacedByContest).toEqual([])
-    expect(loaded.integrityEvents.filter((e) => e.kind === "multiple-active-hierarchy")).toEqual([])
+    expect(report.contestedCount).toBe(0)
+    expect(positionMap(report.loaded, report.index).unplacedByContest).toEqual([])
+    expect(report.loaded.integrityEvents.filter((e) => e.kind === "multiple-active-hierarchy")).toEqual([])
+  }, 60_000)
+
+  it("reports the step-8 row counts, distinguishing an empty table from an absent one", () => {
+    // §10 step 8 names `claims`, `sources` and `rating_events`, none of which exist in the
+    // pre-migration file — `save.ts` creates them on the first write. An absent table and an
+    // empty one are different pre-write facts, so the harness reports them differently and
+    // step 22 compares against the right one.
+    const byName = new Map(report.tables.map((t) => [t.table, t]))
+    expect(byName.get("geometries")?.count).toBe(291)
+    expect(byName.get("layers")?.count).toBe(16)
+    expect(byName.get("units")?.parented).toBe(999)
+    expect(byName.get("organisations")?.parented).toBe(13)
+    expect(report.fileSizeBytes).toBeGreaterThan(0)
   }, 60_000)
 })
