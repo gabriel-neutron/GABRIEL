@@ -2314,7 +2314,9 @@ test's per-field assertions do and what a hash comparison structurally cannot.
 ### Still owed after this run
 
 - **§10 steps 17-28** — the first write of the derived model. Unrun, and the owner's.
-- **The push.** No longer gated on anything in this repository: **ten commits unpushed.**
+- **The push.** No longer gated on anything in this repository: **15 commits unpushed** as at
+  `518f133` (this entry first said ten, counted by hand and wrong; measured with
+  `git log origin/telegram-osint-sidecar..HEAD`).
 - **Deep scan (story 31) and the Claim-value pivot (story 30)** — the rest of Stage 2. The PRD
   reads as though all three land together, so this is a real shortfall against the written plan,
   not merely a scope call.
