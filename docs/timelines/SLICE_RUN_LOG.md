@@ -2144,3 +2144,20 @@ it read-only over HTTP and saving is an explicit file-picker action nobody invok
   now; they are still bare.
 - **Provenance per edge** (Slice 6). Publication safety still rests on the export gate's endpoint
   proxy.
+
+---
+
+## Correction 2026-08-05 — the name scan is retired
+
+**Owner ruling: the all-history name scan is no longer required.** `scripts/scan-names.mjs` and the
+`npm run scan:names` script are removed.
+
+Every "Still owed after this run" list above that gates the push on it — the 2026-08-04 entries and
+both 2026-08-05 entries — is **superseded on that point only**. Those entries are left as written,
+because a run log records what was true at the time; this note is the correction, in keeping with
+the house rule that older documents carry dated corrections rather than being edited back.
+
+The push is no longer gated on anything in this repository.
+
+`.scan-names` stays in `.gitignore`. The scan is gone, but a leftover input file on any machine
+would still hold the exact strings that must not be committed, and the ignore costs nothing.
