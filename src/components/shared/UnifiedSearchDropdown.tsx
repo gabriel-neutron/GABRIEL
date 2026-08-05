@@ -1,51 +1,61 @@
+import { useEffect, useRef } from "react"
 import { createPortal } from "react-dom"
-import { explainHit, type SearchGroup, type SearchHit } from "@/core/search/searchQuery"
-import type { NominatimResult } from "@/modules/osm/services/nominatim.service"
-import type { LocalOsmSearchHit } from "@/modules/osm/services/osmLocalSearch"
 import { cn } from "@/lib/utils"
-
-export type EntityHit = { source: "entity"; hit: SearchHit }
-export type CoordinateHit = { source: "coordinates"; lat: number; lng: number; display_name: string }
-export type NominatimHit = NominatimResult & { source: "nominatim" }
-export type SearchResult = EntityHit | CoordinateHit | LocalOsmSearchHit | NominatimHit
-
-export type DropdownPos = { top: number; left: number; width: number }
+import {
+  ACTIVE_ROW_ID_PREFIX,
+  hasLocalRows,
+  type DropdownPos,
+  type ResultSection,
+  type RowAccent,
+  type SearchResult,
+} from "./searchResultSections"
 
 type Props = {
   pos: DropdownPos
   query: string
-  entityGroups: SearchGroup[]
-  coordinateHit: CoordinateHit | null
-  osmHits: LocalOsmSearchHit[]
-  nominatimResults: NominatimHit[]
+  sections: ResultSection[]
+  activeIndex: number
   loading: boolean
   error: string | null
   dropdownRef: React.RefObject<HTMLDivElement | null>
   onSelect: (result: SearchResult) => void
+  onHover: (index: number) => void
 }
 
 type RowProps = {
   title: string
   detail: string
-  accent: "entity" | "coordinates" | "osm" | null
+  accent: RowAccent
+  active: boolean
+  id: string
   onSelect: () => void
+  onHover: () => void
 }
 
-function ResultRow({ title, detail, accent, onSelect }: RowProps) {
+function ResultRow({ title, detail, accent, active, id, onSelect, onHover }: RowProps) {
+  const ref = useRef<HTMLButtonElement>(null)
+
+  useEffect(() => {
+    // Arrow keys can move the highlight past the fold of a `max-h-72` list, and a highlight the
+    // analyst cannot see is worse than none: they would be selecting a row off-screen.
+    if (active) ref.current?.scrollIntoView({ block: "nearest" })
+  }, [active])
+
   return (
     <button
+      ref={ref}
+      id={id}
       type="button"
       role="option"
-      aria-selected={false}
+      aria-selected={active}
       className={cn(
         "w-full px-3 py-2 text-left text-sm hover:bg-accent focus:bg-accent focus:outline-none",
         accent === "entity" && "border-l-2 border-l-violet-500 bg-violet-500/5 hover:bg-violet-500/10",
         accent === "coordinates" && "border-l-2 border-l-sky-500 bg-sky-500/5 hover:bg-sky-500/10",
         accent === "osm" && "border-l-2 border-l-amber-500 bg-amber-500/5 hover:bg-amber-500/10",
+        active && "bg-accent ring-1 ring-inset ring-ring",
       )}
-      // Preserving focus on the input is what keeps Escape and Enter working while the
-      // pointer is over the list.
-      onMouseDown={(e) => e.preventDefault()}
+      onMouseMove={onHover}
       onClick={onSelect}
     >
       <span className="line-clamp-1 font-medium">{title}</span>
@@ -62,109 +72,69 @@ function GroupHeading({ label }: { label: string }) {
   )
 }
 
-function entityRow(hit: SearchHit, onSelect: (result: SearchResult) => void) {
-  return (
-    <ResultRow
-      key={"ent-" + hit.entityId}
-      title={hit.entityName}
-      // The reason, not the kind: an analyst who cannot see *why* a row is in the list
-      // cannot tell a name match from a URL that merely mentions the word.
-      detail={explainHit(hit)}
-      accent="entity"
-      onSelect={() => onSelect({ source: "entity", hit })}
-    />
-  )
-}
-
 export function UnifiedSearchDropdown({
   pos,
   query,
-  entityGroups,
-  coordinateHit,
-  osmHits,
-  nominatimResults,
+  sections,
+  activeIndex,
   loading,
   error,
   dropdownRef,
   onSelect,
+  onHover,
 }: Props) {
-  const hasInstant = entityGroups.length > 0 || coordinateHit !== null || osmHits.length > 0
-  const hasNominatim = nominatimResults.length > 0
+  const local = hasLocalRows(sections)
+  const hasNominatim = sections.some((s) => s.key === "nominatim")
+  const hasAnyRow = sections.some((s) => s.rows.length > 0)
 
   return createPortal(
     <div
       ref={dropdownRef}
+      id="unified-search-listbox"
       role="listbox"
       style={{ position: "fixed", top: pos.top, left: pos.left, width: pos.width }}
       className="z-[9999] max-h-72 overflow-auto rounded-md border bg-background shadow-md"
+      // Keeping focus on the input is what keeps Escape, the arrow keys and Enter working while
+      // the pointer is over the list — and it is why `onBlur` closing the dropdown is safe: a
+      // blur now means focus genuinely left the search, not that a row was clicked.
+      onMouseDown={(e) => e.preventDefault()}
     >
-      {!hasInstant && !hasNominatim && !loading && query.trim() && (
+      {!hasAnyRow && !loading && query.trim() && (
         <p className="px-3 py-4 text-center text-sm text-muted-foreground">
           No results — press Enter to search online
         </p>
       )}
 
-      {entityGroups.map((group) => (
-        <div key={group.kind} role="group" aria-label={group.label}>
-          <GroupHeading label={group.label} />
-          {group.hits.map((hit) => entityRow(hit, onSelect))}
+      {sections.map((section) => (
+        <div key={section.key} role="group" aria-label={section.label}>
+          {section.key === "nominatim" && local && <div className="mx-3 my-1 border-t border-border" />}
+          <GroupHeading label={section.label} />
+          {section.rows.map((row, i) => (
+            <ResultRow
+              key={row.key}
+              id={ACTIVE_ROW_ID_PREFIX + String(section.startIndex + i)}
+              title={row.title}
+              detail={row.detail}
+              accent={row.accent}
+              active={section.startIndex + i === activeIndex}
+              onSelect={() => onSelect(row.result)}
+              onHover={() => onHover(section.startIndex + i)}
+            />
+          ))}
         </div>
       ))}
 
-      {coordinateHit && (
-        <div role="group" aria-label="Coordinates">
-          <GroupHeading label="Coordinates" />
-          <ResultRow
-            title={coordinateHit.display_name}
-            detail="Coordinates"
-            accent="coordinates"
-            onSelect={() => onSelect(coordinateHit)}
-          />
-        </div>
-      )}
-
-      {osmHits.length > 0 && (
-        <div role="group" aria-label="OSM features">
-          <GroupHeading label="OSM features" />
-          {osmHits.map((hit, i) => (
-            <ResultRow
-              key={"osm-" + String(i)}
-              title={hit.display_name}
-              detail={hit.detail ?? hit.layerLabel}
-              accent="osm"
-              onSelect={() => onSelect(hit)}
-            />
-          ))}
-        </div>
-      )}
-
-      {hasNominatim && (
-        <div role="group" aria-label="Online places">
-          {hasInstant && <div className="mx-3 my-1 border-t border-border" />}
-          <GroupHeading label="Online places" />
-          {nominatimResults.map((r, i) => (
-            <ResultRow
-              key={"nom-" + String(r.osm_type ?? "") + "-" + String(r.osm_id ?? i)}
-              title={r.display_name}
-              detail={[r.type, r.class].filter(Boolean).join(" · ")}
-              accent={null}
-              onSelect={() => onSelect(r)}
-            />
-          ))}
-        </div>
-      )}
-
       {loading && (
-        <p className={cn("px-3 py-2 text-xs text-muted-foreground", (hasInstant || hasNominatim) && "border-t")}>
-          {hasInstant || hasNominatim ? "Loading online results…" : "Searching…"}
+        <p className={cn("px-3 py-2 text-xs text-muted-foreground", hasAnyRow && "border-t")}>
+          {hasAnyRow ? "Loading online results…" : "Searching…"}
         </p>
       )}
 
       {error && <p className="border-t px-3 py-2 text-sm text-destructive">{error}</p>}
 
-      {hasInstant && !hasNominatim && !loading && (
+      {local && !hasNominatim && !loading && (
         <p className="border-t px-3 py-2 text-xs text-muted-foreground">
-          Press Enter to search online places
+          Enter opens the highlighted result — use the button to search online places
         </p>
       )}
     </div>,

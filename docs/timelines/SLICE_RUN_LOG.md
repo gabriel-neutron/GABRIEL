@@ -2450,3 +2450,80 @@ missing.
 - **§10 steps 17-28** — unchanged, and still the owner's: a native save picker, an overnight gap,
   and an irreversible public write.
 - Everything else listed under the previous two runs stands.
+
+---
+
+## Run 2026-08-05 — the search dropdown is driven in a browser, and it was mouse-only
+
+The previous run closed by naming the gap: the instant search shipped without ever being driven in
+a browser, "the most likely place something is still hiding". The Playwright MCP server was
+available this session. It was hiding five things.
+
+**The instant index had no keyboard path to any result.** Two defects that are really one. The
+arrow keys did nothing — `handleKeyDown` handled `Escape` and `Enter` and nothing else, there was
+no active-row state, and every row hardcoded `aria-selected={false}`. And Enter did not select:
+it ran the Nominatim geocode. Typing `Rostec`, with **Rostec State Corporation** sitting at row 0
+as an exact name match, and pressing Enter returned a technical college in Pretoria and a
+restaurant in Lombardy. Nothing was selected. The only way to open a result was the mouse.
+
+That is also the shape of a leak. The query an analyst types into a local-first tool is project
+content — an entity name out of the corpus — and it went to `nominatim.openstreetmap.org` on a
+keystroke every convention in every other search box says means "open the thing I am looking at".
+Reaching the network is now something the query has to earn: **Enter takes the highlighted row,
+else the top row, and goes online only when the query matched nothing on the device** (owner's
+ruling). Verified in the browser in both directions — `Motovilikha` opens PJSC Motovilikha Plants
+under NPK Techmash JSC, and `Trafalgar Square`, which matches nothing locally, still reaches
+Nominatim and returns eight places.
+
+**Ctrl+K, promised in the search box's own placeholder, opened the command palette.** Two global
+listeners, one on `document` and one on `window`, both calling `preventDefault`; the palette's
+focus trap won every time. ADR 0007 assigns Ctrl/Cmd+K to the palette, so the placeholder was the
+newcomer and the promise is what went. **The search now has no shortcut** — giving it one is a new
+decision, not a bug fix, and is left to the owner.
+
+**Tab left the dropdown open behind the focus.** There was no `onBlur` at all; closing rested
+entirely on a `document` mousedown listener. Closing on blur is only safe because the dropdown
+preventDefaults its own mousedown, so a click on a row never blurs the input — the two have to
+land together, and did.
+
+**The input collapsed to 29px at a 900px viewport**, showing one character of the query — an
+ordinary half-screen split on a 1920 display. The first fix was wrong and the browser said so: a
+`min-w-56` floor stopped the collapse and put the input **underneath three toolbar buttons**
+instead. The header row is a fixed 56px with a `shrink-0` toolbar, so the primary slot is the only
+thing that can give, and no min-width fixes that — it only changes which way it breaks. The slot's
+existing `hidden sm:block` idiom moved to `lg`: below 1024px the search is absent rather than
+present and unusable. Measured after: 0px and hidden at 900, 308px and no overlap at 1280.
+
+### What the browser could not be made to show
+
+Three candidates from the static read did **not** reproduce, and are recorded as not-found rather
+than fixed: the never-recomputed dropdown position never detached (the header is fixed, so the
+input's left edge does not move); the Radix dialog's `pointer-events` never blocked the dropdown;
+`flyToRef` was never null on the paths driven. The code smells remain.
+
+### Where the assertions went, given there is no jsdom
+
+`vitest.config.ts` runs `environment: "node"` and there is no jsdom and no testing-library — a
+standing decision, and the reason the wiring had no test to begin with. So the decisions moved out
+of the component instead of a renderer being bolted on: `core/search/searchNavigation.ts` holds
+what the arrow keys and Enter do, and `searchResultSections.ts` holds the row order. The second
+one matters more than it looks. The dropdown paints from `resultSections` and the container
+flattens the same value to index the highlight, so `startIndex` is asserted to address the same
+row in both — two independent orderings would agree exactly until someone added a section, and
+then ArrowDown would highlight one entity while Enter opened another.
+
+`npm run verify` green at **115 test files / 939 tests / 0 failed**, read as a file count;
+`scan:nul` clean at 416. `public/project.gpkg` untouched at md5 `10525d42…`; the search path is
+read-only and the ceremony is unaffected.
+
+### Still owed after this run
+
+- **§10 pre-flight step 4 and steps 17-28** — unchanged, and still the owner's.
+- **A keyboard shortcut for the search box**, if it wants one. Ctrl+K is spoken for.
+- **Story 29's grouping** (Entity/Claim/Source, not entity kind) — untouched this run.
+- **Stories 30 and 31 are data-starved**, which the PRD's "three tiers, all in the first delivery"
+  does not anticipate: `createFieldClaim` has no production caller, so every Claim carries
+  `value: null` and the pivot would return nothing; `research_sources` is 0 rows, so deep scan has
+  nothing to scan. Both are buildable on fixtures today and neither is demonstrable against the
+  real file. Deep scan also makes the fetch cache a first-class searchable surface while that
+  cache is under a standing must-not-publish rule — it needs an export-gate policy first.

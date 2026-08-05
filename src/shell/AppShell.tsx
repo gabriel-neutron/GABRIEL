@@ -193,7 +193,12 @@ export function AppShell({
             </Tabs>
           </div>
 
-          <div className="hidden min-w-0 flex-1 sm:block">{headerPrimarySlot}</div>
+          {/* `lg`, not `sm`. This row is a fixed 56px with a shrink-0 toolbar on the right, so the
+              primary slot is the only thing that can give — and it gives all the way: measured in
+              a browser at a 900px viewport, the search input inside it collapsed to 29px, showing
+              one character of the analyst's query. A min-width does not help, it just overlaps the
+              toolbar. Below `lg` the slot is absent rather than present and unusable. */}
+          <div className="hidden min-w-0 flex-1 lg:block">{headerPrimarySlot}</div>
 
           <div className="hidden shrink-0 items-center gap-2 sm:flex">
             {headerSecondarySlot}

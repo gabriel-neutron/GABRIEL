@@ -7,17 +7,21 @@ import { selectEntity } from "@/core/map/selection"
 import { parseCoordinateQuery } from "@/core/search/coordinateQuery"
 import { buildSearchIndex } from "@/core/search/searchIndex"
 import { groupHitsByKind, searchEntities } from "@/core/search/searchQuery"
+import { enterAction, nextActiveRow, NO_ACTIVE_ROW } from "@/core/search/searchNavigation"
 import { Input } from "@/ui/input"
 import { Button } from "@/ui/button"
 import { searchPlace } from "@/modules/osm/services/nominatim.service"
 import { searchLocalOsmFeatures } from "@/modules/osm/services/osmLocalSearch"
+import { UnifiedSearchDropdown } from "./UnifiedSearchDropdown"
 import {
-  UnifiedSearchDropdown,
+  ACTIVE_ROW_ID_PREFIX,
+  flattenSections,
+  resultSections,
   type CoordinateHit,
   type DropdownPos,
   type NominatimHit,
   type SearchResult,
-} from "./UnifiedSearchDropdown"
+} from "./searchResultSections"
 
 export type FlyToFn = (lat: number, lng: number, zoom?: number) => void
 
@@ -43,6 +47,7 @@ export function UnifiedSearch({ flyToRef }: Props) {
   const [nominatimResults, setNominatimResults] = useState<NominatimHit[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [activeIndex, setActiveIndex] = useState(NO_ACTIVE_ROW)
 
   const inputRef = useRef<HTMLInputElement>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
@@ -85,17 +90,17 @@ export function UnifiedSearch({ flyToRef }: Props) {
     [query, layers, entityOsmGeometries, entityNameById],
   )
 
+  const sections = useMemo(
+    () => resultSections({ entityGroups, coordinateHit, osmHits, nominatimResults }),
+    [entityGroups, coordinateHit, osmHits, nominatimResults],
+  )
+  const rows = useMemo(() => flattenSections(sections), [sections])
+
+  // The rows are rebuilt on every keystroke, so a highlight held across that rebuild would sit on
+  // a different entity than the one the analyst was looking at when they pressed the key.
   useEffect(() => {
-    function onGlobalKey(e: KeyboardEvent) {
-      if ((e.ctrlKey || e.metaKey) && e.key === "k") {
-        e.preventDefault()
-        inputRef.current?.focus()
-        inputRef.current?.select()
-      }
-    }
-    document.addEventListener("keydown", onGlobalKey)
-    return () => document.removeEventListener("keydown", onGlobalKey)
-  }, [])
+    setActiveIndex(NO_ACTIVE_ROW)
+  }, [rows])
 
   useEffect(() => {
     function onOutsideClick(e: MouseEvent) {
@@ -156,9 +161,25 @@ export function UnifiedSearch({ flyToRef }: Props) {
       setOpen(false)
       setNominatimResults([])
       setError(null)
+      setActiveIndex(NO_ACTIVE_ROW)
       inputRef.current?.blur()
-    } else if (e.key === "Enter") {
-      void triggerNominatim()
+      return
+    }
+    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      if (!open || rows.length === 0) return
+      // Without this the caret jumps to either end of the query while the highlight moves.
+      e.preventDefault()
+      setActiveIndex((current) => nextActiveRow(current, e.key === "ArrowDown" ? 1 : -1, rows.length))
+      return
+    }
+    if (e.key === "Enter") {
+      const action = enterAction(activeIndex, rows.length)
+      if (action.kind === "online") {
+        void triggerNominatim()
+        return
+      }
+      const row = rows[action.index]
+      if (row) handleSelect(row.result)
     }
   }
 
@@ -175,6 +196,7 @@ export function UnifiedSearch({ flyToRef }: Props) {
     setQuery("")
     setOpen(false)
     setNominatimResults([])
+    setActiveIndex(NO_ACTIVE_ROW)
     inputRef.current?.blur()
   }
 
@@ -187,11 +209,22 @@ export function UnifiedSearch({ flyToRef }: Props) {
           value={query}
           onChange={handleChange}
           onKeyDown={handleKeyDown}
-          placeholder="Search entities, ids, notes or places… (Ctrl+K)"
-          className="h-8 flex-1 text-xs"
+          // Closing on blur is safe because the dropdown preventDefaults its own mousedown, so a
+          // click on a row never blurs the input. A blur therefore means focus genuinely left.
+          onBlur={() => setOpen(false)}
+          // Ctrl+K belongs to the command palette (ADR 0007). This placeholder used to promise it
+          // here too, and the palette's focus trap won every time — a documented shortcut and a
+          // written promise cannot both be honoured, so the promise goes.
+          placeholder="Search entities, ids, notes or places…"
+          className="h-8 min-w-0 flex-1 text-xs"
+          role="combobox"
           aria-label="Search entities or places"
           aria-expanded={open}
-          aria-haspopup="listbox"
+          aria-controls="unified-search-listbox"
+          aria-autocomplete="list"
+          aria-activedescendant={
+            open && activeIndex >= 0 ? ACTIVE_ROW_ID_PREFIX + String(activeIndex) : undefined
+          }
         />
         <Button
           type="button"
@@ -200,7 +233,7 @@ export function UnifiedSearch({ flyToRef }: Props) {
           className="h-8 w-8 shrink-0 border-input"
           onClick={() => void triggerNominatim()}
           disabled={loading || !query.trim()}
-          title="Search online places (Enter)"
+          title="Search online places"
         >
           <Search className="h-3.5 w-3.5 text-foreground" />
         </Button>
@@ -209,14 +242,13 @@ export function UnifiedSearch({ flyToRef }: Props) {
         <UnifiedSearchDropdown
           pos={dropdownPos}
           query={query}
-          entityGroups={entityGroups}
-          coordinateHit={coordinateHit}
-          osmHits={osmHits}
-          nominatimResults={nominatimResults}
+          sections={sections}
+          activeIndex={activeIndex}
           loading={loading}
           error={error}
           dropdownRef={dropdownRef}
           onSelect={handleSelect}
+          onHover={setActiveIndex}
         />
       )}
     </>
