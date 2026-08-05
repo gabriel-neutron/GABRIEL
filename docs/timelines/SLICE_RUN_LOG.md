@@ -2031,3 +2031,116 @@ otherwise.
   still accepts a `parentId` patch, and no UI resolves a contest — the last stays deliberate.
 - **Provenance per edge** (Slice 6), which the owner ruled out of this run rather than deferred by
   accident. Publication safety still rests on the export gate's endpoint proxy.
+
+---
+
+## Run 2026-08-05 — the three bare kinds become creatable, and the backbone becomes visible
+
+Owner ruled the two questions the previous handoff left open, both before any code: build **(b)
+the entity graph view** of the three-way fork, and **add person/vessel/equipment_class to the
+entity-creation path** rather than telling the demo's story corporate-only.
+
+Two commits, `75af6e9` and `177db70`. Their bodies carry the rationale; this records the run.
+
+### The blocker was larger than "add three buttons"
+
+The previous handoff named the gap correctly — nothing minted a `person`, so `owned_by` had no
+valid target and the split from `corporate_parent` was untestable from the UI. What it could not
+see is that three other things had to close before a created person was of any use.
+
+**A saved person could make the file unopenable.** `load.ts` validated a stored `parent_id`
+against `kind === "corporate" ? corporateIds : unitIds`. That ternary reads as exhaustive and is
+not: all three bare profiles fell through to the UNIT id set, so a person legitimately parented to
+a person resolved against ids that could not contain it and the next load threw "entity references
+missing parent". It now builds an id set per kind. This is precisely the failure mode
+`decodeEntityKind` documents one file over — a narrower answer that keeps typechecking after the
+union widens — and it had been latent since Slice 1, invisible only because nothing could create
+the kinds that trip it. Proved red against a two-person fixture.
+
+**A created person appeared nowhere.** No map layer drew it (`OrganisationsLayer` filtered to
+`corporate`), no panel listed it, and `detailRenderer` registered two kinds — so it could be
+created and then never selected again, and selection is the only route to the relationship editor.
+The layer now draws every non-unit kind, keyed on each entity's own layer rather than the fixed
+industry layer a vessel is not on, and both the renderer map and the geometry menu are built from
+`ENTITY_KINDS` so a sixth profile cannot ship unreachable the way three did.
+
+**The inspector offered a person an echelon.** `EntityInspector` branched on `isCorporate`, so
+everything not corporate got the military field set — echelon, affiliation, battle dimension —
+fields ADR 0010 withheld until Slice 5 and which `Entity`'s D1-loose shape would have let an
+analyst fill in.
+
+One change was not required by the ruling and is defended in the commit: the creation path mints
+the parent edge only when the kinds match. A cross-kind hierarchy edge derives no parent and, once
+persisted, is what `load.ts` calls corrupt. It was harmless while the only pair was unit/corporate
+and the selection was almost always same-kind; with five kinds on the menu it would be the norm.
+
+### The graph view, and the one thing that makes it readable
+
+The projection is pure and decides three things — colour, size, position — and defers everything
+else. Hierarchy comes from `hierarchyIndex`, tier and layer from the vocabulary, the type's prose
+from `edgeForm`. Edges colour by vocabulary *layer*, not by type: six layers are distinguishable at
+a glance where thirteen types are not, with a seventh colour for the assessment tier, whose types
+declare `layer: null` and which is the class a reader most needs told apart.
+
+The layout is the part that matters. The only coordinates in this repo were `Math.random()`, which
+is not a layout — it is noise that changes every render, and adjacency read off it is read off
+nothing. 999 of the 1,012 edges are `subordinate_to` minted from the legacy `parent_id` column, so
+the corpus is overwhelmingly a tree, and a tree on concentric rings is legible at a thousand nodes
+where a force simulation is a blob. Wedges are allotted by leaf count, or a 900-unit army and a
+lone battalion would get the same slice. No new dependency was taken for this.
+
+**The layout is computed over the whole hierarchy, never over the filtered edge set.** Deriving it
+from the filtered set would re-root all 1,027 entities the moment `subordinate_to` was deselected
+and rearrange the canvas, so an analyst comparing two filters would be comparing two pictures
+rather than two states of one. This is asserted in a test, because it is the kind of property that
+is easy to break while everything still renders.
+
+The cycle test earned its place the hard way: the first layout hung on one, and
+`validateRelationships` reports cycles rather than forbidding them, so nobody has proved this
+corpus acyclic. A view that hangs on a cycle takes the app down with it.
+
+### Two defects found by driving the app, by nothing else
+
+Trap 5 from the previous handoff held: Radix `Select` still refuses a programmatic click and needs
+the MCP click tool. Both defects below were invisible to 840 passing tests.
+
+1. **The control bar's third row laid out underneath the Sigma canvas.** With the detail panel
+   open, the wrapping flex row resolved a height for two rows and wrapped to three; "Hide
+   unconnected" and "Reset" sat at y=112 in a box ending at y=111.96, and `elementFromPoint`
+   returned the canvas. Every click on them went to the graph. Diagnosed by measuring the box
+   against `scrollHeight` (62 vs 83) rather than guessed at; fixed with a block wrapper around the
+   flex row, plus `z-10` so the bar wins any overlap that remains.
+2. **A bare profile on an echelon layer got no layer picker.** That suppression exists because a
+   unit's layer follows its echelon. A person has no echelon, so it stranded them on Team/Crew — a
+   military rank — with no way off.
+
+### Driven against the real project
+
+Dev server, the real 1,027-entity project. **`public/project.gpkg` was not written**: the app loads
+it read-only over HTTP and saving is an explicit file-picker action nobody invoked.
+
+- The Network view drew 1027 of 1027 entities and 1012 edges, rings by hierarchy depth, the
+  corporate cluster and its financial edges visible as chords against the military tree.
+- Deselecting `subordinate to` with "Hide unconnected" left **14 of 1027 entities and 13 edges** —
+  the industry hierarchy alone, Rostec at the hub, edge labels legible. Node positions did not
+  move, which is the property above, observed.
+- Clicking a node opened the inspector with its relationships listed: the loop this view exists to
+  close is one click.
+- The geometry menu offered all five kinds. A person was created, rendered with Name, Notes,
+  Sources, Layer, Parent, Position and the relationship editor — and no echelon, affiliation,
+  domain, military unit ID or OSM relation.
+- **The payoff, end to end**: `owned_by` selected on Rostec reads "Target — owning person" and
+  ranks the new person **first of 1,027** candidates. Before this run that list had no person in
+  it, at any position.
+
+### Still owed after this run
+
+- **§10 steps 17-28** — the first write of the derived model. Still unrun, still the owner's, and
+  still what stands between an authored edge and surviving a reload.
+- **The push**, still gated on `npm run scan:names` with the real names. **Seven commits unpushed.**
+- **Search (Stage 2)** — the remaining item of the three-way fork, and now sharper: the target
+  picker that ranks a person first still ranks it first of 1,027 in a flat list.
+- **Slice 5** gives vessel, person and equipment_class their real field sets. They are creatable
+  now; they are still bare.
+- **Provenance per edge** (Slice 6). Publication safety still rests on the export gate's endpoint
+  proxy.

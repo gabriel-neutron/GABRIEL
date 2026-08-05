@@ -42,6 +42,10 @@ Relationship editor shipped that day (`src/modules/orbat/ui/RelationshipSection.
 `core/relationship/authoring.ts`), so all thirteen types are now reachable from the entity
 inspector, with per-type metadata, end-dating, and refusal in the validator's own words.
 
+**Amended again 2026-08-05.** The Network view shipped the same day, so a recorded backbone can now
+be *seen* as a structure rather than only listed one entity at a time — which is a different claim
+from being able to record one, and was the gap between item 1 and item 2 below.
+
 The PRD's central sentence — *"I can catalogue the nodes of the backbone; I cannot record the
 backbone"* — is no longer true of the interface. It remains true of the **file**: `project.gpkg`
 has no `relationships` table, its 1,012 edges are still 999 `subordinate_to` plus 13
@@ -57,12 +61,25 @@ because a demo needs one recorded chain rather than a complete capability:
    `validateRelationships` enforces them, the index derives from the result and the export gate
    publishes it. What is left of this item is the **first write of the derived model**, without
    which the twenty-edge chain does not survive a reload.
-2. **The entity graph view.** The Sigma/WebGL stack is built and perf-proven but wired to the
-   sidecar's *channel* graph; `TelegramGraphView` already accepts a `SigmaGraphData` prop, so this
-   is an adapter plus edge-type and tier filters. Highest visual payoff per hour.
+2. ~~**The entity graph view.**~~ **Shipped 2026-08-05** as the "Network" view
+   (`src/modules/orbat/ui/EntityGraphView.tsx`, over the pure `core/graph/`). Entities and
+   relationships projected to a Sigma canvas, edges coloured by vocabulary layer, filtered by
+   type and tier, with a radial layout derived from the hierarchy — computed over the *whole*
+   edge set, so filtering changes which chords are drawn and never where the nodes sit. The
+   canvas is now shared with the Telegram channel graph.
 3. **Search (Stage 2).** Still `name.toLowerCase().includes(q)` in `UnifiedSearch.tsx:69` — the
    "six results" failure the PRD calls the most humiliating in the project. Partly needed by (1)
-   anyway, since authoring an edge means finding both endpoints.
+   anyway, since authoring an edge means finding both endpoints, and now the sharpest item left:
+   the relationship target picker is a flat list of 1,027 entities.
+
+**Also 2026-08-05, by owner ruling:** `person`, `vessel` and `equipment_class` became creatable,
+visible and selectable. They had been declared as edge endpoints since Slice 1 — `owned_by` takes
+a person, `fields` an equipment class — while nothing in the interface could mint one, so the
+`owned_by` / `corporate_parent` split that keeps a natural person's ownership out of the CC-BY
+dataset was untestable from the UI. They remain **bare profiles** (ADR 0010): the discriminant, a
+name and a layer, with their real field sets still deferred to Slice 5. Closing this also closed a
+latent fault in `load.ts`, which validated a stored `parent_id` for all three kinds against the
+*unit* id set and would have called a file holding a parented person corrupt.
 
 Collaboration and continuity (§12 — baton pass, private repo backup) is a **protocol, not a
 stage**: it starts before Stage 1 and runs forever. See [Standing obligations](#standing-obligations).
